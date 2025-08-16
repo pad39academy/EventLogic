@@ -36,11 +36,12 @@ export default function UploadModal({
       setUploadType(propsUploadType);
     }
   }, [propsUploadType]);
-  const [options, setOptions] = useState({
+  // Mandatory validation options (not user-selectable)
+  const mandatoryOptions = {
     validateHotelIds: true,
     enforceMinimumStay: true,
-    skipDuplicates: false,
-  });
+    skipDuplicates: true,
+  };
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
@@ -134,11 +135,6 @@ export default function UploadModal({
     setUploadProgress(0);
     setUploadResult(null);
     onUploadTypeChange?.("");
-    setOptions({
-      validateHotelIds: true,
-      enforceMinimumStay: true,
-      skipDuplicates: false,
-    });
     onOpenChange(false);
   };
 
@@ -218,51 +214,40 @@ export default function UploadModal({
             </div>
           )}
 
-          {/* Validation Options */}
-          <div className="space-y-3">
-            <Label>Validation Options</Label>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="validate-hotel-ids"
-                  checked={options.validateHotelIds}
-                  onCheckedChange={(checked) =>
-                    setOptions({ ...options, validateHotelIds: checked as boolean })
-                  }
-                  data-testid="checkbox-validate-hotel-ids"
-                />
-                <Label htmlFor="validate-hotel-ids" className="text-sm">
-                  Validate hotel ID references
-                </Label>
+          {/* Hotel Inventory Format Guide */}
+          {uploadType === "hotel_inventory" && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">Required Format (14 columns)</h4>
+                <div className="text-xs text-blue-800 font-mono bg-blue-100 p-2 rounded">
+                  hotelId|instanceCode|hotelName|location|district|address|pincode|pointOfContact|contactPhoneNumber|startDate|endDate|totalRooms|occupiedRooms|availableRooms
+                </div>
+                <div className="mt-3 space-y-1 text-sm text-blue-700">
+                  <div className="font-medium">New Required Fields:</div>
+                  <div>• <strong>pointOfContact</strong> - Hotel staff contact person name</div>
+                  <div>• <strong>contactPhoneNumber</strong> - Hotel staff phone number</div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="enforce-minimum-stay"
-                  checked={options.enforceMinimumStay}
-                  onCheckedChange={(checked) =>
-                    setOptions({ ...options, enforceMinimumStay: checked as boolean })
-                  }
-                  data-testid="checkbox-enforce-minimum-stay"
-                />
-                <Label htmlFor="enforce-minimum-stay" className="text-sm">
-                  Enforce minimum 3-day stay
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="skip-duplicates"
-                  checked={options.skipDuplicates}
-                  onCheckedChange={(checked) =>
-                    setOptions({ ...options, skipDuplicates: checked as boolean })
-                  }
-                  data-testid="checkbox-skip-duplicates"
-                />
-                <Label htmlFor="skip-duplicates" className="text-sm">
-                  Skip duplicate detection
-                </Label>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-amber-900 mb-2">Mandatory Validations</h4>
+                <div className="space-y-1 text-sm text-amber-800">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
+                    <span>Hotel ID reference validation (prevent overlapping dates)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
+                    <span>Minimum 3-day stay enforcement (booking requirement)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
+                    <span>Duplicate detection (skip existing hotel+instance combinations)</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Progress Bar */}
           {uploadMutation.isPending && (

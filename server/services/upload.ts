@@ -31,9 +31,9 @@ export class UploadService {
       
       // Validate headers
       const expectedHeaders = [
-        'HotelID', 'InstanceCode', 'HotelName', 'Location', 'District',
-        'Address', 'Pincode', 'StartDate', 'EndDate', 'TotalRooms',
-        'OccupiedRooms', 'AvailableRooms'
+        'hotelId', 'instanceCode', 'hotelName', 'location', 'district',
+        'address', 'pincode', 'pointOfContact', 'contactPhoneNumber',
+        'startDate', 'endDate', 'totalRooms', 'occupiedRooms', 'availableRooms'
       ];
 
       const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
@@ -58,54 +58,89 @@ export class UploadService {
 
         try {
           // Validate required fields
-          if (!hotelData.HotelID || !hotelData.InstanceCode) {
-            result.errors.push(`Row ${i + 1}: Missing HotelID or InstanceCode`);
+          if (!hotelData.hotelId || !hotelData.instanceCode) {
+            result.errors.push(`Row ${i + 1}: Missing hotelId or instanceCode`);
             continue;
           }
 
-          // Check for overlapping dates
-          const startDate = new Date(hotelData.StartDate);
-          const endDate = new Date(hotelData.EndDate);
+          // Validate dates
+          const startDate = new Date(hotelData.startDate);
+          const endDate = new Date(hotelData.endDate);
           
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            result.errors.push(`Row ${i + 1}: Invalid date format`);
+            continue;
+          }
+
+          if (endDate <= startDate) {
+            result.errors.push(`Row ${i + 1}: End date must be after start date`);
+            continue;
+          }
+
+          // Mandatory: Enforce minimum 3-day stay (only for booking data)
+          const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff < 3) {
+            result.errors.push(`Row ${i + 1}: Minimum 3-day stay required. Current duration: ${daysDiff} days`);
+            continue;
+          }
+
+          // Mandatory: Validate hotel ID references - check for overlapping dates
           const overlapping = await storage.getHotelsWithOverlappingDates(
-            hotelData.HotelID,
+            hotelData.hotelId,
             startDate,
             endDate
           );
 
           if (overlapping.length > 0) {
             result.errors.push(
-              `Row ${i + 1}: Hotel ${hotelData.HotelID} has overlapping dates with existing records`
+              `Row ${i + 1}: Hotel ${hotelData.hotelId} has overlapping dates with existing records`
             );
             continue;
           }
 
-          // Check for existing hotel with same ID and instance
+          // Mandatory: Skip duplicate detection - check for existing hotel with same ID and instance
           const existing = await storage.getHotelByHotelIdAndInstance(
-            hotelData.HotelID,
-            hotelData.InstanceCode
+            hotelData.hotelId,
+            hotelData.instanceCode
           );
 
           if (existing) {
             result.warnings.push(
-              `Row ${i + 1}: Hotel ${hotelData.HotelID} with instance ${hotelData.InstanceCode} already exists`
+              `Row ${i + 1}: Hotel ${hotelData.hotelId} with instance ${hotelData.instanceCode} already exists`
             );
             continue;
           }
 
+          // Validate room numbers
+          const totalRooms = parseInt(hotelData.totalRooms);
+          const occupiedRooms = parseInt(hotelData.occupiedRooms) || 0;
+          const availableRooms = parseInt(hotelData.availableRooms);
+
+          if (isNaN(totalRooms) || isNaN(availableRooms) || totalRooms <= 0 || availableRooms < 0) {
+            result.errors.push(`Row ${i + 1}: Invalid room numbers`);
+            continue;
+          }
+
+          if (occupiedRooms + availableRooms !== totalRooms) {
+            result.errors.push(`Row ${i + 1}: Room count mismatch. Occupied (${occupiedRooms}) + Available (${availableRooms}) ≠ Total (${totalRooms})`);
+            continue;
+          }
+
           const insertHotel: InsertHotel = {
-            hotelId: hotelData.HotelID,
-            instanceCode: hotelData.InstanceCode,
-            hotelName: hotelData.HotelName,
-            location: hotelData.Location,
-            district: hotelData.District,
-            address: hotelData.Address,
-            pincode: hotelData.Pincode,
+            hotelId: hotelData.hotelId,
+            instanceCode: hotelData.instanceCode,
+            hotelName: hotelData.hotelName,
+            location: hotelData.location,
+            district: hotelData.district,
+            address: hotelData.address,
+            pincode: hotelData.pincode,
+            pointOfContact: hotelData.pointOfContact || '',
+            contactPhoneNumber: hotelData.contactPhoneNumber || '',
             startDate,
             endDate,
-            totalRooms: parseInt(hotelData.TotalRooms),
-            occupiedRooms: parseInt(hotelData.OccupiedRooms),
-            availableRooms: parseInt(hotelData.AvailableRooms),
+            totalRooms,
+            occupiedRooms,
+            availableRooms,
           };
 
           await storage.createHotel(insertHotel);
