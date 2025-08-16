@@ -149,7 +149,7 @@ export default function UploadModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-full" data-testid="upload-modal">
+      <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto" data-testid="upload-modal">
         <DialogHeader>
           <DialogTitle>Upload Data Sheet</DialogTitle>
         </DialogHeader>
@@ -219,8 +219,10 @@ export default function UploadModal({
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">Required Format (14 columns)</h4>
-                <div className="text-xs text-blue-800 font-mono bg-blue-100 p-2 rounded overflow-x-auto">
-                  HotelID|InstanceCode|HotelName|Location|District|Address|Pincode|PointOfContact|ContactPhone|StartDate|EndDate|TotalRooms|OccupiedRooms|AvailableRooms
+                <div className="text-xs text-blue-800 font-mono bg-blue-100 p-2 rounded overflow-x-auto whitespace-nowrap">
+                  <div className="min-w-max">
+                    HotelID|InstanceCode|HotelName|Location|District|Address|Pincode|PointOfContact|ContactPhone|StartDate|EndDate|TotalRooms|OccupiedRooms|AvailableRooms
+                  </div>
                 </div>
                 <div className="mt-2 text-xs text-blue-700">
                   <strong>Alternative formats accepted:</strong> camelCase (hotelId, instanceCode...) or lowercase headers
@@ -234,18 +236,18 @@ export default function UploadModal({
               
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-amber-900 mb-2">Mandatory Validations</h4>
-                <div className="space-y-1 text-sm text-amber-800">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
-                    <span>Hotel ID reference validation (prevent overlapping dates)</span>
+                <div className="space-y-2 text-sm text-amber-800">
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full mt-1 flex-shrink-0"></div>
+                    <span className="leading-tight">Hotel ID reference validation (prevent overlapping dates)</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
-                    <span>Minimum 3-day stay enforcement (booking requirement)</span>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full mt-1 flex-shrink-0"></div>
+                    <span className="leading-tight">Minimum 3-day stay enforcement (booking requirement)</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-amber-600 rounded-full"></div>
-                    <span>Duplicate detection (skip existing hotel+instance combinations)</span>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-amber-600 rounded-full mt-1 flex-shrink-0"></div>
+                    <span className="leading-tight">Duplicate detection (skip existing hotel+instance combinations)</span>
                   </div>
                 </div>
               </div>
