@@ -122,7 +122,8 @@ export default function UploadModal({
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('options', JSON.stringify(options));
+    formData.append('uploadType', uploadType);
+    formData.append('options', JSON.stringify(mandatoryOptions));
 
     setUploadProgress(0);
     setUploadResult(null);
