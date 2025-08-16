@@ -219,8 +219,11 @@ export default function UploadModal({
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">Required Format (14 columns)</h4>
-                <div className="text-xs text-blue-800 font-mono bg-blue-100 p-2 rounded">
-                  hotelId|instanceCode|hotelName|location|district|address|pincode|pointOfContact|contactPhoneNumber|startDate|endDate|totalRooms|occupiedRooms|availableRooms
+                <div className="text-xs text-blue-800 font-mono bg-blue-100 p-2 rounded overflow-x-auto">
+                  HotelID|InstanceCode|HotelName|Location|District|Address|Pincode|PointOfContact|ContactPhone|StartDate|EndDate|TotalRooms|OccupiedRooms|AvailableRooms
+                </div>
+                <div className="mt-2 text-xs text-blue-700">
+                  <strong>Alternative formats accepted:</strong> camelCase (hotelId, instanceCode...) or lowercase headers
                 </div>
                 <div className="mt-3 space-y-1 text-sm text-blue-700">
                   <div className="font-medium">New Required Fields:</div>

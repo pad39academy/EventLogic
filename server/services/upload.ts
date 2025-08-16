@@ -29,16 +29,41 @@ export class UploadService {
       const rows = this.parsePSV(content);
       const headers = rows[0];
       
-      // Validate headers
-      const expectedHeaders = [
-        'hotelId', 'instanceCode', 'hotelName', 'location', 'district',
-        'address', 'pincode', 'pointOfContact', 'contactPhoneNumber',
-        'startDate', 'endDate', 'totalRooms', 'occupiedRooms', 'availableRooms'
+      // Validate headers - support both camelCase and original format
+      const requiredFields = [
+        { original: 'HotelID', camel: 'hotelId', key: 'hotelId' },
+        { original: 'InstanceCode', camel: 'instanceCode', key: 'instanceCode' },
+        { original: 'HotelName', camel: 'hotelName', key: 'hotelName' },
+        { original: 'Location', camel: 'location', key: 'location' },
+        { original: 'District', camel: 'district', key: 'district' },
+        { original: 'Address', camel: 'address', key: 'address' },
+        { original: 'Pincode', camel: 'pincode', key: 'pincode' },
+        { original: 'PointOfContact', camel: 'pointOfContact', key: 'pointOfContact' },
+        { original: 'ContactPhone', camel: 'contactPhoneNumber', key: 'contactPhoneNumber' },
+        { original: 'StartDate', camel: 'startDate', key: 'startDate' },
+        { original: 'EndDate', camel: 'endDate', key: 'endDate' },
+        { original: 'TotalRooms', camel: 'totalRooms', key: 'totalRooms' },
+        { original: 'OccupiedRooms', camel: 'occupiedRooms', key: 'occupiedRooms' },
+        { original: 'AvailableRooms', camel: 'availableRooms', key: 'availableRooms' }
       ];
 
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        result.errors.push(`Missing headers: ${missingHeaders.join(', ')}`);
+      // Create header mapping
+      const headerMapping: { [key: string]: string } = {};
+      const missingFields: string[] = [];
+
+      requiredFields.forEach(field => {
+        const foundHeader = headers.find(h => 
+          h === field.original || h === field.camel || h.toLowerCase() === field.key.toLowerCase()
+        );
+        if (foundHeader) {
+          headerMapping[foundHeader] = field.key;
+        } else {
+          missingFields.push(field.original);
+        }
+      });
+
+      if (missingFields.length > 0) {
+        result.errors.push(`Missing headers: ${missingFields.join(', ')}`);
         result.success = false;
         return result;
       }
@@ -53,7 +78,10 @@ export class UploadService {
 
         const hotelData: any = {};
         headers.forEach((header, index) => {
-          hotelData[header] = row[index];
+          const mappedKey = headerMapping[header];
+          if (mappedKey) {
+            hotelData[mappedKey] = row[index];
+          }
         });
 
         try {
