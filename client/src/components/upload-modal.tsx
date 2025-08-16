@@ -218,39 +218,41 @@ export default function UploadModal({
           {/* Hotel Inventory Format Guide */}
           {uploadType === "hotel_inventory" && (
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <h4 className="text-xs font-semibold text-blue-900 mb-2">Required Format (14 columns)</h4>
-                <div className="text-[10px] text-blue-800 font-mono bg-blue-100 p-1.5 rounded overflow-x-auto whitespace-nowrap">
-                  <div className="min-w-max leading-tight">
-                    HotelID|InstanceCode|HotelName|Location|District|Address|Pincode|PointOfContact|ContactPhone|StartDate|EndDate|TotalRooms|OccupiedRooms|AvailableRooms
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-blue-900 mb-1.5">Required Format (14 columns)</h4>
+                <div className="text-[8px] text-blue-800 font-mono bg-blue-100 p-1 rounded leading-tight">
+                  <div className="space-y-0.5">
+                    <div>HotelID|InstanceCode|HotelName|Location|District</div>
+                    <div>Address|Pincode|PointOfContact|ContactPhone</div>
+                    <div>StartDate|EndDate|TotalRooms|OccupiedRooms|AvailableRooms</div>
                   </div>
                 </div>
-                <div className="mt-1.5 text-[10px] text-blue-700">
-                  <strong>Alternative formats:</strong> camelCase or lowercase headers accepted
+                <div className="mt-1 text-[8px] text-blue-700">
+                  <strong>Alternative:</strong> camelCase or lowercase accepted
                 </div>
-                <div className="mt-2 space-y-0.5 text-xs text-blue-700">
+                <div className="mt-1.5 space-y-0.5 text-[8px] text-blue-700">
                   <div className="font-medium">New Required Fields:</div>
-                  <div className="grid grid-cols-1 gap-0.5 text-[10px]">
-                    <div>• <strong>pointOfContact</strong> - Hotel staff contact person</div>
-                    <div>• <strong>contactPhoneNumber</strong> - Hotel staff phone number</div>
+                  <div className="space-y-0.5">
+                    <div>• <strong>pointOfContact</strong> - Hotel staff contact</div>
+                    <div>• <strong>contactPhoneNumber</strong> - Hotel phone</div>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <h4 className="text-xs font-semibold text-amber-900 mb-2">Mandatory Validations</h4>
-                <div className="space-y-1 text-xs text-amber-800">
-                  <div className="flex items-start space-x-1.5">
-                    <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
-                    <span className="leading-tight text-[10px]">Hotel ID reference validation (prevent overlapping dates)</span>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-amber-900 mb-1.5">Mandatory Validations</h4>
+                <div className="space-y-0.5 text-[8px] text-amber-800">
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Hotel ID validation (prevent overlapping dates)</span>
                   </div>
-                  <div className="flex items-start space-x-1.5">
-                    <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
-                    <span className="leading-tight text-[10px]">Minimum 3-day stay enforcement (booking requirement)</span>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Minimum 3-day stay enforcement</span>
                   </div>
-                  <div className="flex items-start space-x-1.5">
-                    <div className="w-1.5 h-1.5 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
-                    <span className="leading-tight text-[10px]">Duplicate detection (skip existing hotel+instance combinations)</span>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Duplicate detection (skip existing combinations)</span>
                   </div>
                 </div>
               </div>
