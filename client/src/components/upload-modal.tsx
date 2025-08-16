@@ -230,13 +230,7 @@ export default function UploadModal({
                 <div className="mt-1 text-[8px] text-blue-700">
                   <strong>Alternative:</strong> camelCase or lowercase accepted
                 </div>
-                <div className="mt-1.5 space-y-0.5 text-[8px] text-blue-700">
-                  <div className="font-medium">New Required Fields:</div>
-                  <div className="space-y-0.5">
-                    <div>• <strong>pointOfContact</strong> - Hotel staff contact</div>
-                    <div>• <strong>contactPhoneNumber</strong> - Hotel phone</div>
-                  </div>
-                </div>
+
               </div>
               
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
