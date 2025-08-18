@@ -13,33 +13,51 @@ Your Ievolve Event Management System now includes comprehensive white-label erro
 - **Function**: Intercepts all server errors and serves branded maintenance pages
 - **Coverage**: Both API errors (JSON) and web errors (HTML)
 
-### 2. Professional Error Pages
-- **API Errors**: Return branded JSON responses without Replit references
-- **Web Errors**: Show "Ievolve Event Management - System Maintenance" pages
-- **Auto-retry**: 30-second countdown with automatic reload attempts
+### 2. Static Error Pages (Work Even When Server is Down)
+- **public/503.html**: Service unavailable page served by reverse proxy
+- **public/404.html**: Page not found with branded design
+- **Features**: Professional branding, auto-retry, contact support links
 
-### 3. Static Error Files
+### 3. Application Error Pages (When Server is Running)
 - **error-page.html**: Standalone error page for direct access
 - **mobile-iframe.html**: Mobile-optimized iframe wrapper with error handling
-- **Features**: Professional branding, auto-retry, contact support links
+- **Middleware handling**: Real-time error interception and branded responses
+
+### 4. Reverse Proxy Configuration
+- **nginx.conf**: Complete Nginx configuration for professional deployment
+- **Custom error handling**: Routes all errors to branded pages
+- **Upstream failure handling**: Graceful fallback when Replit is down
 
 ## Custom Domain Setup Process
 
-### Step 1: Configure DNS
-Point your custom domain to Replit:
+### Option A: Direct DNS (Simple Setup)
+Point your custom domain directly to Replit:
 ```
 Type: CNAME
 Name: www (or @)
 Value: your-replit-url.replit.dev
 ```
+**Limitation**: Customers may see Replit errors if server is completely down.
 
-### Step 2: Update Application URLs
-The system now uses relative URLs (`/api/auth/me` instead of full Replit URLs) for seamless custom domain support.
+### Option B: Reverse Proxy (Professional Setup - Recommended)
+Use a reverse proxy server (Nginx/Apache) to completely hide Replit:
+
+1. **Set up your own server** (VPS, AWS, etc.)
+2. **Install Nginx** and use the provided `nginx.conf`
+3. **Point DNS to your server**:
+   ```
+   Type: A
+   Name: www (or @)
+   Value: YOUR-SERVER-IP
+   ```
+4. **Copy static error pages** to `/app/public/` on your server
+5. **Configure SSL** for HTTPS support
 
 ### Step 3: Test Error Handling
 1. Visit your custom domain: `https://www.greatorsoftware.com`
-2. Test server failures to verify branded error pages appear
-3. Confirm no Replit references are visible
+2. **Test server failures** to verify branded error pages appear
+3. **Test complete downtime** (only works with reverse proxy setup)
+4. Confirm no Replit references are visible anywhere
 
 ## Error Handling Features
 
@@ -74,13 +92,29 @@ Instead of Replit errors, customers see:
 
 ```
 ├── server/middleware/error-handler.ts    # Custom error handling logic
+├── public/503.html                       # Service unavailable (reverse proxy)
+├── public/404.html                       # Page not found (reverse proxy)
 ├── error-page.html                       # Standalone error page
 ├── mobile-iframe.html                    # Mobile wrapper with error handling
+├── nginx.conf                            # Reverse proxy configuration
 └── server/index.ts                       # Error middleware integration
 ```
 
+## Complete Protection Levels
+
+### Level 1: Application-Level Protection
+- **What's Protected**: Server errors while app is running
+- **What's NOT Protected**: Complete server downtime
+- **Setup**: Already implemented in your app
+
+### Level 2: Reverse Proxy Protection (Recommended)
+- **What's Protected**: ALL errors, even complete server failures
+- **What's NOT Protected**: Nothing (100% white-label)
+- **Setup**: Requires reverse proxy server (see nginx.conf)
+
 ## Testing Checklist
 
+### Basic Tests (Both Setups)
 - [ ] Custom domain resolves correctly
 - [ ] Server errors show branded maintenance page
 - [ ] API errors return professional JSON responses
@@ -88,6 +122,13 @@ Instead of Replit errors, customers see:
 - [ ] Mobile error pages display properly
 - [ ] No Replit branding visible anywhere
 - [ ] Support contact links work correctly
+
+### Advanced Tests (Reverse Proxy Only)
+- [ ] Complete server shutdown shows branded 503 page
+- [ ] Invalid URLs show branded 404 page
+- [ ] Auto-recovery when server comes back online
+- [ ] SSL/HTTPS works correctly
+- [ ] No Replit headers or references in HTTP responses
 
 ## Customer Demo Setup
 

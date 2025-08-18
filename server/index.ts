@@ -74,6 +74,11 @@ app.use((req, res, next) => {
   // Serve custom error pages for white-label experience
   app.use('/error-page.html', express.static('error-page.html'));
   app.use('/mobile-iframe.html', express.static('mobile-iframe.html'));
+  
+  // Serve static error pages that work even when server is down
+  app.use('/503.html', express.static('public/503.html'));
+  app.use('/404.html', express.static('public/404.html'));
+  app.use('/public', express.static('public'));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
