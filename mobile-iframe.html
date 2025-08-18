@@ -105,7 +105,7 @@
 <body>
     <iframe 
         id="app-frame" 
-        src="https://d698c84b-fbd4-42e1-8652-8b92c3450c5f-00-jk2pa9a1bwct.riker.replit.dev"
+        src="/"
         title="Ievolve Event Management System"
         allow="camera; microphone; geolocation"
         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
@@ -137,7 +137,7 @@
         
         // Check if server is responding
         function checkServerStatus() {
-            fetch('https://d698c84b-fbd4-42e1-8652-8b92c3450c5f-00-jk2pa9a1bwct.riker.replit.dev/api/auth/me', {
+            fetch('/api/auth/me', {
                 method: 'GET',
                 mode: 'no-cors'
             })

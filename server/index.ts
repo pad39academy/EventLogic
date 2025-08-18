@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { customErrorHandler, handle404 } from "./middleware/error-handler";
 
 const app = express();
 
@@ -70,13 +71,9 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  // Serve custom error pages for white-label experience
+  app.use('/error-page.html', express.static('error-page.html'));
+  app.use('/mobile-iframe.html', express.static('mobile-iframe.html'));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -86,6 +83,12 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
+
+  // Add custom error handlers to hide Replit branding AFTER vite setup
+  app.use(customErrorHandler);
+  
+  // Handle 404s professionally LAST
+  app.use('*', handle404);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.

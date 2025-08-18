@@ -190,15 +190,15 @@
             clearInterval(retryInterval);
             
             // Try to reload the main application
-            window.location.href = 'https://d698c84b-fbd4-42e1-8652-8b92c3450c5f-00-jk2pa9a1bwct.riker.replit.dev';
+            window.location.reload();
         }
         
         function checkServerStatus() {
-            fetch('https://d698c84b-fbd4-42e1-8652-8b92c3450c5f-00-jk2pa9a1bwct.riker.replit.dev/api/auth/me')
+            fetch('/api/auth/me')
                 .then(response => {
                     if (response.status !== 500) {
                         // Server is back up
-                        window.location.href = 'https://d698c84b-fbd4-42e1-8652-8b92c3450c5f-00-jk2pa9a1bwct.riker.replit.dev';
+                        window.location.reload();
                     }
                 })
                 .catch(error => {
