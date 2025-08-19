@@ -201,7 +201,7 @@ export class UploadService {
       const expectedHeaders = [
         'ROLE', 'COACH_id', 'Name', 'Mobile_Number', 'Discipline',
         'Hotel_ID', 'Hotel_Name', 'Stadium', 'Booking_Start_Date',
-        'Booking_End_Date', 'Booking_Reference_Number', 'Transport POC'
+        'Booking_End_Date', 'Booking_Reference_Number', 'Transport_POC'
       ];
 
       const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
@@ -290,7 +290,7 @@ export class UploadService {
             bookingStartDate: startDate,
             bookingEndDate: endDate,
             bookingReference: data.Booking_Reference_Number,
-            transportPoc: data['Transport POC'],
+            transportPoc: data['Transport_POC'],
             checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
