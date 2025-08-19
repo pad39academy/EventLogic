@@ -168,6 +168,14 @@ export default function HotelTable() {
 
   // Handle edit button click
   const handleEditHotel = (hotel: Hotel) => {
+    console.log('Editing hotel:', hotel);
+    console.log('Original dates:', {
+      startDate: hotel.startDate,
+      endDate: hotel.endDate,
+      startFormatted: formatForDateInput(hotel.startDate),
+      endFormatted: formatForDateInput(hotel.endDate)
+    });
+    
     setEditingHotel(hotel);
     form.reset({
       hotelName: hotel.hotelName,
@@ -752,6 +760,9 @@ export default function HotelTable() {
                     <strong> Instance:</strong> {editingHotel.instanceCode}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
+                    Original date range: {formatDateRange(editingHotel.startDate, editingHotel.endDate)}
+                  </p>
+                  <p className="text-xs text-gray-500">
                     Note: Hotel ID cannot be changed. Changes will only affect this instance.
                   </p>
                 </div>

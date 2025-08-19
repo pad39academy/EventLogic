@@ -31,6 +31,7 @@ export function formatToIndianDate(date: Date | string | null | undefined): stri
 /**
  * Formats a date for HTML date input (YYYY-MM-DD)
  * Used in form inputs that expect ISO date format
+ * Handles timezone properly to prevent date shifts
  */
 export function formatForDateInput(date: Date | string | null | undefined): string {
   if (!date) return '';
@@ -46,8 +47,12 @@ export function formatForDateInput(date: Date | string | null | undefined): stri
     return '';
   }
   
-  // Return YYYY-MM-DD format for HTML input
-  return dateObj.toISOString().split('T')[0];
+  // Use local date components to avoid timezone shift
+  const year = dateObj.getFullYear();
+  const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+  const day = dateObj.getDate().toString().padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
 }
 
 /**

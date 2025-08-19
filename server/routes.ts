@@ -536,11 +536,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = updates.endDate;
 
       // Only check for date conflicts if dates are actually being changed
-      // Compare dates as YYYY-MM-DD strings to avoid timezone issues  
-      const originalStartStr = new Date(originalHotel.startDate).toISOString().split('T')[0];
-      const originalEndStr = new Date(originalHotel.endDate).toISOString().split('T')[0];
-      const newStartStr = new Date(startDate).toISOString().split('T')[0];
-      const newEndStr = new Date(endDate).toISOString().split('T')[0];
+      // Compare dates using local date components to avoid timezone issues
+      const originalStart = new Date(originalHotel.startDate);
+      const originalEnd = new Date(originalHotel.endDate);
+      const newStart = new Date(startDate);
+      const newEnd = new Date(endDate);
+      
+      const originalStartStr = `${originalStart.getFullYear()}-${(originalStart.getMonth() + 1).toString().padStart(2, '0')}-${originalStart.getDate().toString().padStart(2, '0')}`;
+      const originalEndStr = `${originalEnd.getFullYear()}-${(originalEnd.getMonth() + 1).toString().padStart(2, '0')}-${originalEnd.getDate().toString().padStart(2, '0')}`;
+      const newStartStr = `${newStart.getFullYear()}-${(newStart.getMonth() + 1).toString().padStart(2, '0')}-${newStart.getDate().toString().padStart(2, '0')}`;
+      const newEndStr = `${newEnd.getFullYear()}-${(newEnd.getMonth() + 1).toString().padStart(2, '0')}-${newEnd.getDate().toString().padStart(2, '0')}`;
       
       const datesChanged = (originalStartStr !== newStartStr || originalEndStr !== newEndStr);
 
@@ -584,9 +589,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Compare values (handle dates specially)
         let isChanged = false;
         if (key === 'startDate' || key === 'endDate') {
-          const newDate = new Date(newValue as Date).toISOString();
-          const oldDate = new Date(oldValue as Date).toISOString();
-          isChanged = newDate !== oldDate;
+          const newDate = new Date(newValue as Date);
+          const oldDate = new Date(oldValue as Date);
+          // Compare date components to avoid timezone issues
+          const newDateStr = `${newDate.getFullYear()}-${(newDate.getMonth() + 1).toString().padStart(2, '0')}-${newDate.getDate().toString().padStart(2, '0')}`;
+          const oldDateStr = `${oldDate.getFullYear()}-${(oldDate.getMonth() + 1).toString().padStart(2, '0')}-${oldDate.getDate().toString().padStart(2, '0')}`;
+          isChanged = newDateStr !== oldDateStr;
         } else {
           isChanged = newValue !== oldValue;
         }
