@@ -14,6 +14,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Building2, MapPin, Users, Bed, Edit3, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { formatToIndianDate, formatForDateInput, formatDateRange } from "@/../../shared/dateUtils";
 
 interface Hotel {
   id: string;
@@ -178,8 +179,8 @@ export default function HotelTable() {
       contactPhoneNumber: hotel.contactPhoneNumber || "",
       totalRooms: hotel.totalRooms,
       availableRooms: hotel.availableRooms,
-      startDate: new Date(hotel.startDate).toISOString().split('T')[0],
-      endDate: new Date(hotel.endDate).toISOString().split('T')[0],
+      startDate: formatForDateInput(hotel.startDate),
+      endDate: formatForDateInput(hotel.endDate),
     });
     setIsEditModalOpen(true);
   };
@@ -506,11 +507,11 @@ export default function HotelTable() {
                       <TableCell>
                         <div className="text-sm">
                           <div className="font-medium">
-                            {new Date(hotel.startDate).toLocaleDateString()}
+                            {formatToIndianDate(hotel.startDate)}
                           </div>
                           <div className="text-gray-500">to</div>
                           <div className="font-medium">
-                            {new Date(hotel.endDate).toLocaleDateString()}
+                            {formatToIndianDate(hotel.endDate)}
                           </div>
                         </div>
                       </TableCell>
@@ -702,7 +703,7 @@ export default function HotelTable() {
                   name="startDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel>Start Date (DD/MM/YYYY)</FormLabel>
                       <FormControl>
                         <Input 
                           type="date" 
@@ -711,6 +712,11 @@ export default function HotelTable() {
                         />
                       </FormControl>
                       <FormMessage />
+                      {field.value && (
+                        <div className="text-xs text-gray-500">
+                          Display: {formatToIndianDate(field.value)}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
@@ -720,7 +726,7 @@ export default function HotelTable() {
                   name="endDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Date</FormLabel>
+                      <FormLabel>End Date (DD/MM/YYYY)</FormLabel>
                       <FormControl>
                         <Input 
                           type="date" 
@@ -729,6 +735,11 @@ export default function HotelTable() {
                         />
                       </FormControl>
                       <FormMessage />
+                      {field.value && (
+                        <div className="text-xs text-gray-500">
+                          Display: {formatToIndianDate(field.value)}
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />

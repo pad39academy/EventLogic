@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Hotel } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
+import { formatToIndianDate, formatDateRange } from "@/../../shared/dateUtils";
 
 export default function HotelCards() {
   const { data: hotels = [], isLoading } = useQuery({
@@ -65,8 +66,9 @@ export default function HotelCards() {
       <CardContent>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {displayHotels.map((hotel) => {
-            const occupancyPercentage = Math.round((hotel.occupiedRooms / hotel.totalRooms) * 100);
-            const status = getOccupancyStatus(hotel.occupiedRooms, hotel.totalRooms);
+            const occupiedRooms = hotel.occupiedRooms || 0;
+            const occupancyPercentage = Math.round((occupiedRooms / hotel.totalRooms) * 100);
+            const status = getOccupancyStatus(occupiedRooms, hotel.totalRooms);
             
             return (
               <div 
@@ -86,7 +88,7 @@ export default function HotelCards() {
                       <div className="flex items-center text-sm">
                         <span className="text-gray-500">Occupancy:</span>
                         <span className="ml-2 font-medium text-gray-900" data-testid={`hotel-occupancy-${hotel.hotelId}`}>
-                          {hotel.occupiedRooms}/{hotel.totalRooms} rooms
+                          {occupiedRooms}/{hotel.totalRooms} rooms
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -114,7 +116,7 @@ export default function HotelCards() {
                     Available: {hotel.availableRooms}
                   </span>
                   <span className="text-gray-500" data-testid={`hotel-dates-${hotel.hotelId}`}>
-                    {new Date(hotel.startDate).toLocaleDateString()} - {new Date(hotel.endDate).toLocaleDateString()}
+                    {formatDateRange(hotel.startDate, hotel.endDate)}
                   </span>
                 </div>
               </div>

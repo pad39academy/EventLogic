@@ -158,12 +158,22 @@ export const updateHotelSchema = createInsertSchema(hotels).omit({
 }).extend({
   // Override date fields to accept strings and transform to Date objects
   startDate: z.string().min(1, "Start date is required").transform((str) => {
-    const date = new Date(str + 'T00:00:00.000Z');
-    return date;
+    // Parse date string in YYYY-MM-DD format and create UTC date
+    const parts = str.split('-');
+    if (parts.length !== 3) throw new Error('Invalid date format');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+    const day = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
   }),
   endDate: z.string().min(1, "End date is required").transform((str) => {
-    const date = new Date(str + 'T00:00:00.000Z');
-    return date;
+    // Parse date string in YYYY-MM-DD format and create UTC date
+    const parts = str.split('-');
+    if (parts.length !== 3) throw new Error('Invalid date format');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+    const day = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
   }),
 }).refine((data) => data.endDate > data.startDate, {
   message: "End date must be after start date",

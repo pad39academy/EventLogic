@@ -426,8 +426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         district: req.body.district,
         address: req.body.address,
         pincode: req.body.pincode,
-        startDate: new Date(req.body.startDate + 'T00:00:00.000Z'),
-        endDate: new Date(req.body.endDate + 'T00:00:00.000Z'),
+        startDate: req.body.startDate, // Already transformed by schema
+        endDate: req.body.endDate, // Already transformed by schema
         totalRooms: parseInt(req.body.totalRooms),
         availableRooms: parseInt(req.body.availableRooms),
         pointOfContact: req.body.pointOfContact || '',
@@ -536,11 +536,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = updates.endDate;
 
       // Only check for date conflicts if dates are actually being changed
-      // Compare dates as YYYY-MM-DD strings to avoid timezone issues
+      // Compare dates as YYYY-MM-DD strings to avoid timezone issues  
       const originalStartStr = new Date(originalHotel.startDate).toISOString().split('T')[0];
       const originalEndStr = new Date(originalHotel.endDate).toISOString().split('T')[0];
-      const newStartStr = startDate.toISOString().split('T')[0];
-      const newEndStr = endDate.toISOString().split('T')[0];
+      const newStartStr = new Date(startDate).toISOString().split('T')[0];
+      const newEndStr = new Date(endDate).toISOString().split('T')[0];
       
       const datesChanged = (originalStartStr !== newStartStr || originalEndStr !== newEndStr);
 
