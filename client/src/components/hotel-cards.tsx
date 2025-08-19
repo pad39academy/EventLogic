@@ -118,7 +118,7 @@ export default function HotelCards() {
                   <span className="text-gray-500" data-testid={`hotel-dates-${hotel.hotelId}`}>
                     {formatDateRange(hotel.startDate, hotel.endDate)}
                     <div className="text-xs text-blue-600 mt-1">
-                      Debug: {hotel.startDate} → {hotel.endDate}
+                      Debug: {String(hotel.startDate)} → {String(hotel.endDate)}
                     </div>
                   </span>
                 </div>
