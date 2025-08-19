@@ -722,7 +722,7 @@ export default function HotelTable() {
                       <FormMessage />
                       {field.value && (
                         <div className="text-xs text-gray-500">
-                          Display: {formatToIndianDate(field.value)}
+                          Will display as: {formatToIndianDate(new Date(field.value + 'T00:00:00.000Z'))}
                         </div>
                       )}
                     </FormItem>
@@ -745,7 +745,7 @@ export default function HotelTable() {
                       <FormMessage />
                       {field.value && (
                         <div className="text-xs text-gray-500">
-                          Display: {formatToIndianDate(field.value)}
+                          Will display as: {formatToIndianDate(new Date(field.value + 'T00:00:00.000Z'))}
                         </div>
                       )}
                     </FormItem>

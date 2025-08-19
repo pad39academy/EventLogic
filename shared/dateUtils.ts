@@ -47,10 +47,10 @@ export function formatForDateInput(date: Date | string | null | undefined): stri
     return '';
   }
   
-  // Use local date components to avoid timezone shift
-  const year = dateObj.getFullYear();
-  const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-  const day = dateObj.getDate().toString().padStart(2, '0');
+  // Use UTC date components to avoid timezone shift for database dates
+  const year = dateObj.getUTCFullYear();
+  const month = (dateObj.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = dateObj.getUTCDate().toString().padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 }
