@@ -142,10 +142,37 @@ export function daysDifference(startDate: Date | string, endDate: Date | string)
 }
 
 /**
- * Formats date range for display in Indian format
+ * Formats date range for display in Indian format using UTC components
+ * Prevents timezone shift issues for database dates
  */
 export function formatDateRange(startDate: Date | string, endDate: Date | string): string {
-  const start = formatToIndianDate(startDate);
-  const end = formatToIndianDate(endDate);
+  const start = formatToIndianDateUTC(startDate);
+  const end = formatToIndianDateUTC(endDate);
   return `${start} → ${end}`;
+}
+
+/**
+ * Formats a date to Indian format using UTC components (for database dates)
+ * Prevents timezone shift issues that cause date display discrepancies
+ */
+export function formatToIndianDateUTC(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  let dateObj: Date;
+  if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else {
+    dateObj = date;
+  }
+  
+  if (isNaN(dateObj.getTime())) {
+    return '';
+  }
+  
+  // Use UTC components for database dates to prevent timezone shifts
+  const day = dateObj.getUTCDate().toString().padStart(2, '0');
+  const month = (dateObj.getUTCMonth() + 1).toString().padStart(2, '0');
+  const year = dateObj.getUTCFullYear();
+  
+  return `${day}/${month}/${year}`;
 }
