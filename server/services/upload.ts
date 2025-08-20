@@ -295,6 +295,10 @@ export class UploadService {
           };
 
           await storage.createParticipant(insertParticipant);
+          
+          // Update hotel occupancy after adding participant
+          await storage.updateHotelOccupancy(data.Hotel_ID, '1');
+          
           result.created++;
         } catch (error) {
           result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -384,6 +388,10 @@ export class UploadService {
           };
 
           await storage.createParticipant(insertParticipant);
+          
+          // Update hotel occupancy after adding participant
+          await storage.updateHotelOccupancy(data.HOTEL_id, '1');
+          
           result.created++;
         } catch (error) {
           result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);

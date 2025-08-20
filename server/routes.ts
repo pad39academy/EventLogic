@@ -263,6 +263,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const content = req.file.buffer.toString('utf-8');
       const result = await UploadService.uploadCoachesOfficials(content);
 
+      // Update all hotel occupancy after successful upload
+      if (result.success && result.created > 0) {
+        await storage.updateAllHotelOccupancy();
+      }
+
       await storage.createAuditLog({
         userId: req.session.user!.id,
         actionType: "upload",
@@ -284,6 +289,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const content = req.file.buffer.toString('utf-8');
       const result = await UploadService.uploadPlayers(content);
+
+      // Update all hotel occupancy after successful upload
+      if (result.success && result.created > 0) {
+        await storage.updateAllHotelOccupancy();
+      }
 
       await storage.createAuditLog({
         userId: req.session.user!.id,
@@ -1062,9 +1072,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/participants/:id", requireAdmin, async (req, res) => {
     try {
+      const original = await storage.getParticipantById(req.params.id);
       const updated = await storage.updateParticipant(req.params.id, req.body);
       if (!updated) {
         return res.status(404).json({ message: "Participant not found" });
+      }
+
+      // Update hotel occupancy if hotel assignment changed
+      if (original && original.hotelId !== updated.hotelId) {
+        // Update occupancy for both old and new hotels
+        await storage.updateHotelOccupancy(original.hotelId, '1');
+        await storage.updateHotelOccupancy(updated.hotelId, '1');
+      } else if (updated.hotelId) {
+        // Update occupancy for the current hotel
+        await storage.updateHotelOccupancy(updated.hotelId, '1');
       }
 
       await storage.createAuditLog({
@@ -1083,9 +1104,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/admin/participants/:id", requireAdmin, async (req, res) => {
     try {
+      const participant = await storage.getParticipantById(req.params.id);
       const success = await storage.deleteParticipant(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "Participant not found" });
+      }
+
+      // Update hotel occupancy after deleting participant
+      if (participant && participant.hotelId) {
+        await storage.updateHotelOccupancy(participant.hotelId, '1');
       }
 
       await storage.createAuditLog({
@@ -1150,6 +1177,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(logs);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get audit logs" });
+    }
+  });
+
+  // Manual occupancy recalculation endpoint (Admin only)
+  app.post("/api/admin/recalculate-occupancy", requireAdmin, async (req, res) => {
+    try {
+      await storage.updateAllHotelOccupancy();
+      
+      await storage.createAuditLog({
+        userId: req.session.user!.id,
+        actionType: "recalculate",
+        targetEntity: "hotel",
+        details: { action: "manual_occupancy_recalculation" },
+      });
+      
+      res.json({ message: "Hotel occupancy recalculated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to recalculate occupancy" });
     }
   });
 

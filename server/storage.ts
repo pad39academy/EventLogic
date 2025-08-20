@@ -447,6 +447,63 @@ export class DatabaseStorage implements IStorage {
     return auditLogs;
   }
 
+  // Calculate dynamic occupancy for a specific hotel
+  async calculateHotelOccupancy(hotelId: string, instanceCode: string): Promise<{ occupiedRooms: number; occupancyRate: number }> {
+    // Get hotel details
+    const hotel = await this.getHotelByHotelIdAndInstance(hotelId, instanceCode);
+    if (!hotel) {
+      return { occupiedRooms: 0, occupancyRate: 0 };
+    }
+
+    // Count participants assigned to this hotel (regardless of check-in status)
+    const assignedParticipants = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.hotelId, hotelId));
+
+    // Calculate rooms needed based on participant roles and sharing rules
+    const playerCount = assignedParticipants.filter(p => p.role === 'player').length;
+    const coachCount = assignedParticipants.filter(p => p.role === 'coach').length;
+    const officialCount = assignedParticipants.filter(p => p.role === 'official').length;
+    
+    // Room allocation rules: 3 players per room, 2 coaches per room, 1 official per room
+    const roomsForPlayers = Math.ceil(playerCount / 3);
+    const roomsForCoaches = Math.ceil(coachCount / 2);
+    const roomsForOfficials = officialCount;
+    
+    const occupiedRooms = roomsForPlayers + roomsForCoaches + roomsForOfficials;
+    const occupancyRate = hotel.totalRooms > 0 ? (occupiedRooms / hotel.totalRooms) * 100 : 0;
+
+    return { occupiedRooms, occupancyRate: Math.round(occupancyRate) };
+  }
+
+  // Update hotel occupancy for a specific hotel
+  async updateHotelOccupancy(hotelId: string, instanceCode: string): Promise<void> {
+    const { occupiedRooms } = await this.calculateHotelOccupancy(hotelId, instanceCode);
+    
+    const hotel = await this.getHotelByHotelIdAndInstance(hotelId, instanceCode);
+    if (!hotel) return;
+
+    const availableRooms = hotel.totalRooms - occupiedRooms;
+    
+    await db
+      .update(hotels)
+      .set({ 
+        occupiedRooms,
+        availableRooms: Math.max(0, availableRooms)
+      })
+      .where(and(eq(hotels.hotelId, hotelId), eq(hotels.instanceCode, instanceCode)));
+  }
+
+  // Update occupancy for all hotels
+  async updateAllHotelOccupancy(): Promise<void> {
+    const allHotels = await db.select().from(hotels);
+    
+    for (const hotel of allHotels) {
+      await this.updateHotelOccupancy(hotel.hotelId, hotel.instanceCode);
+    }
+  }
+
   async getDashboardStats(date?: string): Promise<DashboardStats> {
     // Get total participants
     const totalParticipants = await db.select().from(participants);
@@ -473,7 +530,10 @@ export class DatabaseStorage implements IStorage {
     const teams = await db.selectDistinct({ teamName: participants.teamName }).from(participants).where(isNotNull(participants.teamName));
     const players = await db.select().from(participants).where(eq(participants.role, 'player'));
 
-    // Get hotel statistics
+    // Update all hotel occupancy before calculating stats
+    await this.updateAllHotelOccupancy();
+
+    // Get updated hotel statistics
     const allHotels = await db.select().from(hotels);
     const totalAvailableRooms = allHotels.reduce((sum, hotel) => sum + hotel.availableRooms, 0);
 

@@ -16,6 +16,7 @@ import ParticipantTable from "@/components/participant-table";
 import HotelTable from "@/components/hotel-table";
 import CheckoutBoard from "@/components/checkout-board";
 import AddHotelModal from "@/components/add-hotel-modal";
+import RecalculateOccupancy from "@/components/recalculate-occupancy";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -401,6 +402,11 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Dynamic Occupancy Control */}
+            <div className="mb-8">
+              <RecalculateOccupancy />
+            </div>
 
             {/* Hotel Management Overview */}
             <HotelTable />

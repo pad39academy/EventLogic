@@ -1,7 +1,7 @@
-# Hotel Occupancy Rate Calculation - Detailed Explanation
+# Hotel Occupancy Rate Calculation - Detailed Explanation (UPDATED - Dynamic System)
 
 ## Overview
-The occupancy rate in the Ievolve Event Management System is **NOT** based on today's date or any specific date range. Instead, it's a **static calculation** based on the current room allocation data stored in the database.
+The occupancy rate in the Ievolve Event Management System is now **DYNAMIC** and updates automatically based on participant assignments. The system calculates room requirements using intelligent room-sharing rules and updates occupancy in real-time when participants are uploaded, modified, or deleted.
 
 ## How Occupancy Rate is Calculated
 
@@ -33,17 +33,24 @@ occupiedRooms: integer       -- Currently occupied (e.g., 58)
 
 ## What the Occupancy Rate Represents
 
-### **Static Room Allocation** (Not Date-Based)
-The occupancy rate shows:
-- ✅ **Current room assignments** regardless of dates
-- ✅ **How many rooms are allocated** to participants  
-- ✅ **Administrative planning status**
+### **Dynamic Room Allocation** (Participant-Based)
+The occupancy rate now shows:
+- ✅ **Real-time room requirements** based on assigned participants
+- ✅ **Intelligent room sharing** using defined rules
+- ✅ **Automatic updates** when participant data changes
+- ✅ **Accurate capacity planning** for event management
 
-### **NOT Real-Time Hotel Utilization**
+### **Room Sharing Rules**
+The system uses these intelligent allocation rules:
+- 👥 **3 Players per room** - Players share accommodation
+- 👔 **2 Coaches per room** - Coaches share double occupancy
+- 🏛️ **1 Official per room** - Officials get individual rooms
+
+### **What the System Does NOT Track**
 The occupancy rate does NOT show:
-- ❌ **Today's actual occupancy**
-- ❌ **Date-specific availability**
-- ❌ **Whether guests are physically present**
+- ❌ **Today's actual check-in status**
+- ❌ **Physical presence in hotels**
+- ❌ **Date-specific daily utilization**
 
 ## Code Implementation
 
