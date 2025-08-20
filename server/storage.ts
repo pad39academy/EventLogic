@@ -156,7 +156,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      query = query.where(and(...conditions)) as any;
     }
 
     let hotelResults = await query;
@@ -302,8 +302,8 @@ export class DatabaseStorage implements IStorage {
           or(
             // Check if ranges overlap: start1 < end2 AND start2 < end1
             and(
-              lt(startDate, hotels.endDate),
-              lt(hotels.startDate, endDate)
+              lt(sql`${startDate}`, hotels.endDate),
+              lt(hotels.startDate, sql`${endDate}`)
             )
           )
         )
@@ -345,23 +345,23 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      query = query.where(and(...conditions)) as any;
     }
 
     // Sorting
     const sortOrder = filters.sortOrder || 'desc';
     
     if (sortOrder === 'asc') {
-      query = query.orderBy(asc(participants.createdAt));
+      query = query.orderBy(asc(participants.createdAt)) as any;
     } else {
-      query = query.orderBy(desc(participants.createdAt));
+      query = query.orderBy(desc(participants.createdAt)) as any;
     }
 
     // Pagination
     if (filters.limit) {
-      query = query.limit(filters.limit);
+      query = query.limit(filters.limit) as any;
       if (filters.page && filters.page > 1) {
-        query = query.offset((filters.page - 1) * filters.limit);
+        query = query.offset((filters.page - 1) * filters.limit) as any;
       }
     }
 

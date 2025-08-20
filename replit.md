@@ -6,6 +6,8 @@ This is a comprehensive event management system built for the Ievolve Events org
 
 ## Recent Changes (August 2025)
 
+- **Dynamic Occupancy System**: Implemented intelligent room allocation replacing static occupancy with real-time participant-based calculations using room sharing rules (3 players, 2 coaches, 1 official per room)
+- **Automatic Occupancy Updates**: Upload processes, participant modifications, and deletions now automatically trigger hotel occupancy recalculation with manual override capability
 - **Fresh Test Data Generated**: Complete database refresh with realistic 2025 Chief Minister Trophy data including 5 coaches, 50 players, 5 officials, and 5 hotels with multiple instances (13 total) across different date ranges
 - **Cascading Hotel Updates**: Property-wide fields (address, location, pincode, district) now update across ALL instances of the same hotel while keeping room counts and dates instance-specific
 - **Auto +91 Country Code**: Team coach login automatically adds +91 country code prefix with visual indicators and 10-digit validation
