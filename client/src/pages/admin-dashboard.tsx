@@ -17,6 +17,7 @@ import HotelTable from "@/components/hotel-table";
 import CheckoutBoard from "@/components/checkout-board";
 import AddHotelModal from "@/components/add-hotel-modal";
 import RecalculateOccupancy from "@/components/recalculate-occupancy";
+import { SendNotification } from "@/components/send-notification";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -188,6 +189,13 @@ export default function AdminDashboard() {
                     data-testid="nav-reports"
                   >
                     Reports
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("notifications")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "notifications" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
+                    data-testid="nav-notifications"
+                  >
+                    Send Notification
                   </button>
                   <button 
                     onClick={() => setActiveTab("audit")}
@@ -456,6 +464,29 @@ export default function AdminDashboard() {
                 <p className="text-gray-500">Reports functionality coming soon...</p>
               </CardContent>
             </Card>
+          </>
+        )}
+
+        {activeTab === "notifications" && (
+          <>
+            {/* Notifications Header */}
+            <div className="mb-8">
+              <div className="md:flex md:items-center md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
+                    Send Notifications
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
+                    Send notifications to team coaches about match results, checkout dates, or general updates
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Send Notification Component */}
+            <div className="mb-8">
+              <SendNotification />
+            </div>
           </>
         )}
 

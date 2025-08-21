@@ -10,6 +10,8 @@ export const participantRoleEnum = pgEnum("participant_role", ["coach", "officia
 export const checkinStatusEnum = pgEnum("checkin_status", ["pending", "checked_in", "checked_out"]);
 export const bookingTypeEnum = pgEnum("booking_type", ["regular", "pre_event", "post_event"]);
 export const hotelStatusEnum = pgEnum("hotel_status", ["upcoming", "active", "expired"]);
+export const notificationStatusEnum = pgEnum("notification_status", ["unread", "read"]);
+export const notificationTypeEnum = pgEnum("notification_type", ["match_lost", "early_checkout", "custom", "general"]);
 
 // Users table (Admins and Coaches)
 export const users = pgTable("users", {
@@ -95,6 +97,21 @@ export const otpVerifications = pgTable("otp_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromUserId: text("from_user_id").notNull(), // Admin who sent the notification
+  toCoachId: text("to_coach_id").notNull(), // Coach who receives the notification
+  teamName: text("team_name").notNull(),
+  notificationType: notificationTypeEnum("notification_type").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  checkoutDate: timestamp("checkout_date"), // Suggested checkout date
+  status: notificationStatusEnum("status").default("unread"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
 // Audit log table
 export const auditLog = pgTable("audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -109,6 +126,21 @@ export const auditLog = pgTable("audit_log", {
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   auditLogs: many(auditLog),
+  sentNotifications: many(notifications, { relationName: "sentNotifications" }),
+  receivedNotifications: many(notifications, { relationName: "receivedNotifications" }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  fromUser: one(users, {
+    fields: [notifications.fromUserId],
+    references: [users.id],
+    relationName: "sentNotifications",
+  }),
+  toCoach: one(users, {
+    fields: [notifications.toCoachId],
+    references: [users.coachId],
+    relationName: "receivedNotifications",
+  }),
 }));
 
 export const participantsRelations = relations(participants, ({ one, many }) => ({
@@ -201,6 +233,18 @@ export const insertOtpSchema = createInsertSchema(otpVerifications).omit({
   createdAt: true,
 });
 
+// Notification schemas
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  sentAt: true,
+  readAt: true,
+});
+
+export const updateNotificationSchema = createSelectSchema(notifications).pick({
+  status: true,
+  readAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -215,6 +259,9 @@ export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = z.infer<typeof insertOtpSchema>;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type UpdateNotification = z.infer<typeof updateNotificationSchema>;
 
 // Additional schemas for API validation
 export const loginSchema = z.object({

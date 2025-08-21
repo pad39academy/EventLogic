@@ -8,8 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { logout } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { 
-  Calendar, LogOut, Phone, LogIn, Users as UsersIcon
+  Calendar, LogOut, Phone, LogIn, Users as UsersIcon, Bell
 } from "lucide-react";
+import { NotificationsList } from "@/components/notifications-list";
 import type { Participant } from "@/lib/types";
 
 interface CoachDashboardData {
@@ -19,6 +20,7 @@ interface CoachDashboardData {
 
 export default function CoachDashboard() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("team");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -29,6 +31,14 @@ export default function CoachDashboard() {
   });
 
   const user = authData?.user || null;
+
+  // Get unread notification count
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["/api/coach/notifications/unread-count"],
+    enabled: !!user,
+  });
+
+  const unreadCountNumber = typeof unreadCount === 'number' ? unreadCount : 0;
 
   // Get coach dashboard data
   const { data: dashboardData, isLoading, error } = useQuery({
@@ -237,11 +247,70 @@ export default function CoachDashboard() {
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b">
+        <div className="max-w-md mx-auto px-4">
+          <div className="flex space-x-1">
+            <button
+              onClick={() => setActiveTab("team")}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg ${
+                activeTab === "team"
+                  ? "bg-primary-100 text-primary-700 border-b-2 border-primary-500"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              data-testid="tab-my-team"
+            >
+              <UsersIcon className="h-4 w-4 inline mr-1" />
+              My Team
+            </button>
+            <button
+              onClick={() => setActiveTab("checkin")}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg ${
+                activeTab === "checkin"
+                  ? "bg-primary-100 text-primary-700 border-b-2 border-primary-500"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              data-testid="tab-checkin-checkout"
+            >
+              <LogIn className="h-4 w-4 inline mr-1" />
+              Check-in/Check-Out
+            </button>
+            <button
+              onClick={() => setActiveTab("messages")}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg relative ${
+                activeTab === "messages"
+                  ? "bg-primary-100 text-primary-700 border-b-2 border-primary-500"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              data-testid="tab-messages"
+            >
+              <Bell className="h-4 w-4 inline mr-1" />
+              Message
+              {unreadCountNumber > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadCountNumber}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Coach Dashboard Content */}
       <div className="max-w-md mx-auto px-4 py-6">
-        {/* Coach Info Card */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
+        {/* Messages Tab Content */}
+        {activeTab === "messages" && (
+          <div className="space-y-4">
+            <NotificationsList />
+          </div>
+        )}
+
+        {/* Team and Check-in/out Content */}
+        {(activeTab === "team" || activeTab === "checkin") && (
+          <>
+            {/* Coach Info Card */}
+            <Card className="mb-6">
+              <CardContent className="p-4">
             <div className="flex items-center space-x-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="bg-primary-100">
@@ -436,6 +505,8 @@ export default function CoachDashboard() {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
     </div>
   );

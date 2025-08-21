@@ -1198,6 +1198,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification endpoints
+  
+  // Admin: Send notification to team coach
+  app.post("/api/admin/notifications/send", requireAdmin, async (req, res) => {
+    try {
+      const { toCoachId, teamName, notificationType, subject, message, checkoutDate } = req.body;
+      
+      if (!toCoachId || !teamName || !notificationType || !subject || !message) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify coach exists
+      const coach = await storage.getUserByCoachId(toCoachId);
+      if (!coach) {
+        return res.status(404).json({ message: "Coach not found" });
+      }
+
+      const notification = await storage.createNotification({
+        fromUserId: req.session.user!.id,
+        toCoachId,
+        teamName,
+        notificationType,
+        subject,
+        message,
+        checkoutDate: checkoutDate ? new Date(checkoutDate) : undefined,
+      });
+
+      // Send SMS notification
+      if (coach.mobileNumber) {
+        await NotificationService.sendSMS(coach.mobileNumber, message);
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user!.id,
+        actionType: "notification_send",
+        targetEntity: "notification",
+        targetId: notification.id,
+        details: { toCoachId, teamName, notificationType, subject },
+      });
+
+      res.json({ message: "Notification sent successfully", notification });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to send notification" });
+    }
+  });
+
+  // Admin: Get list of teams for notification dropdown
+  app.get("/api/admin/teams", requireAdmin, async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const teamMap = new Map();
+      participants
+        .filter(p => p.teamName && p.role === 'coach')
+        .forEach(p => {
+          teamMap.set(p.participantId, { teamName: p.teamName, coachId: p.participantId });
+        });
+      const teams = Array.from(teamMap.values());
+      
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get teams" });
+    }
+  });
+
+  // Coach: Get notifications for current coach
+  app.get("/api/coach/notifications", requireCoach, async (req, res) => {
+    try {
+      const coachId = req.session.user!.coachId;
+      if (!coachId) {
+        return res.status(400).json({ message: "Coach ID not found" });
+      }
+
+      const notifications = await storage.getNotificationsByCoachId(coachId);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get notifications" });
+    }
+  });
+
+  // Coach: Mark notification as read
+  app.post("/api/coach/notifications/:id/read", requireCoach, async (req, res) => {
+    try {
+      const notification = await storage.getNotificationById(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      // Verify notification belongs to this coach
+      if (notification.toCoachId !== req.session.user!.coachId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const updatedNotification = await storage.markNotificationAsRead(req.params.id);
+      res.json({ message: "Notification marked as read", notification: updatedNotification });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to mark notification as read" });
+    }
+  });
+
+  // Coach: Get unread notification count
+  app.get("/api/coach/notifications/unread-count", requireCoach, async (req, res) => {
+    try {
+      const coachId = req.session.user!.coachId;
+      if (!coachId) {
+        return res.status(400).json({ message: "Coach ID not found" });
+      }
+
+      const count = await storage.getUnreadNotificationCount(coachId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get unread count" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

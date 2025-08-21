@@ -1,8 +1,9 @@
 import { 
-  users, hotels, participants, reassignments, auditLog,
+  users, hotels, participants, reassignments, auditLog, notifications,
   type User, type InsertUser, type Hotel, type InsertHotel, type UpdateHotel,
   type Participant, type InsertParticipant, type Reassignment, 
   type InsertReassignment, type AuditLog, type InsertAuditLog,
+  type Notification, type InsertNotification, type UpdateNotification,
   calculateHotelStatus, type HotelWithStatus
 } from "@shared/schema";
 import { db } from "./db";
@@ -46,6 +47,14 @@ export interface IStorage {
   // Audit logging
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(filters?: AuditFilters): Promise<AuditLog[]>;
+
+  // Notification management
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getNotificationsByCoachId(coachId: string): Promise<Notification[]>;
+  getNotificationById(id: string): Promise<Notification | undefined>;
+  updateNotification(id: string, updates: UpdateNotification): Promise<Notification | undefined>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  getUnreadNotificationCount(coachId: string): Promise<number>;
 
   // Dashboard statistics
   getDashboardStats(): Promise<DashboardStats>;
@@ -562,6 +571,55 @@ export class DatabaseStorage implements IStorage {
       occupancyRate: Math.round(occupancyRate),
       estimatedRoomsNeeded,
     };
+  }
+
+  // Notification methods
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db.insert(notifications).values(insertNotification).returning();
+    return notification;
+  }
+
+  async getNotificationsByCoachId(coachId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.toCoachId, coachId))
+      .orderBy(desc(notifications.sentAt));
+  }
+
+  async getNotificationById(id: string): Promise<Notification | undefined> {
+    const [notification] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.id, id));
+    return notification || undefined;
+  }
+
+  async updateNotification(id: string, updates: UpdateNotification): Promise<Notification | undefined> {
+    const [notification] = await db
+      .update(notifications)
+      .set(updates)
+      .where(eq(notifications.id, id))
+      .returning();
+    return notification || undefined;
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    return this.updateNotification(id, {
+      status: "read",
+      readAt: new Date(),
+    });
+  }
+
+  async getUnreadNotificationCount(coachId: string): Promise<number> {
+    const unreadNotifications = await db
+      .select()
+      .from(notifications)
+      .where(and(
+        eq(notifications.toCoachId, coachId),
+        eq(notifications.status, "unread")
+      ));
+    return unreadNotifications.length;
   }
 }
 
