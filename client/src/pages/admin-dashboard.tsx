@@ -17,7 +17,7 @@ import HotelTable from "@/components/hotel-table";
 import CheckoutBoard from "@/components/checkout-board";
 import AddHotelModal from "@/components/add-hotel-modal";
 import RecalculateOccupancy from "@/components/recalculate-occupancy";
-import { SendNotification } from "@/components/send-notification";
+import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -485,7 +485,7 @@ export default function AdminDashboard() {
 
             {/* Send Notification Component */}
             <div className="mb-8">
-              <SendNotification />
+              <SendNotificationEnhanced />
             </div>
           </>
         )}

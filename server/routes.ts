@@ -1200,7 +1200,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Notification endpoints
   
-  // Admin: Send notification to team coach
+  // Admin: Send enhanced notification with audience targeting
+  app.post("/api/admin/notifications/send-enhanced", requireAdmin, async (req, res) => {
+    try {
+      const { audienceType, notificationType, subject, message, checkoutDate, targetDisciplines, teamName } = req.body;
+      
+      if (!audienceType || !notificationType || !subject || !message) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const participants = await storage.getParticipants();
+      let targetParticipants: typeof participants = [];
+
+      // Filter participants based on audience type
+      switch (audienceType) {
+        case "coaches_only":
+          targetParticipants = participants.filter(p => p.role === 'coach');
+          break;
+        case "all_participants":
+          targetParticipants = participants;
+          break;
+        case "discipline_specific":
+          if (!targetDisciplines || targetDisciplines.length === 0) {
+            return res.status(400).json({ message: "Target disciplines required for discipline-specific notifications" });
+          }
+          targetParticipants = participants.filter(p => targetDisciplines.includes(p.discipline));
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid audience type" });
+      }
+
+      const notifications = [];
+      const smsPromises = [];
+
+      // Create notifications for each target participant
+      for (const participant of targetParticipants) {
+        const notification = await storage.createNotification({
+          fromUserId: req.session.user!.id,
+          toParticipantId: participant.participantId,
+          toParticipantRole: participant.role,
+          teamName: participant.teamName || teamName,
+          discipline: participant.discipline,
+          notificationType,
+          audienceType,
+          targetDisciplines: audienceType === "discipline_specific" ? targetDisciplines : [],
+          subject,
+          message: message.replace('{checkoutDate}', checkoutDate ? new Date(checkoutDate).toLocaleDateString('en-IN') : ''),
+          checkoutDate: checkoutDate ? new Date(checkoutDate) : undefined,
+        });
+
+        notifications.push(notification);
+
+        // Send SMS notification for coaches and officials
+        if ((participant.role === 'coach' || participant.role === 'official') && participant.mobileNumber) {
+          smsPromises.push(
+            NotificationService.sendSMS(
+              participant.mobileNumber, 
+              notification.message
+            ).catch(error => console.error(`SMS failed for ${participant.participantId}:`, error))
+          );
+        }
+      }
+
+      // Send all SMS notifications concurrently
+      await Promise.allSettled(smsPromises);
+
+      await storage.createAuditLog({
+        userId: req.session.user!.id,
+        actionType: "notification_send",
+        targetEntity: "notification",
+        details: { 
+          audienceType, 
+          targetDisciplines, 
+          notificationType, 
+          subject, 
+          recipientCount: notifications.length 
+        },
+      });
+
+      res.json({ 
+        message: "Notifications sent successfully", 
+        recipientCount: notifications.length,
+        notifications 
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to send notifications" });
+    }
+  });
+
+  // Admin: Send notification to specific team coach (legacy endpoint)
   app.post("/api/admin/notifications/send", requireAdmin, async (req, res) => {
     try {
       const { toCoachId, teamName, notificationType, subject, message, checkoutDate } = req.body;
@@ -1209,17 +1297,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Verify coach exists
-      const coach = await storage.getUserByCoachId(toCoachId);
-      if (!coach) {
+      // Get coach participant record
+      const coach = await storage.getParticipantByParticipantId(toCoachId);
+      if (!coach || coach.role !== 'coach') {
         return res.status(404).json({ message: "Coach not found" });
       }
 
       const notification = await storage.createNotification({
         fromUserId: req.session.user!.id,
-        toCoachId,
+        toParticipantId: toCoachId,
+        toParticipantRole: 'coach',
         teamName,
+        discipline: coach.discipline,
         notificationType,
+        audienceType: 'coaches_only',
+        targetDisciplines: [],
         subject,
         message,
         checkoutDate: checkoutDate ? new Date(checkoutDate) : undefined,
@@ -1252,13 +1344,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       participants
         .filter(p => p.teamName && p.role === 'coach')
         .forEach(p => {
-          teamMap.set(p.participantId, { teamName: p.teamName, coachId: p.participantId });
+          teamMap.set(p.participantId, { 
+            teamName: p.teamName, 
+            coachId: p.participantId,
+            discipline: p.discipline 
+          });
         });
       const teams = Array.from(teamMap.values());
       
       res.json(teams);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get teams" });
+    }
+  });
+
+  // Admin: Get list of disciplines with participant counts
+  app.get("/api/admin/disciplines", requireAdmin, async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const disciplineMap = new Map();
+      
+      participants.forEach(p => {
+        if (p.discipline) {
+          const current = disciplineMap.get(p.discipline) || 0;
+          disciplineMap.set(p.discipline, current + 1);
+        }
+      });
+      
+      const disciplines = Array.from(disciplineMap.entries()).map(([discipline, count]) => ({
+        discipline,
+        count
+      }));
+      
+      res.json(disciplines);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get disciplines" });
     }
   });
 
@@ -1270,7 +1390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Coach ID not found" });
       }
 
-      const notifications = await storage.getNotificationsByCoachId(coachId);
+      const notifications = await storage.getNotificationsByParticipantId(coachId);
       res.json(notifications);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get notifications" });
@@ -1286,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify notification belongs to this coach
-      if (notification.toCoachId !== req.session.user!.coachId) {
+      if (notification.toParticipantId !== req.session.user!.coachId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -1305,8 +1425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Coach ID not found" });
       }
 
-      const count = await storage.getUnreadNotificationCount(coachId);
-      res.json({ count });
+      const count = await storage.getUnreadNotificationCountByParticipantId(coachId);
+      res.json(count);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get unread count" });
     }

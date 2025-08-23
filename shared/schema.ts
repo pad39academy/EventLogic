@@ -12,6 +12,7 @@ export const bookingTypeEnum = pgEnum("booking_type", ["regular", "pre_event", "
 export const hotelStatusEnum = pgEnum("hotel_status", ["upcoming", "active", "expired"]);
 export const notificationStatusEnum = pgEnum("notification_status", ["unread", "read"]);
 export const notificationTypeEnum = pgEnum("notification_type", ["match_lost", "early_checkout", "custom", "general"]);
+export const audienceTypeEnum = pgEnum("audience_type", ["coaches_only", "all_participants", "discipline_specific"]);
 
 // Users table (Admins and Coaches)
 export const users = pgTable("users", {
@@ -101,9 +102,13 @@ export const otpVerifications = pgTable("otp_verifications", {
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   fromUserId: text("from_user_id").notNull(), // Admin who sent the notification
-  toCoachId: text("to_coach_id").notNull(), // Coach who receives the notification
-  teamName: text("team_name").notNull(),
+  toParticipantId: text("to_participant_id").notNull(), // Participant who receives the notification (coach, official, or player)
+  toParticipantRole: participantRoleEnum("to_participant_role").notNull(), // Role of the recipient
+  teamName: text("team_name"), // Can be null for general notifications
+  discipline: text("discipline"), // Can be null for general notifications
   notificationType: notificationTypeEnum("notification_type").notNull(),
+  audienceType: audienceTypeEnum("audience_type").notNull(), // Target audience
+  targetDisciplines: text("target_disciplines").array().default([]), // Array of disciplines for discipline-specific notifications
   subject: text("subject").notNull(),
   message: text("message").notNull(),
   checkoutDate: timestamp("checkout_date"), // Suggested checkout date
@@ -136,10 +141,9 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     references: [users.id],
     relationName: "sentNotifications",
   }),
-  toCoach: one(users, {
-    fields: [notifications.toCoachId],
-    references: [users.coachId],
-    relationName: "receivedNotifications",
+  toParticipant: one(participants, {
+    fields: [notifications.toParticipantId],
+    references: [participants.participantId],
   }),
 }));
 

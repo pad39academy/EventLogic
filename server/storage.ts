@@ -50,11 +50,13 @@ export interface IStorage {
 
   // Notification management
   createNotification(notification: InsertNotification): Promise<Notification>;
-  getNotificationsByCoachId(coachId: string): Promise<Notification[]>;
+  getNotificationsByParticipantId(participantId: string): Promise<Notification[]>;
+  getNotificationsByCoachId(coachId: string): Promise<Notification[]>; // Legacy support
   getNotificationById(id: string): Promise<Notification | undefined>;
   updateNotification(id: string, updates: UpdateNotification): Promise<Notification | undefined>;
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
-  getUnreadNotificationCount(coachId: string): Promise<number>;
+  getUnreadNotificationCountByParticipantId(participantId: string): Promise<number>;
+  getUnreadNotificationCount(coachId: string): Promise<number>; // Legacy support
 
   // Dashboard statistics
   getDashboardStats(): Promise<DashboardStats>;
@@ -579,12 +581,17 @@ export class DatabaseStorage implements IStorage {
     return notification;
   }
 
-  async getNotificationsByCoachId(coachId: string): Promise<Notification[]> {
+  async getNotificationsByParticipantId(participantId: string): Promise<Notification[]> {
     return await db
       .select()
       .from(notifications)
-      .where(eq(notifications.toCoachId, coachId))
+      .where(eq(notifications.toParticipantId, participantId))
       .orderBy(desc(notifications.sentAt));
+  }
+
+  async getNotificationsByCoachId(coachId: string): Promise<Notification[]> {
+    // Legacy method - delegates to new method
+    return this.getNotificationsByParticipantId(coachId);
   }
 
   async getNotificationById(id: string): Promise<Notification | undefined> {
@@ -611,15 +618,20 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getUnreadNotificationCount(coachId: string): Promise<number> {
+  async getUnreadNotificationCountByParticipantId(participantId: string): Promise<number> {
     const unreadNotifications = await db
       .select()
       .from(notifications)
       .where(and(
-        eq(notifications.toCoachId, coachId),
+        eq(notifications.toParticipantId, participantId),
         eq(notifications.status, "unread")
       ));
     return unreadNotifications.length;
+  }
+
+  async getUnreadNotificationCount(coachId: string): Promise<number> {
+    // Legacy method - delegates to new method
+    return this.getUnreadNotificationCountByParticipantId(coachId);
   }
 }
 
