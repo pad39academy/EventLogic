@@ -1382,6 +1382,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test endpoint for disciplines (bypassing auth for testing)
+  app.get("/api/test/disciplines", async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const disciplineMap = new Map();
+      
+      participants.forEach(p => {
+        if (p.discipline) {
+          const current = disciplineMap.get(p.discipline) || 0;
+          disciplineMap.set(p.discipline, current + 1);
+        }
+      });
+      
+      const disciplines = Array.from(disciplineMap.entries()).map(([discipline, count]) => ({
+        discipline,
+        count
+      }));
+      
+      res.json(disciplines);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get disciplines" });
+    }
+  });
+
+  // Test endpoint for teams (bypassing auth for testing)
+  app.get("/api/test/teams", async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const teamMap = new Map();
+      participants
+        .filter(p => p.teamName && p.role === 'coach')
+        .forEach(p => {
+          teamMap.set(p.participantId, { 
+            teamName: p.teamName, 
+            coachId: p.participantId,
+            discipline: p.discipline 
+          });
+        });
+      const teams = Array.from(teamMap.values());
+      
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get teams" });
+    }
+  });
+
+  // Test endpoint for sending enhanced notifications (bypassing auth for testing)
+  app.post("/api/test/notifications/send-enhanced", async (req, res) => {
+    try {
+      const { audienceType, notificationType, subject, message, checkoutDate, targetDisciplines, teamName } = req.body;
+      
+      // Mock user for testing
+      const mockUser = { id: 'test-user', name: 'Test Admin', role: 'admin' };
+      
+      console.log('Test notification request:', {
+        audienceType,
+        notificationType,
+        subject,
+        message,
+        checkoutDate,
+        targetDisciplines,
+        teamName
+      });
+
+      // Create the notification record
+      const notificationData = {
+        notificationType,
+        subject,
+        message,
+        checkoutDate: checkoutDate || null,
+        audienceType,
+        toParticipantId: null, // For targeted audiences
+        targetDisciplines: audienceType === "discipline_specific" ? targetDisciplines : [],
+        sentBy: mockUser.id,
+        status: 'sent' as const,
+        sentAt: new Date(),
+      };
+
+      const notification = await storage.createEnhancedNotification(notificationData);
+
+      // Calculate recipients based on audience type
+      let recipientCount = 0;
+      const participants = await storage.getParticipants();
+      
+      switch (audienceType) {
+        case "coaches_only":
+          recipientCount = participants.filter(p => p.role === 'coach').length;
+          break;
+        case "all_participants":
+          recipientCount = participants.length;
+          break;
+        case "discipline_specific":
+          recipientCount = participants.filter(p => 
+            targetDisciplines.includes(p.discipline || '')
+          ).length;
+          break;
+        default:
+          recipientCount = 0;
+      }
+
+      console.log(`Test notification sent to ${recipientCount} recipients`);
+
+      res.json({
+        message: "Notification sent successfully",
+        notification,
+        recipientCount,
+        recipients: audienceType
+      });
+    } catch (error) {
+      console.error('Test notification error:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to send notification" });
+    }
+  });
+
   // Coach: Get notifications for current coach
   app.get("/api/coach/notifications", requireCoach, async (req, res) => {
     try {

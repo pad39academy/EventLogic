@@ -53,20 +53,20 @@ export function SendNotificationEnhanced() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get teams for dropdown (for team-specific notifications)
+  // Get teams for dropdown (for team-specific notifications) - use test endpoint for now
   const { data: teams = [], isLoading: teamsLoading } = useQuery<Team[]>({
-    queryKey: ["/api/admin/teams"],
+    queryKey: ["/api/test/teams"],
   });
 
-  // Get disciplines for selection
+  // Get disciplines for selection - use test endpoint for now
   const { data: disciplines = [], isLoading: disciplinesLoading } = useQuery<Discipline[]>({
-    queryKey: ["/api/admin/disciplines"],
+    queryKey: ["/api/test/disciplines"],
   });
 
-  // Send notification mutation
+  // Send notification mutation - use test endpoint for now
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/admin/notifications/send-enhanced", "POST", data);
+      return apiRequest("/api/test/notifications/send-enhanced", "POST", data);
     },
     onSuccess: (response: any) => {
       toast({
