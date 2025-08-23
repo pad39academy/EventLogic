@@ -66,7 +66,8 @@ export function SendNotificationEnhanced() {
   // Send notification mutation
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/admin/notifications/send-enhanced", "POST", data);
+      const response = await apiRequest("POST", "/api/admin/notifications/send-enhanced", data);
+      return response.json();
     },
     onSuccess: (response: any) => {
       toast({
