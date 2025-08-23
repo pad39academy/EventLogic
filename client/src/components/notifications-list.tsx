@@ -61,7 +61,7 @@ export function NotificationsList() {
   // Mark notification as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      return apiRequest(`/api/coach/notifications/${notificationId}/read`, "POST");
+      return apiRequest("POST", `/api/coach/notifications/${notificationId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/notifications"] });
