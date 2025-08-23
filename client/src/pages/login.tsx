@@ -397,14 +397,6 @@ export default function Login() {
                     <Shield className="h-4 w-4 inline mr-1" />
                     Note: Admin login requires two-factor authentication via SMS OTP
                   </div>
-                  
-                  {/* Development Credentials Hint */}
-                  <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border">
-                    <div className="font-medium text-gray-700 mb-1">💡 Development Credentials:</div>
-                    <div><strong>Email:</strong> admin@ievolve.com</div>
-                    <div><strong>Password:</strong> IevolveAdmin2025!</div>
-                    <div className="text-gray-500 mt-1">OTP will be sent to: +919344100312</div>
-                  </div>
                 </form>
               </Form>
             )}
