@@ -57,6 +57,7 @@ export interface IStorage {
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
   getUnreadNotificationCountByParticipantId(participantId: string): Promise<number>;
   getUnreadNotificationCount(coachId: string): Promise<number>; // Legacy support
+  getAllNotifications(): Promise<Notification[]>;
 
   // Dashboard statistics
   getDashboardStats(): Promise<DashboardStats>;
@@ -632,6 +633,13 @@ export class DatabaseStorage implements IStorage {
   async getUnreadNotificationCount(coachId: string): Promise<number> {
     // Legacy method - delegates to new method
     return this.getUnreadNotificationCountByParticipantId(coachId);
+  }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .orderBy(desc(notifications.sentAt));
   }
 }
 

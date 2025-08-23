@@ -1428,6 +1428,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get all sent notifications with details
+  app.get("/api/admin/notifications", requireAdmin, async (req, res) => {
+    try {
+      const allNotifications = await storage.getAllNotifications();
+
+      // Group notifications by message (for bulk sends)
+      const groupedNotifications = new Map<string, any>();
+      
+      allNotifications.forEach((notification: any) => {
+        const key = `${notification.fromUserId}-${notification.subject}-${notification.sentAt?.getTime()}`;
+        if (!groupedNotifications.has(key)) {
+          groupedNotifications.set(key, {
+            ...notification,
+            recipientCount: 1,
+            recipients: [notification.toParticipantId],
+            readCount: notification.status === 'read' ? 1 : 0,
+            unreadCount: notification.status === 'unread' ? 1 : 0
+          });
+        } else {
+          const existing = groupedNotifications.get(key);
+          existing.recipientCount++;
+          existing.recipients.push(notification.toParticipantId);
+          if (notification.status === 'read') existing.readCount++;
+          if (notification.status === 'unread') existing.unreadCount++;
+        }
+      });
+
+      const result = Array.from(groupedNotifications.values());
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get notifications" });
+    }
+  });
+
   // Test endpoint for sending enhanced notifications (bypassing auth for testing)
   app.post("/api/test/notifications/send-enhanced", async (req, res) => {
     try {
