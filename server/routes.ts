@@ -1446,21 +1446,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamName
       });
 
-      // Create the notification record
+      // Create notification records - for this test, we'll create one sample record
       const notificationData = {
+        fromUserId: mockUser.id,
+        toParticipantId: 'COACH-00001', // Sample participant ID 
+        toParticipantRole: 'coach' as const,
+        teamName: teamName || null,
+        discipline: targetDisciplines.length > 0 ? targetDisciplines[0] : null,
         notificationType,
+        audienceType,
+        targetDisciplines: audienceType === "discipline_specific" ? targetDisciplines : [],
         subject,
         message,
-        checkoutDate: checkoutDate || null,
-        audienceType,
-        toParticipantId: null, // For targeted audiences
-        targetDisciplines: audienceType === "discipline_specific" ? targetDisciplines : [],
-        sentBy: mockUser.id,
-        status: 'sent' as const,
-        sentAt: new Date(),
+        checkoutDate: checkoutDate ? new Date(checkoutDate) : null,
+        status: 'unread' as const,
       };
 
-      const notification = await storage.createEnhancedNotification(notificationData);
+      const notification = await storage.createNotification(notificationData);
 
       // Calculate recipients based on audience type
       let recipientCount = 0;

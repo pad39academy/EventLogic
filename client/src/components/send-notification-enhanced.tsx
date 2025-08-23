@@ -53,20 +53,20 @@ export function SendNotificationEnhanced() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get teams for dropdown (for team-specific notifications) - use test endpoint for now
+  // Get teams for dropdown (for team-specific notifications)
   const { data: teams = [], isLoading: teamsLoading } = useQuery<Team[]>({
-    queryKey: ["/api/test/teams"],
+    queryKey: ["/api/admin/teams"],
   });
 
-  // Get disciplines for selection - use test endpoint for now
+  // Get disciplines for selection
   const { data: disciplines = [], isLoading: disciplinesLoading } = useQuery<Discipline[]>({
-    queryKey: ["/api/test/disciplines"],
+    queryKey: ["/api/admin/disciplines"],
   });
 
-  // Send notification mutation - use test endpoint for now
+  // Send notification mutation
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/test/notifications/send-enhanced", "POST", data);
+      return apiRequest("/api/admin/notifications/send-enhanced", "POST", data);
     },
     onSuccess: (response: any) => {
       toast({
@@ -101,6 +101,10 @@ export function SendNotificationEnhanced() {
       const template = defaultMessages[type as keyof typeof defaultMessages];
       setSubject(template.subject);
       setMessage(template.message);
+    } else if (type === "custom") {
+      // Clear the fields for custom messages so user can enter their own
+      setSubject("");
+      setMessage("");
     }
   };
 
@@ -385,6 +389,8 @@ export function SendNotificationEnhanced() {
             </Button>
           </div>
         )}
+
+
       </CardContent>
     </Card>
   );
