@@ -21,9 +21,10 @@ export default function HotelCards() {
 
   const getOccupancyStatus = (occupiedRooms: number, totalRooms: number) => {
     const percentage = (occupiedRooms / totalRooms) * 100;
-    if (percentage >= 90) return { label: "High Occupancy", variant: "warning" as const, color: "warning-500" };
-    if (percentage >= 70) return { label: "Active", variant: "default" as const, color: "primary-600" };
-    return { label: "Available", variant: "success" as const, color: "success-500" };
+    if (percentage >= 90) return { label: "High Occupancy", variant: "warning" as const, color: "#ef4444", bgClass: "bg-red-500" };
+    if (percentage >= 70) return { label: "Active", variant: "default" as const, color: "#f59e0b", bgClass: "bg-yellow-500" };
+    if (percentage >= 30) return { label: "Moderate", variant: "default" as const, color: "#3b82f6", bgClass: "bg-blue-500" };
+    return { label: "Available", variant: "success" as const, color: "#10b981", bgClass: "bg-green-500" };
   };
 
   if (isLoading) {
@@ -93,7 +94,7 @@ export default function HotelCards() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                         <div 
-                          className={`bg-${status.color} h-2 rounded-full transition-all duration-300`}
+                          className={`h-2 rounded-full transition-all duration-300 ${status.bgClass}`}
                           style={{ width: `${occupancyPercentage}%` }}
                           data-testid={`hotel-progress-${hotel.hotelId}`}
                         ></div>
