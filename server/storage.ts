@@ -7,7 +7,7 @@ import {
   calculateHotelStatus, type HotelWithStatus
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, lt, gt, or, like, desc, asc, sql, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lte, lt, gt, or, like, ilike, desc, asc, sql, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -329,9 +329,9 @@ export class DatabaseStorage implements IStorage {
     if (filters.search) {
       conditions.push(
         or(
-          like(participants.name, `%${filters.search}%`),
-          like(participants.participantId, `%${filters.search}%`),
-          like(participants.mobileNumber, `%${filters.search}%`)
+          ilike(participants.name, `%${filters.search}%`),
+          ilike(participants.participantId, `%${filters.search}%`),
+          ilike(participants.mobileNumber, `%${filters.search}%`)
         )
       );
     }
