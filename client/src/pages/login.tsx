@@ -192,13 +192,20 @@ export default function Login() {
   });
 
   // Handle successful hotel verification
-  const handleHotelVerificationSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  const handleHotelVerificationSuccess = async () => {
+    // Invalidate and refetch the auth data
+    await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
+    
     toast({
       title: "Welcome Coach!",
       description: "Hotel verification completed successfully",
     });
-    setLocation("/coach");
+    
+    // Small delay to ensure state updates are processed
+    setTimeout(() => {
+      setLocation("/coach");
+    }, 100);
   };
 
   // Resend OTP mutation
