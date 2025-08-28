@@ -209,6 +209,9 @@ export function SendNotificationEnhanced() {
   const getAudienceDescription = () => {
     switch (audienceType) {
       case "coaches_only":
+        if (selectedCoaches.length > 0) {
+          return `Message will be sent to ${selectedCoaches.length} selected coach${selectedCoaches.length !== 1 ? 'es' : ''}${includeTeamMembers ? ' and their team members' : ''}`;
+        }
         return "Message will be sent to all team coaches only";
       case "all_participants":
         return "Message will be sent to all participants (coaches, officials, and players)";
@@ -224,6 +227,11 @@ export function SendNotificationEnhanced() {
     
     switch (audienceType) {
       case "coaches_only":
+        // If specific coaches are selected using enhanced selection
+        if (selectedCoaches.length > 0) {
+          return selectedCoaches.length; // Just count selected coaches for now
+        }
+        // Otherwise, show total available coaches
         return teams.length;
       case "all_participants":
         return disciplines.reduce((sum, d) => sum + d.count, 0);
