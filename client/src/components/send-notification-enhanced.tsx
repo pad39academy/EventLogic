@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Bell, Send, Users, UserCheck, Award, Loader2 } from "lucide-react";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 interface Team {
   teamName: string;
@@ -358,7 +359,7 @@ export function SendNotificationEnhanced() {
                 />
                 {checkoutDate && (
                   <p className="text-sm text-gray-500 mt-1">
-                    Checkout date will be formatted as: {new Date(checkoutDate).toLocaleDateString('en-IN')}
+                    Checkout date will be formatted as: {formatToIndianDate(checkoutDate)}
                   </p>
                 )}
               </div>

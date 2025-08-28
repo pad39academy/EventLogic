@@ -11,6 +11,7 @@ import {
   Calendar, Clock, LogOut, AlertTriangle, CheckCircle, 
   Search, Filter, Users, Building2 
 } from "lucide-react";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 interface CheckoutParticipant {
   id: string;
@@ -426,7 +427,7 @@ export default function CheckoutBoard() {
                       
                       <TableCell>
                         <div className="text-sm text-gray-900">
-                          {new Date(participant.bookingEndDate).toLocaleDateString()}
+                          {formatToIndianDate(participant.bookingEndDate)}
                         </div>
                         <div className="text-xs text-gray-500">
                           {new Date(participant.bookingEndDate).toLocaleDateString('en-US', { weekday: 'short' })}

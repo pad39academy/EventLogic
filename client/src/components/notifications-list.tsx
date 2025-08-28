@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Bell, Clock, CheckCircle, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 interface Notification {
   id: string;
@@ -168,7 +168,7 @@ export function NotificationsList() {
                               {getNotificationTypeLabel(notification.notificationType)}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {format(new Date(notification.sentAt), "MMM d, yyyy 'at' h:mm a")}
+                              {formatToIndianDate(notification.sentAt)} at {new Date(notification.sentAt).toLocaleTimeString('en-IN')}
                             </span>
                           </div>
                           <h4 className="font-medium text-sm mb-2">{notification.subject}</h4>
@@ -178,7 +178,7 @@ export function NotificationsList() {
                             </p>
                             {notification.checkoutDate && (
                               <p className="text-xs text-orange-600 dark:text-orange-300 mt-2 font-medium">
-                                Checkout Date: {format(new Date(notification.checkoutDate), "MMM d, yyyy 'at' h:mm a")}
+                                Checkout Date: {formatToIndianDate(notification.checkoutDate)} at {new Date(notification.checkoutDate).toLocaleTimeString('en-IN')}
                               </p>
                             )}
                           </div>
@@ -215,7 +215,7 @@ export function NotificationsList() {
                             {getNotificationTypeLabel(notification.notificationType)}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(notification.sentAt), "MMM d, yyyy 'at' h:mm a")}
+                            {formatToIndianDate(notification.sentAt)} at {new Date(notification.sentAt).toLocaleTimeString('en-IN')}
                           </span>
                           <CheckCircle className="h-3 w-3 text-green-500" />
                           <span className="text-xs text-green-600">Read</span>
@@ -226,7 +226,7 @@ export function NotificationsList() {
                         </p>
                         {notification.checkoutDate && (
                           <p className="text-xs text-muted-foreground mt-2">
-                            Checkout Date: {format(new Date(notification.checkoutDate), "MMM d, yyyy 'at' h:mm a")}
+                            Checkout Date: {formatToIndianDate(notification.checkoutDate)} at {new Date(notification.checkoutDate).toLocaleTimeString('en-IN')}
                           </p>
                         )}
                       </div>

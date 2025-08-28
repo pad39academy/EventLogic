@@ -96,7 +96,7 @@ export default function AdminDashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `participants-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `participants-${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

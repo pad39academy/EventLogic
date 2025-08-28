@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Building, AlertCircle, CheckCircle } from "lucide-react";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 const addHotelSchema = z.object({
   hotelId: z.string().min(1, "Hotel ID is required"),
@@ -311,7 +312,7 @@ export default function AddHotelModal({ open, onOpenChange, mode = "new", onMode
                                 <div className="mt-2 space-y-1">
                                   {hotelCheckResult.existingInstances.map((instance: any, index: number) => (
                                     <div key={index} className="text-blue-700 text-xs">
-                                      <span className="font-medium">Instance {instance.instanceCode}:</span> {new Date(instance.startDate).toLocaleDateString()} - {new Date(instance.endDate).toLocaleDateString()}
+                                      <span className="font-medium">Instance {instance.instanceCode}:</span> {formatToIndianDate(instance.startDate)} - {formatToIndianDate(instance.endDate)}
                                     </div>
                                   ))}
                                 </div>
@@ -438,8 +439,8 @@ export default function AddHotelModal({ open, onOpenChange, mode = "new", onMode
                     <strong>⚠️ Date Conflict Prevention:</strong>
                     <div className="mt-1 text-amber-700">
                       Ensure your dates don't overlap with existing instances. Overall date range spans from{" "}
-                      <strong>{new Date(hotelCheckResult.earliestStart).toLocaleDateString()}</strong> to{" "}
-                      <strong>{new Date(hotelCheckResult.latestEnd).toLocaleDateString()}</strong>.
+                      <strong>{formatToIndianDate(hotelCheckResult.earliestStart)}</strong> to{" "}
+                      <strong>{formatToIndianDate(hotelCheckResult.latestEnd)}</strong>.
                     </div>
                   </div>
                 </div>

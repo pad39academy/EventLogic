@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, User, Building, FileText, Clock } from "lucide-react";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 interface AuditLog {
   id: string;
@@ -173,7 +174,7 @@ export default function AuditLogTable() {
                     <div className="flex items-center text-sm text-gray-500">
                       <Clock className="h-4 w-4 mr-1" />
                       <span data-testid="text-timestamp">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {formatToIndianDate(log.timestamp)} {new Date(log.timestamp).toLocaleTimeString('en-IN')}
                       </span>
                     </div>
                   </div>

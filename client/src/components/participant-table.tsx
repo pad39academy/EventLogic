@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -341,7 +342,7 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">
-                      {new Date(participant.bookingStartDate).toLocaleDateString()} - {new Date(participant.bookingEndDate).toLocaleDateString()}
+                      {formatToIndianDate(participant.bookingStartDate)} - {formatToIndianDate(participant.bookingEndDate)}
                     </div>
                     <div className="text-sm text-gray-500">
                       {Math.ceil((new Date(participant.bookingEndDate).getTime() - new Date(participant.bookingStartDate).getTime()) / (1000 * 3600 * 24))} days

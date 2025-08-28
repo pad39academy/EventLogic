@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bell, Clock, CheckCircle, AlertTriangle, Users, UserCheck, Award } from "lucide-react";
-import { format } from "date-fns";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 
 interface AdminNotification {
   id: string;
@@ -180,7 +180,7 @@ export function AdminNotificationsList() {
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {format(new Date(notification.sentAt), "MMM d, yyyy 'at' h:mm a")}
+                          {formatToIndianDate(notification.sentAt)} at {new Date(notification.sentAt).toLocaleTimeString('en-IN')}
                         </span>
                       </div>
                       
@@ -192,7 +192,7 @@ export function AdminNotificationsList() {
                         </p>
                         {notification.checkoutDate && (
                           <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
-                            Checkout Date: {format(new Date(notification.checkoutDate), "MMM d, yyyy")}
+                            Checkout Date: {formatToIndianDate(notification.checkoutDate)}
                           </p>
                         )}
                         {notification.targetDisciplines && notification.targetDisciplines.length > 0 && (

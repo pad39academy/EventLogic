@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatToIndianDate } from "@/../../shared/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { logout } from "@/lib/auth";
 import { useLocation } from "wouter";
@@ -369,13 +370,13 @@ export default function CoachDashboard() {
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Check-in Date</span>
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-checkin-date">
-                {coach?.bookingStartDate ? new Date(coach.bookingStartDate).toLocaleDateString() : 'N/A'}
+                {coach?.bookingStartDate ? formatToIndianDate(coach.bookingStartDate) : 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Check-out Date</span>
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-checkout-date">
-                {coach?.bookingEndDate ? new Date(coach.bookingEndDate).toLocaleDateString() : 'N/A'}
+                {coach?.bookingEndDate ? formatToIndianDate(coach.bookingEndDate) : 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
