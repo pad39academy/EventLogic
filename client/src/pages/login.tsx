@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Phone, Mail, Lock, Shield, ArrowRight, RefreshCw } from "lucide-react";
+import HotelVerification from "@/components/hotel-verification";
 
 // Login form schemas
 const adminLoginSchema = z.object({
@@ -43,9 +44,10 @@ export default function Login() {
   const queryClient = useQueryClient();
   
   const [selectedRole, setSelectedRole] = useState<"admin" | "coach" | "">("");
-  const [step, setStep] = useState<"role" | "credentials" | "otp">("role");
+  const [step, setStep] = useState<"role" | "credentials" | "otp" | "hotel_verification">("role");
   const [mobileForOTP, setMobileForOTP] = useState("");
   const [countdown, setCountdown] = useState(0);
+  const [coachName, setCoachName] = useState("");
 
   // Admin form
   const adminForm = useForm<AdminLoginForm>({
@@ -161,13 +163,24 @@ export default function Login() {
       });
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({
-        title: "Login Successful",
-        description: "Welcome Coach!",
-      });
-      setLocation("/coach");
+      setCoachName(response.user.name);
+      
+      // Check if hotel verification is required
+      if (!response.user.isHotelVerified) {
+        setStep("hotel_verification");
+        toast({
+          title: "OTP Verified Successfully",
+          description: "Please complete hotel verification to continue",
+        });
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Welcome Coach!",
+        });
+        setLocation("/coach");
+      }
     },
     onError: (error: any) => {
       toast({
@@ -177,6 +190,16 @@ export default function Login() {
       });
     },
   });
+
+  // Handle successful hotel verification
+  const handleHotelVerificationSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    toast({
+      title: "Welcome Coach!",
+      description: "Hotel verification completed successfully",
+    });
+    setLocation("/coach");
+  };
 
   // Resend OTP mutation
   const resendOtpMutation = useMutation({
@@ -267,12 +290,14 @@ export default function Login() {
               {step === "credentials" && selectedRole === "admin" && "Admin Login"}
               {step === "credentials" && selectedRole === "coach" && "Team Coach Login"}
               {step === "otp" && "OTP Verification"}
+              {step === "hotel_verification" && "Hotel Verification Required"}
             </CardTitle>
             <CardDescription className="text-center text-gray-600">
               {step === "role" && "Choose your login role to continue"}
               {step === "credentials" && selectedRole === "admin" && "Enter your email and password"}
               {step === "credentials" && selectedRole === "coach" && "Enter your registered mobile number"}
               {step === "otp" && `Enter 6-digit OTP sent to ${mobileForOTP.replace(/(\+\d{2})(\d{4})(\d{4})/, '$1****$3')}`}
+              {step === "hotel_verification" && "Please verify your hotel code to continue"}
             </CardDescription>
           </CardHeader>
 
@@ -557,6 +582,14 @@ export default function Login() {
           Having trouble? Contact support for assistance.
         </div>
       </div>
+
+      {/* Hotel Verification Modal/Overlay */}
+      {step === "hotel_verification" && (
+        <HotelVerification 
+          onVerificationSuccess={handleHotelVerificationSuccess}
+          coachName={coachName}
+        />
+      )}
     </div>
   );
 }

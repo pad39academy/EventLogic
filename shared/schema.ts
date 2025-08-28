@@ -24,6 +24,11 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull(),
   coachId: text("coach_id").unique(), // For coaches (COA_001, etc.)
   isActive: boolean("is_active").default(true),
+  // Hotel verification fields for coaches
+  isHotelVerified: boolean("is_hotel_verified").default(false), // Coach has verified hotel code
+  verifiedHotelId: text("verified_hotel_id"), // Which hotel they verified for
+  verificationFailedAttempts: integer("verification_failed_attempts").default(0), // Failed attempts counter
+  lastFailedAttempt: timestamp("last_failed_attempt"), // Last failed verification attempt
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -117,11 +122,22 @@ export const notifications = pgTable("notifications", {
   readAt: timestamp("read_at"),
 });
 
+// Settings table for global configuration
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // Setting key (e.g., "checkin_time_window_hours")
+  value: text("value").notNull(), // Setting value as string
+  description: text("description"), // Description of the setting
+  updatedBy: text("updated_by").notNull(), // Admin who updated the setting
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Audit log table
 export const auditLog = pgTable("audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: text("user_id").notNull(),
-  actionType: text("action_type").notNull(), // upload, edit, delete, checkin, checkout, reassign
+  actionType: text("action_type").notNull(), // upload, edit, delete, checkin, checkout, reassign, verify_hotel
   targetEntity: text("target_entity").notNull(), // participant, hotel, etc.
   targetId: text("target_id"),
   details: jsonb("details"),
@@ -237,6 +253,12 @@ export const insertOtpSchema = createInsertSchema(otpVerifications).omit({
   createdAt: true,
 });
 
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Notification schemas
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
@@ -266,6 +288,9 @@ export type InsertOtpVerification = z.infer<typeof insertOtpSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type UpdateNotification = z.infer<typeof updateNotificationSchema>;
+export type Settings = typeof settings.$inferSelect;
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type HotelVerificationRequest = z.infer<typeof hotelVerificationSchema>;
 
 // Additional schemas for API validation
 export const loginSchema = z.object({
@@ -289,6 +314,10 @@ export const otpVerifySchema = z.object({
   email: z.string().email().optional(),
   otp: z.string().length(6),
   purpose: z.enum(["admin_login", "coach_login"]),
+});
+
+export const hotelVerificationSchema = z.object({
+  hotelCode: z.string().min(1, "Hotel code is required"),
 });
 
 export const uploadFileSchema = z.object({

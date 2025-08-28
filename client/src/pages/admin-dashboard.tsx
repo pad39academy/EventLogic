@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,7 @@ import { logout } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { 
   Calendar, Bell, User, Upload, Download, Plus, Menu,
-  Building, UserCheck, Users as UsersIcon, LogOut
+  Building, UserCheck, Users as UsersIcon, LogOut, Clock, Shield
 } from "lucide-react";
 import StatsCards from "@/components/stats-cards";
 import UploadModal from "@/components/upload-modal";
@@ -20,6 +20,7 @@ import AddHotelModal from "@/components/add-hotel-modal";
 import RecalculateOccupancy from "@/components/recalculate-occupancy";
 import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
 import { AdminNotificationsList } from "@/components/admin-notifications-list";
+import TimeWindowSettings from "@/components/time-window-settings";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -205,6 +206,13 @@ export default function AdminDashboard() {
                     data-testid="nav-notifications"
                   >
                     Send Notification
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("settings")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "settings" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
+                    data-testid="nav-settings"
+                  >
+                    Settings
                   </button>
                   {/* Temporarily disabled
                   <button 
@@ -596,6 +604,84 @@ export default function AdminDashboard() {
           </>
         )}
         */}
+
+        {/* Settings */}
+        {activeTab === "settings" && (
+          <>
+            <div className="mb-8">
+              <div className="md:flex md:items-center md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
+                    System Settings
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
+                    Configure access controls and system-wide parameters
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Access Control Settings */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5" />
+                  <span>Coach Access Control</span>
+                </CardTitle>
+                <CardDescription>
+                  Configure when coaches can perform check-in and check-out operations relative to their booking dates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TimeWindowSettings />
+              </CardContent>
+            </Card>
+
+            {/* Security Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5" />
+                  <span>Security Settings</span>
+                </CardTitle>
+                <CardDescription>
+                  Hotel verification and authentication settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center space-x-3">
+                      <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                      <div>
+                        <p className="text-sm font-medium text-green-800">Hotel Verification Enabled</p>
+                        <p className="text-sm text-green-600">
+                          Coaches must verify their hotel code before accessing check-in/out features
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="default" className="bg-green-100 text-green-800">
+                      Active
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900">Maximum Failed Attempts</h4>
+                      <p className="text-2xl font-bold text-gray-700">10</p>
+                      <p className="text-sm text-gray-600">Before account lockout</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900">Verification Method</h4>
+                      <p className="text-sm text-gray-700">Hotel ID Code</p>
+                      <p className="text-sm text-gray-600">Provided by hotel reception</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Upload Modal */}

@@ -10,9 +10,12 @@ import { UploadService } from "./services/upload";
 import { NotificationService } from "./services/notification";
 import { 
   loginSchema, uploadFileSchema, checkinSchema, checkoutSchema,
-  otpRequestSchema, otpVerifySchema, updateHotelSchema, calculateHotelStatus,
+  otpRequestSchema, otpVerifySchema, hotelVerificationSchema, updateHotelSchema, calculateHotelStatus,
   type User, type Participant, type Hotel, type UpdateHotel 
 } from "@shared/schema";
+import { db } from "./db";
+import { users, participants, settings } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import multer from "multer";
 import { z } from "zod";
 
@@ -182,9 +185,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: { method: "coach_otp_login", mobileNumber },
       });
 
-      res.json({ user: { id: user.id, name: user.name, role: user.role, coachId: user.coachId } });
+      res.json({ 
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          role: user.role, 
+          coachId: user.coachId,
+          isHotelVerified: user.isHotelVerified || false,
+          verificationFailedAttempts: user.verificationFailedAttempts || 0
+        } 
+      });
     } catch (error) {
       res.status(401).json({ message: error instanceof Error ? error.message : "Login failed" });
+    }
+  });
+
+  // Coach hotel verification step
+  app.post("/api/auth/coach/verify-hotel", requireCoach, async (req, res) => {
+    try {
+      const { hotelCode } = hotelVerificationSchema.parse(req.body);
+      const userId = req.session.user!.id;
+      const coachId = req.session.user!.coachId;
+      
+      if (!coachId) {
+        return res.status(400).json({ message: "Coach ID not found" });
+      }
+
+      // Get current user to check failed attempts
+      const [currentUser] = await db.select().from(users).where(eq(users.id, userId));
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user has exceeded maximum failed attempts
+      if (currentUser.verificationFailedAttempts >= 10) {
+        return res.status(429).json({ 
+          message: "Maximum verification attempts exceeded. Please logout and try again." 
+        });
+      }
+
+      // Find coach's assigned hotel using their participant record
+      const [coachParticipant] = await db.select().from(participants).where(
+        eq(participants.participantId, coachId)
+      );
+      
+      if (!coachParticipant) {
+        return res.status(404).json({ message: "Coach assignment not found" });
+      }
+
+      // Verify hotel code matches assigned hotel ID
+      if (hotelCode !== coachParticipant.hotelId) {
+        // Increment failed attempts
+        await db.update(users)
+          .set({ 
+            verificationFailedAttempts: (currentUser.verificationFailedAttempts || 0) + 1,
+            lastFailedAttempt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(users.id, userId));
+
+        await storage.createAuditLog({
+          userId: userId,
+          actionType: "verify_hotel",
+          targetEntity: "hotel",
+          targetId: hotelCode,
+          details: { success: false, coachId, attemptedCode: hotelCode, assignedHotel: coachParticipant.hotelId },
+        });
+
+        return res.status(400).json({ 
+          message: `Invalid hotel code. This code does not match your assigned hotel.`,
+          failedAttempts: (currentUser.verificationFailedAttempts || 0) + 1,
+          maxAttempts: 10
+        });
+      }
+
+      // Valid hotel code - update user as verified
+      await db.update(users)
+        .set({ 
+          isHotelVerified: true,
+          verifiedHotelId: hotelCode,
+          verificationFailedAttempts: 0, // Reset on successful verification
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+
+      // Update session
+      req.session.user!.isHotelVerified = true;
+      req.session.user!.verifiedHotelId = hotelCode;
+
+      await storage.createAuditLog({
+        userId: userId,
+        actionType: "verify_hotel",
+        targetEntity: "hotel",
+        targetId: hotelCode,
+        details: { success: true, coachId, verifiedHotel: hotelCode },
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Hotel verified successfully",
+        hotelName: coachParticipant.hotelName,
+        hotelId: coachParticipant.hotelId
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Hotel verification failed" });
+    }
+  });
+
+  // Settings management routes (Admin only)
+  app.get("/api/admin/settings/checkin-time-window", requireAdmin, async (req, res) => {
+    try {
+      const [setting] = await db.select().from(settings).where(
+        eq(settings.key, "checkin_time_window_hours")
+      );
+      
+      if (!setting) {
+        // Create default setting if it doesn't exist
+        const [newSetting] = await db.insert(settings).values({
+          key: "checkin_time_window_hours",
+          value: "4",
+          description: "Hours before check-in time that coaches can access check-in features",
+          updatedBy: req.session.user!.name,
+        }).returning();
+        
+        return res.json(newSetting);
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get settings" });
+    }
+  });
+
+  app.put("/api/admin/settings/checkin-time-window", requireAdmin, async (req, res) => {
+    try {
+      const { value } = req.body;
+      
+      if (!value || isNaN(Number(value)) || Number(value) < 0 || Number(value) > 72) {
+        return res.status(400).json({ message: "Value must be a number between 0 and 72" });
+      }
+
+      const [updated] = await db.update(settings)
+        .set({ 
+          value: value.toString(),
+          updatedBy: req.session.user!.name,
+          updatedAt: new Date()
+        })
+        .where(eq(settings.key, "checkin_time_window_hours"))
+        .returning();
+
+      if (!updated) {
+        // Create if it doesn't exist
+        const [newSetting] = await db.insert(settings).values({
+          key: "checkin_time_window_hours",
+          value: value.toString(),
+          description: "Hours before check-in time that coaches can access check-in features",
+          updatedBy: req.session.user!.name,
+        }).returning();
+        
+        return res.json(newSetting);
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user!.id,
+        actionType: "update_setting",
+        targetEntity: "setting",
+        targetId: "checkin_time_window_hours",
+        details: { newValue: value, updatedBy: req.session.user!.name },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to update settings" });
     }
   });
 
@@ -741,6 +913,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to check time-based access
+  const checkTimeBasedAccess = async (participant: any): Promise<{ allowed: boolean; message?: string; hoursUntil?: number }> => {
+    // Get the time window setting
+    const [setting] = await db.select().from(settings).where(
+      eq(settings.key, "checkin_time_window_hours")
+    );
+    
+    const timeWindowHours = parseInt(setting?.value || "4", 10);
+    const now = new Date();
+    const bookingStartDate = new Date(participant.bookingStartDate);
+    
+    // Calculate the allowed access time (time window hours before booking start)
+    const allowedAccessTime = new Date(bookingStartDate.getTime() - (timeWindowHours * 60 * 60 * 1000));
+    
+    // Check if current time is within the allowed window
+    if (now < allowedAccessTime) {
+      const timeDiff = allowedAccessTime.getTime() - now.getTime();
+      const hoursUntil = Math.ceil(timeDiff / (1000 * 60 * 60));
+      return { 
+        allowed: false, 
+        message: `Check-in access will be available ${timeWindowHours} hours before your booking start time. Please try again in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`,
+        hoursUntil 
+      };
+    }
+    
+    // Check if current time is past the booking end date
+    const bookingEndDate = new Date(participant.bookingEndDate);
+    if (now > bookingEndDate) {
+      return { 
+        allowed: false, 
+        message: "Booking period has ended. Contact hotel reception for assistance." 
+      };
+    }
+    
+    return { allowed: true };
+  };
+
   // Check-in/Check-out routes
   app.post("/api/coach/checkin", requireCoach, async (req, res) => {
     try {
@@ -751,7 +960,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Coach ID not found" });
       }
 
+      // Check if coach is hotel verified
+      if (!req.session.user!.isHotelVerified) {
+        return res.status(403).json({ message: "Hotel verification required before check-in access" });
+      }
+
       const checkedInParticipants: Participant[] = [];
+      const accessDeniedParticipants: string[] = [];
       
       for (const participantId of participantIds) {
         const participant = await storage.getParticipantByParticipantId(participantId);
@@ -762,6 +977,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Verify participant belongs to this coach
         if (participant.coachId !== coachId && participant.participantId !== coachId) {
+          continue;
+        }
+
+        // Check time-based access for this participant
+        const accessCheck = await checkTimeBasedAccess(participant);
+        if (!accessCheck.allowed) {
+          accessDeniedParticipants.push(participant.name);
           continue;
         }
 
@@ -793,13 +1015,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.session.user!.id,
         actionType: "checkin",
         targetEntity: "participant",
-        details: { participantIds, checkedInCount: checkedInParticipants.length },
+        details: { 
+          participantIds, 
+          checkedInCount: checkedInParticipants.length,
+          accessDeniedCount: accessDeniedParticipants.length,
+          accessDeniedNames: accessDeniedParticipants 
+        },
       });
 
+      let message = "";
+      if (checkedInParticipants.length > 0 && accessDeniedParticipants.length === 0) {
+        message = "Check-in successful";
+      } else if (checkedInParticipants.length > 0 && accessDeniedParticipants.length > 0) {
+        message = `Partial check-in: ${checkedInParticipants.length} successful, ${accessDeniedParticipants.length} access denied due to time restrictions`;
+      } else if (accessDeniedParticipants.length > 0) {
+        // Get access details for the first denied participant
+        const firstDenied = await storage.getParticipantByParticipantId(participantIds[0]);
+        if (firstDenied) {
+          const accessCheck = await checkTimeBasedAccess(firstDenied);
+          message = accessCheck.message || "Check-in access not yet available";
+        } else {
+          message = "Check-in access not yet available";
+        }
+      } else {
+        message = "No participants were eligible for check-in";
+      }
+
       res.json({ 
-        message: "Check-in successful", 
+        message, 
         checkedIn: checkedInParticipants.length,
-        participants: checkedInParticipants 
+        participants: checkedInParticipants,
+        accessDenied: accessDeniedParticipants.length,
+        deniedNames: accessDeniedParticipants
       });
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Check-in failed" });
@@ -813,6 +1060,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!coachId) {
         return res.status(400).json({ message: "Coach ID not found" });
+      }
+
+      // Check if coach is hotel verified
+      if (!req.session.user!.isHotelVerified) {
+        return res.status(403).json({ message: "Hotel verification required before checkout access" });
       }
 
       const checkedOutParticipants: Participant[] = [];
