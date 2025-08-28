@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatToIndianDate } from "@/../../shared/dateUtils";
+import { formatToIndianDate, formatToIST } from "@/../../shared/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -349,7 +349,19 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                     </div>
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(participant.checkinStatus)}
+                    <div className="space-y-1">
+                      {getStatusBadge(participant.checkinStatus)}
+                      {participant.checkinTime && (
+                        <div className="text-xs text-gray-500" data-testid={`checkin-time-${participant.participantId}`}>
+                          Check-in: {formatToIST(participant.checkinTime)}
+                        </div>
+                      )}
+                      {participant.checkoutTime && (
+                        <div className="text-xs text-gray-500" data-testid={`checkout-time-${participant.participantId}`}>
+                          Check-out: {formatToIST(participant.checkoutTime)}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">

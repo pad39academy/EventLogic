@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { formatToIndianDate } from "@/../../shared/dateUtils";
+import { formatToIndianDate, formatToIST } from "@/../../shared/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { logout } from "@/lib/auth";
 import { useLocation } from "wouter";
@@ -381,8 +381,18 @@ export default function CoachDashboard() {
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Status</span>
-              <div data-testid="badge-coach-status">
+              <div className="text-right" data-testid="badge-coach-status">
                 {getStatusBadge(coach?.checkinStatus || 'pending')}
+                {coach?.checkinTime && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Check-in: {formatToIST(coach.checkinTime)}
+                  </div>
+                )}
+                {coach?.checkoutTime && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Check-out: {formatToIST(coach.checkoutTime)}
+                  </div>
+                )}
               </div>
             </div>
             {coach?.checkinStatus === 'pending' && (
@@ -440,6 +450,16 @@ export default function CoachDashboard() {
                     <p className="text-xs text-gray-500 font-mono" data-testid={`player-booking-${player.participantId}`}>
                       {player.bookingReference}
                     </p>
+                    {player.checkinTime && (
+                      <p className="text-xs text-gray-400 mt-1" data-testid={`player-checkin-${player.participantId}`}>
+                        Check-in: {formatToIST(player.checkinTime)}
+                      </p>
+                    )}
+                    {player.checkoutTime && (
+                      <p className="text-xs text-gray-400 mt-1" data-testid={`player-checkout-${player.participantId}`}>
+                        Check-out: {formatToIST(player.checkoutTime)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

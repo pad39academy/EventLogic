@@ -11,7 +11,7 @@ import {
   Calendar, Clock, LogOut, AlertTriangle, CheckCircle, 
   Search, Filter, Users, Building2 
 } from "lucide-react";
-import { formatToIndianDate } from "@/../../shared/dateUtils";
+import { formatToIndianDate, formatToIST } from "@/../../shared/dateUtils";
 
 interface CheckoutParticipant {
   id: string;
@@ -435,7 +435,19 @@ export default function CheckoutBoard() {
                       </TableCell>
                       
                       <TableCell>
-                        {getStatusBadge(participant)}
+                        <div className="space-y-1">
+                          {getStatusBadge(participant)}
+                          {participant.checkinTime && (
+                            <div className="text-xs text-gray-500" data-testid={`checkin-time-${participant.participantId}`}>
+                              Check-in: {formatToIST(participant.checkinTime)}
+                            </div>
+                          )}
+                          {participant.checkoutTime && (
+                            <div className="text-xs text-gray-500" data-testid={`checkout-time-${participant.participantId}`}>
+                              Check-out: {formatToIST(participant.checkoutTime)}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       
                       <TableCell>

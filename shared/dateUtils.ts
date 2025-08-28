@@ -176,3 +176,34 @@ export function formatToIndianDateUTC(date: Date | string | null | undefined): s
   
   return `${day}/${month}/${year}`;
 }
+
+/**
+ * Formats a timestamp to IST (Indian Standard Time) format 
+ * Returns: DD/MM/YYYY, HH:MM IST
+ */
+export function formatToIST(timestamp: Date | string | null | undefined): string {
+  if (!timestamp) return '';
+  
+  let dateObj: Date;
+  if (typeof timestamp === 'string') {
+    dateObj = new Date(timestamp);
+  } else {
+    dateObj = timestamp;
+  }
+  
+  if (isNaN(dateObj.getTime())) {
+    return '';
+  }
+  
+  // Convert to IST (UTC+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+  const istTime = new Date(dateObj.getTime() + istOffset);
+  
+  const day = istTime.getUTCDate().toString().padStart(2, '0');
+  const month = (istTime.getUTCMonth() + 1).toString().padStart(2, '0');
+  const year = istTime.getUTCFullYear();
+  const hours = istTime.getUTCHours().toString().padStart(2, '0');
+  const minutes = istTime.getUTCMinutes().toString().padStart(2, '0');
+  
+  return `${day}/${month}/${year}, ${hours}:${minutes} IST`;
+}
