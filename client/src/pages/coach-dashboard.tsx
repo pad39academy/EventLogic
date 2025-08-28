@@ -178,6 +178,30 @@ export default function CoachDashboard() {
     checkoutMutation.mutate([participantId]);
   };
 
+  // Handle selected players check-in
+  const handleSelectedCheckin = () => {
+    const pendingSelected = selectedPlayers.filter(id => {
+      const player = players.find(p => p.participantId === id);
+      return player?.checkinStatus === 'pending';
+    });
+    if (pendingSelected.length > 0) {
+      checkinMutation.mutate(pendingSelected);
+      setSelectedPlayers([]); // Clear selection after action
+    }
+  };
+
+  // Handle selected players check-out
+  const handleSelectedCheckout = () => {
+    const checkedInSelected = selectedPlayers.filter(id => {
+      const player = players.find(p => p.participantId === id);
+      return player?.checkinStatus === 'checked_in';
+    });
+    if (checkedInSelected.length > 0) {
+      checkoutMutation.mutate(checkedInSelected);
+      setSelectedPlayers([]); // Clear selection after action
+    }
+  };
+
   const handleBulkCheckin = () => {
     const pendingPlayers = dashboardData?.players.filter(p => p.checkinStatus === 'pending').map(p => p.participantId) || [];
     if (pendingPlayers.length > 0) {
@@ -413,10 +437,35 @@ export default function CoachDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>My Team Players</CardTitle>
-              <span className="text-sm text-gray-500" data-testid="text-player-count">
-                {players.length} players
-              </span>
+              <div className="flex items-center space-x-4">
+                {selectedPlayers.length > 0 && (
+                  <span className="text-sm text-primary-600 font-medium" data-testid="text-selected-count">
+                    {selectedPlayers.length} selected
+                  </span>
+                )}
+                <span className="text-sm text-gray-500" data-testid="text-player-count">
+                  {players.length} players
+                </span>
+              </div>
             </div>
+            {players.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedPlayers.length === players.length && players.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedPlayers(players.map(p => p.participantId));
+                    } else {
+                      setSelectedPlayers([]);
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                  data-testid="checkbox-select-all"
+                />
+                <label className="text-sm text-gray-600">Select All</label>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             {players.map((player) => (
@@ -426,6 +475,19 @@ export default function CoachDashboard() {
                 data-testid={`player-card-${player.participantId}`}
               >
                 <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlayers.includes(player.participantId)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedPlayers(prev => [...prev, player.participantId]);
+                      } else {
+                        setSelectedPlayers(prev => prev.filter(id => id !== player.participantId));
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                    data-testid={`checkbox-${player.participantId}`}
+                  />
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className={
                       player.checkinStatus === 'checked_in' ? 'bg-success-100' :
@@ -500,6 +562,49 @@ export default function CoachDashboard() {
             {players.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-gray-500">No players assigned to your team yet.</p>
+              </div>
+            )}
+
+            {/* Selected Actions */}
+            {selectedPlayers.length > 0 && (
+              <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-primary-700 font-medium">
+                    {selectedPlayers.length} player{selectedPlayers.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <div className="flex space-x-2">
+                    {selectedPlayers.some(id => {
+                      const player = players.find(p => p.participantId === id);
+                      return player?.checkinStatus === 'pending';
+                    }) && (
+                      <Button 
+                        size="sm"
+                        onClick={() => handleSelectedCheckin()}
+                        disabled={checkinMutation.isPending}
+                        data-testid="button-selected-checkin"
+                      >
+                        <LogIn className="h-4 w-4 mr-1" />
+                        Check In Selected
+                      </Button>
+                    )}
+                    {selectedPlayers.some(id => {
+                      const player = players.find(p => p.participantId === id);
+                      return player?.checkinStatus === 'checked_in';
+                    }) && (
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="border-error-600 text-error-600 hover:bg-error-50"
+                        onClick={() => handleSelectedCheckout()}
+                        disabled={checkoutMutation.isPending}
+                        data-testid="button-selected-checkout"
+                      >
+                        <LogOut className="h-4 w-4 mr-1" />
+                        Check Out Selected
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
