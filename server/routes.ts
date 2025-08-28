@@ -396,8 +396,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     if (req.session.user) {
-      const { id, name, role, coachId } = req.session.user;
-      res.json({ user: { id, name, role, coachId } });
+      const { id, name, role, coachId, isHotelVerified, verifiedHotelId, verificationFailedAttempts } = req.session.user;
+      res.json({ 
+        user: { 
+          id, 
+          name, 
+          role, 
+          coachId,
+          isHotelVerified: isHotelVerified || false,
+          verifiedHotelId,
+          verificationFailedAttempts: verificationFailedAttempts || 0
+        } 
+      });
     } else {
       res.status(401).json({ message: "Not authenticated" });
     }
