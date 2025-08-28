@@ -468,6 +468,49 @@ export default function CoachDashboard() {
             )}
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Selected Actions */}
+            {selectedPlayers.length > 0 && (
+              <div className="mb-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-primary-700 font-medium">
+                    {selectedPlayers.length} player{selectedPlayers.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <div className="flex space-x-2">
+                    {selectedPlayers.some(id => {
+                      const player = players.find(p => p.participantId === id);
+                      return player?.checkinStatus === 'pending';
+                    }) && (
+                      <Button 
+                        size="sm"
+                        onClick={() => handleSelectedCheckin()}
+                        disabled={checkinMutation.isPending}
+                        data-testid="button-selected-checkin"
+                      >
+                        <LogIn className="h-4 w-4 mr-1" />
+                        Check In Selected
+                      </Button>
+                    )}
+                    {selectedPlayers.some(id => {
+                      const player = players.find(p => p.participantId === id);
+                      return player?.checkinStatus === 'checked_in';
+                    }) && (
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="border-error-600 text-error-600 hover:bg-error-50"
+                        onClick={() => handleSelectedCheckout()}
+                        disabled={checkoutMutation.isPending}
+                        data-testid="button-selected-checkout"
+                      >
+                        <LogOut className="h-4 w-4 mr-1" />
+                        Check Out Selected
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {players.map((player) => (
               <div 
                 key={player.id} 
@@ -565,48 +608,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* Selected Actions */}
-            {selectedPlayers.length > 0 && (
-              <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-primary-700 font-medium">
-                    {selectedPlayers.length} player{selectedPlayers.length !== 1 ? 's' : ''} selected
-                  </span>
-                  <div className="flex space-x-2">
-                    {selectedPlayers.some(id => {
-                      const player = players.find(p => p.participantId === id);
-                      return player?.checkinStatus === 'pending';
-                    }) && (
-                      <Button 
-                        size="sm"
-                        onClick={() => handleSelectedCheckin()}
-                        disabled={checkinMutation.isPending}
-                        data-testid="button-selected-checkin"
-                      >
-                        <LogIn className="h-4 w-4 mr-1" />
-                        Check In Selected
-                      </Button>
-                    )}
-                    {selectedPlayers.some(id => {
-                      const player = players.find(p => p.participantId === id);
-                      return player?.checkinStatus === 'checked_in';
-                    }) && (
-                      <Button 
-                        size="sm"
-                        variant="outline"
-                        className="border-error-600 text-error-600 hover:bg-error-50"
-                        onClick={() => handleSelectedCheckout()}
-                        disabled={checkoutMutation.isPending}
-                        data-testid="button-selected-checkout"
-                      >
-                        <LogOut className="h-4 w-4 mr-1" />
-                        Check Out Selected
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Quick Actions */}
             <div className="mt-6 grid grid-cols-2 gap-3">
