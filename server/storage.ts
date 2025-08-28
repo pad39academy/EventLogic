@@ -152,9 +152,9 @@ export class DatabaseStorage implements IStorage {
     if (filters?.search) {
       conditions.push(
         or(
-          like(hotels.hotelName, `%${filters.search}%`),
-          like(hotels.hotelId, `%${filters.search}%`),
-          like(hotels.address, `%${filters.search}%`)
+          ilike(hotels.hotelName, `%${filters.search}%`),
+          ilike(hotels.hotelId, `%${filters.search}%`),
+          ilike(hotels.address, `%${filters.search}%`)
         )
       );
     }
