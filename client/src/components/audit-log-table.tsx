@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Search, User, Building, FileText, Clock } from "lucide-react";
 
 interface AuditLog {
@@ -18,6 +19,7 @@ interface AuditLog {
 
 export default function AuditLogTable() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   // Fetch audit logs
   const { data: auditLogs = [], isLoading } = useQuery({
@@ -32,6 +34,18 @@ export default function AuditLogTable() {
       return await response.json();
     },
   });
+
+  // Handle search button click
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  // Handle Enter key press
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   // Filter audit logs based on search term
   const filteredLogs = auditLogs.filter(log => 
@@ -100,15 +114,21 @@ export default function AuditLogTable() {
       {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search audit logs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-audit-search"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search audit logs..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="pl-10"
+                data-testid="input-audit-search"
+              />
+            </div>
+            <Button onClick={handleSearch} data-testid="button-search-audit">
+              Search
+            </Button>
           </div>
         </CardContent>
       </Card>

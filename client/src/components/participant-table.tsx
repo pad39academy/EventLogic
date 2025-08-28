@@ -17,6 +17,7 @@ interface ParticipantTableProps {
 }
 
 export default function ParticipantTable({ isAdmin = false, coachId }: ParticipantTableProps) {
+  const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState<ParticipantFilters>({
     search: "",
     discipline: "",
@@ -145,6 +146,18 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
     checkoutMutation.mutate(participantId);
   };
 
+  // Handle search button click
+  const handleSearch = () => {
+    setFilters({ ...filters, search: searchInput, page: 1 });
+  };
+
+  // Handle Enter key press
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "coach":
@@ -196,16 +209,22 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
 
         {/* Search and Filters - Admin only */}
         {isAdmin && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 mt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search participants..."
-                className="pl-10"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
-                data-testid="input-search-participants"
-              />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-5 mt-6">
+            <div className="flex gap-2 sm:col-span-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search participants..."
+                  className="pl-10"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  data-testid="input-search-participants"
+                />
+              </div>
+              <Button onClick={handleSearch} data-testid="button-search-participants">
+                Search
+              </Button>
             </div>
             <Select
               value={filters.discipline || "all"}

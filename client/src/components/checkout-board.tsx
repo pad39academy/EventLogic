@@ -39,6 +39,7 @@ interface CheckoutStats {
 
 export default function CheckoutBoard() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [filterBy, setFilterBy] = useState("all");
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const { toast } = useToast();
@@ -168,6 +169,18 @@ export default function CheckoutBoard() {
 
   const handleSingleCheckout = (participantId: string) => {
     singleCheckoutMutation.mutate(participantId);
+  };
+
+  // Handle search button click
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  // Handle Enter key press
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   const getStatusBadge = (participant: CheckoutParticipant) => {
@@ -308,17 +321,21 @@ export default function CheckoutBoard() {
           
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="flex-1">
-              <div className="relative">
+            <div className="flex gap-2 flex-1">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search by name, ID, or hotel..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="pl-10"
                   data-testid="input-search-checkout"
                 />
               </div>
+              <Button onClick={handleSearch} data-testid="button-search-checkout">
+                Search
+              </Button>
             </div>
             
             <Select value={filterBy} onValueChange={setFilterBy}>

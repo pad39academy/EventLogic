@@ -76,6 +76,7 @@ const getStatusBadge = (status: string) => {
 
 export default function HotelTable() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [districtFilter, setDistrictFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState<string>("hotelId");
@@ -209,6 +210,18 @@ export default function HotelTable() {
     }
   };
 
+  // Handle search button click
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  // Handle Enter key press
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   // Get sort icon for column header
   const getSortIcon = (field: string) => {
     if (sortField !== field) {
@@ -270,15 +283,21 @@ export default function HotelTable() {
         
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search hotels, locations, or IDs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-hotel-search"
-            />
+          <div className="flex gap-2 flex-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search hotels, locations, or IDs..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="pl-10"
+                data-testid="input-hotel-search"
+              />
+            </div>
+            <Button onClick={handleSearch} data-testid="button-search-hotel">
+              Search
+            </Button>
           </div>
           
           <Select value={districtFilter} onValueChange={setDistrictFilter}>
