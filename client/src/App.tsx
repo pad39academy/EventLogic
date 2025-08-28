@@ -31,6 +31,11 @@ function AuthWrapper() {
     return <Login />;
   }
 
+  // For coaches, check if hotel verification is required
+  if (user.role === 'coach' && !user.isHotelVerified) {
+    return <Login />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={() => 
