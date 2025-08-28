@@ -15,6 +15,7 @@ import UploadModal from "@/components/upload-modal";
 import ParticipantTable from "@/components/participant-table";
 import HotelTable from "@/components/hotel-table";
 import CheckoutBoard from "@/components/checkout-board";
+import CheckinBoard from "@/components/checkin-board";
 import AddHotelModal from "@/components/add-hotel-modal";
 import RecalculateOccupancy from "@/components/recalculate-occupancy";
 import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
@@ -176,6 +177,13 @@ export default function AdminDashboard() {
                     data-testid="nav-hotels"
                   >
                     Hotels
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("checkin")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "checkin" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
+                    data-testid="nav-checkin"
+                  >
+                    Check-in
                   </button>
                   <button 
                     onClick={() => setActiveTab("checkout")}
@@ -428,6 +436,27 @@ export default function AdminDashboard() {
 
             {/* Hotel Management Overview */}
             <HotelTable />
+          </>
+        )}
+
+        {activeTab === "checkin" && (
+          <>
+            {/* Checkin Header */}
+            <div className="mb-8">
+              <div className="md:flex md:items-center md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
+                    Check-in Management
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
+                    Manage participant arrivals and track check-in status
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Checkin Board */}
+            <CheckinBoard />
           </>
         )}
 

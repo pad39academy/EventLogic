@@ -955,6 +955,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Checkin dashboard endpoint
+  app.get("/api/admin/dashboard/checkin", requireAdmin, async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const checkinData = participants.map((participant: any) => {
+        const bookingStartDate = new Date(participant.bookingStartDate);
+        const timeDiff = bookingStartDate.getTime() - today.getTime();
+        const daysUntilArrival = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        return {
+          ...participant,
+          daysUntilArrival,
+          isLate: daysUntilArrival < 0 && participant.checkinStatus === "pending"
+        };
+      }).filter((p: any) => p.checkinStatus === "pending" || p.checkinStatus === "checked_in");
+
+      // Calculate stats
+      const stats = {
+        totalPending: checkinData.filter((p: any) => p.checkinStatus === "pending").length,
+        dueToday: checkinData.filter((p: any) => p.daysUntilArrival === 0 && p.checkinStatus === "pending").length,
+        late: checkinData.filter((p: any) => p.isLate).length,
+        completed: checkinData.filter((p: any) => {
+          const checkinDate = p.checkinTime ? new Date(p.checkinTime) : null;
+          return p.checkinStatus === "checked_in" && checkinDate && 
+                 checkinDate.toDateString() === today.toDateString();
+        }).length
+      };
+
+      res.json({ participants: checkinData, stats });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch checkin data" });
+    }
+  });
+
   // Checkout dashboard endpoint
   app.get("/api/admin/dashboard/checkout", requireAdmin, async (req, res) => {
     try {
