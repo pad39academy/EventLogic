@@ -272,6 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update session
       req.session.user!.isHotelVerified = true;
       req.session.user!.verifiedHotelId = hotelCode;
+      req.session.user!.verificationFailedAttempts = 0;
 
       await storage.createAuditLog({
         userId: userId,
@@ -279,6 +280,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetEntity: "hotel",
         targetId: hotelCode,
         details: { success: true, coachId, verifiedHotel: hotelCode },
+      });
+
+      // Force session save
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+        }
       });
 
       res.json({ 
