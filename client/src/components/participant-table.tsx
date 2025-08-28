@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Edit, LogIn, LogOut, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Edit, LogIn, LogOut, MoreHorizontal, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { Participant, ParticipantFilters } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ interface ParticipantTableProps {
 
 export default function ParticipantTable({ isAdmin = false, coachId }: ParticipantTableProps) {
   const [searchInput, setSearchInput] = useState("");
+  const [showAddParticipantDialog, setShowAddParticipantDialog] = useState(false);
   const [filters, setFilters] = useState<ParticipantFilters>({
     search: "",
     discipline: "",
@@ -147,6 +149,38 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
     checkoutMutation.mutate(participantId);
   };
 
+  // Add participant mutation
+  const addParticipantMutation = useMutation({
+    mutationFn: async (participantData: any) => {
+      const response = await fetch("/api/admin/participants", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(participantData),
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add participant');
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard/participants"] });
+      setShowAddParticipantDialog(false);
+      toast({
+        title: "Success",
+        description: "Participant added successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add participant",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle search button click
   const handleSearch = () => {
     setFilters({ ...filters, search: searchInput, page: 1 });
@@ -202,7 +236,11 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             </p>
           </div>
           {isAdmin && (
-            <Button data-testid="button-add-participant">
+            <Button 
+              onClick={() => setShowAddParticipantDialog(true)}
+              data-testid="button-add-participant"
+            >
+              <Plus className="h-4 w-4 mr-2" />
               Add Participant
             </Button>
           )}
@@ -500,6 +538,51 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
           </div>
         )}
       </CardContent>
+
+      {/* Add Participant Dialog */}
+      <Dialog open={showAddParticipantDialog} onOpenChange={setShowAddParticipantDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Participant</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600">
+              <p className="mb-3">You can add a single participant manually or upload bulk data using the PSV upload options above.</p>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
+                  <span>Use "Coach & Official Data" upload for coaches and officials</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
+                  <span>Use "Player Data Sheet" upload for players</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAddParticipantDialog(false)}
+                data-testid="button-cancel-add-participant"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowAddParticipantDialog(false);
+                  toast({
+                    title: "Info",
+                    description: "Please use the PSV upload options above to add participants efficiently",
+                  });
+                }}
+                data-testid="button-confirm-add-participant"
+              >
+                Got it
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
