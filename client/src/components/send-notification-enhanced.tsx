@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Bell, Send, Users, UserCheck, Award, Loader2 } from "lucide-react";
 import { formatToIndianDate } from "@/../../shared/dateUtils";
+import { CoachSelectionEnhanced } from "@/components/coach-selection-enhanced";
 
 interface Team {
   teamName: string;
@@ -51,6 +52,10 @@ export function SendNotificationEnhanced() {
   const [checkoutDate, setCheckoutDate] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("");
   
+  // Enhanced coach selection states
+  const [selectedCoaches, setSelectedCoaches] = useState<string[]>([]);
+  const [includeTeamMembers, setIncludeTeamMembers] = useState(false);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -64,7 +69,7 @@ export function SendNotificationEnhanced() {
     queryKey: ["/api/admin/disciplines"],
   });
 
-  // Send notification mutation
+  // Send notification mutation (general)
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/admin/notifications/send-enhanced", data);
@@ -87,6 +92,29 @@ export function SendNotificationEnhanced() {
     },
   });
 
+  // Send notification to selected coaches mutation
+  const sendCoachNotificationMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/admin/notifications/send-to-coaches", data);
+      return response.json();
+    },
+    onSuccess: (response: any) => {
+      toast({
+        title: "Success",
+        description: `Notification sent to ${response.recipientCount} recipients`,
+      });
+      // Reset form
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send notification",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setAudienceType("");
     setSelectedDisciplines([]);
@@ -95,6 +123,8 @@ export function SendNotificationEnhanced() {
     setMessage("");
     setCheckoutDate("");
     setSelectedTeam("");
+    setSelectedCoaches([]);
+    setIncludeTeamMembers(false);
   };
 
   const handleTypeChange = (type: string) => {
@@ -115,6 +145,8 @@ export function SendNotificationEnhanced() {
     // Reset related fields when audience changes
     setSelectedDisciplines([]);
     setSelectedTeam("");
+    setSelectedCoaches([]);
+    setIncludeTeamMembers(false);
   };
 
   const handleDisciplineToggle = (discipline: string) => {
@@ -144,6 +176,23 @@ export function SendNotificationEnhanced() {
       return;
     }
 
+    // Validate coach selection for enhanced coach notifications
+    if (audienceType === "coaches_only" && selectedCoaches.length > 0) {
+      // Use enhanced coach selection
+      const notificationData = {
+        selectedCoaches,
+        includeTeamMembers,
+        notificationType,
+        subject,
+        message,
+        checkoutDate: checkoutDate || null,
+      };
+
+      sendCoachNotificationMutation.mutate(notificationData);
+      return;
+    }
+
+    // Use general notification system
     const notificationData = {
       audienceType,
       notificationType,
@@ -294,6 +343,16 @@ export function SendNotificationEnhanced() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Enhanced Coach Selection (when coaches_only is selected) */}
+        {audienceType === "coaches_only" && (
+          <CoachSelectionEnhanced
+            selectedCoaches={selectedCoaches}
+            onCoachesChange={setSelectedCoaches}
+            includeTeamMembers={includeTeamMembers}
+            onIncludeTeamMembersChange={setIncludeTeamMembers}
+          />
         )}
 
         {/* Message Type Selection */}
