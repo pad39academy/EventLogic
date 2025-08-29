@@ -12,6 +12,7 @@ import {
   Calendar, LogOut, Phone, LogIn, Users as UsersIcon, Bell
 } from "lucide-react";
 import { NotificationsList } from "@/components/notifications-list";
+import HotelVerificationModal from "@/components/hotel-verification-modal";
 import type { Participant } from "@/lib/types";
 
 interface CoachDashboardData {
@@ -22,6 +23,8 @@ interface CoachDashboardData {
 export default function CoachDashboard() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("team");
+  const [showHotelVerificationModal, setShowHotelVerificationModal] = useState(false);
+  const [pendingCheckinAction, setPendingCheckinAction] = useState<(() => void) | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -170,8 +173,32 @@ export default function CoachDashboard() {
     }
   };
 
+  // Check if hotel verification is required before check-in
+  const requiresHotelVerification = () => {
+    return !user?.isHotelVerified;
+  };
+
+  const handleCheckinWithVerification = (checkinAction: () => void) => {
+    if (requiresHotelVerification()) {
+      setPendingCheckinAction(() => checkinAction);
+      setShowHotelVerificationModal(true);
+    } else {
+      checkinAction();
+    }
+  };
+
+  const onHotelVerificationSuccess = () => {
+    // Execute the pending check-in action after successful verification
+    if (pendingCheckinAction) {
+      pendingCheckinAction();
+      setPendingCheckinAction(null);
+    }
+  };
+
   const handleSingleCheckin = (participantId: string) => {
-    checkinMutation.mutate([participantId]);
+    handleCheckinWithVerification(() => {
+      checkinMutation.mutate([participantId]);
+    });
   };
 
   const handleSingleCheckout = (participantId: string) => {
@@ -185,8 +212,10 @@ export default function CoachDashboard() {
       return player?.checkinStatus === 'pending';
     });
     if (pendingSelected.length > 0) {
-      checkinMutation.mutate(pendingSelected);
-      setSelectedPlayers([]); // Clear selection after action
+      handleCheckinWithVerification(() => {
+        checkinMutation.mutate(pendingSelected);
+        setSelectedPlayers([]); // Clear selection after action
+      });
     }
   };
 
@@ -205,13 +234,17 @@ export default function CoachDashboard() {
   const handleBulkCheckin = () => {
     const pendingPlayers = dashboardData?.players.filter(p => p.checkinStatus === 'pending').map(p => p.participantId) || [];
     if (pendingPlayers.length > 0) {
-      checkinMutation.mutate(pendingPlayers);
+      handleCheckinWithVerification(() => {
+        checkinMutation.mutate(pendingPlayers);
+      });
     }
   };
 
   const handleCoachCheckin = () => {
     if (dashboardData?.coach) {
-      checkinMutation.mutate([dashboardData.coach.participantId]);
+      handleCheckinWithVerification(() => {
+        checkinMutation.mutate([dashboardData.coach.participantId]);
+      });
     }
   };
 
@@ -635,6 +668,13 @@ export default function CoachDashboard() {
           </>
         )}
       </div>
+
+      {/* Hotel Verification Modal */}
+      <HotelVerificationModal
+        open={showHotelVerificationModal}
+        onOpenChange={setShowHotelVerificationModal}
+        onVerificationSuccess={onHotelVerificationSuccess}
+      />
     </div>
   );
 }

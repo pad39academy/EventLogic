@@ -167,20 +167,13 @@ export default function Login() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setCoachName(response.user.name);
       
-      // Check if hotel verification is required
-      if (!response.user.isHotelVerified) {
-        setStep("hotel_verification");
-        toast({
-          title: "OTP Verified Successfully",
-          description: "Please complete hotel verification to continue",
-        });
-      } else {
-        toast({
-          title: "Login Successful",
-          description: "Welcome Coach!",
-        });
-        setLocation("/coach");
-      }
+      // Always redirect to coach dashboard after successful OTP verification
+      // Hotel verification will happen when coach tries to check-in
+      toast({
+        title: "Login Successful", 
+        description: "Welcome Coach!",
+      });
+      setLocation("/coach");
     },
     onError: (error: any) => {
       toast({
