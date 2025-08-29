@@ -109,7 +109,7 @@ echo "YOUR_TWILIO_PHONE_NUMBER" | gcloud secrets create twilio-phone-number --da
 
 ```bash
 # Build the container
-gcloud builds submit --tag gcr.io/ievolve-event-management/ievolve-app
+gcloud builds submit --tag gcr.io/ievolve-event-management-2025/ievolve-app
 
 # Deploy to Cloud Run
 gcloud run deploy ievolve-app \
