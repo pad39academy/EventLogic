@@ -55,6 +55,7 @@ export function SendNotificationEnhanced() {
   // Enhanced coach selection states
   const [selectedCoaches, setSelectedCoaches] = useState<string[]>([]);
   const [includeTeamMembers, setIncludeTeamMembers] = useState(false);
+  const [teamMembersCount, setTeamMembersCount] = useState<Record<string, number>>({});
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -125,6 +126,7 @@ export function SendNotificationEnhanced() {
     setSelectedTeam("");
     setSelectedCoaches([]);
     setIncludeTeamMembers(false);
+    setTeamMembersCount({});
   };
 
   const handleTypeChange = (type: string) => {
@@ -147,6 +149,7 @@ export function SendNotificationEnhanced() {
     setSelectedTeam("");
     setSelectedCoaches([]);
     setIncludeTeamMembers(false);
+    setTeamMembersCount({});
   };
 
   const handleDisciplineToggle = (discipline: string) => {
@@ -229,7 +232,12 @@ export function SendNotificationEnhanced() {
       case "coaches_only":
         // If specific coaches are selected using enhanced selection
         if (selectedCoaches.length > 0) {
-          return selectedCoaches.length; // Just count selected coaches for now
+          let total = selectedCoaches.length; // Count selected coaches
+          if (includeTeamMembers) {
+            // Add team members count for each selected coach
+            total += Object.values(teamMembersCount).reduce((sum, count) => sum + count, 0);
+          }
+          return total;
         }
         // Otherwise, show total available coaches
         return teams.length;
@@ -360,6 +368,7 @@ export function SendNotificationEnhanced() {
             onCoachesChange={setSelectedCoaches}
             includeTeamMembers={includeTeamMembers}
             onIncludeTeamMembersChange={setIncludeTeamMembers}
+            onTeamMembersCountChange={setTeamMembersCount}
           />
         )}
 

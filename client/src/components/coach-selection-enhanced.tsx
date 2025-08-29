@@ -42,13 +42,15 @@ interface CoachSelectionEnhancedProps {
   onCoachesChange: (coachIds: string[]) => void;
   includeTeamMembers: boolean;
   onIncludeTeamMembersChange: (include: boolean) => void;
+  onTeamMembersCountChange?: (counts: Record<string, number>) => void;
 }
 
 export function CoachSelectionEnhanced({ 
   selectedCoaches, 
   onCoachesChange, 
   includeTeamMembers, 
-  onIncludeTeamMembersChange 
+  onIncludeTeamMembersChange,
+  onTeamMembersCountChange
 }: CoachSelectionEnhancedProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
@@ -81,7 +83,18 @@ export function CoachSelectionEnhanced({
             });
             if (response.ok) {
               const data = await response.json();
-              setTeamData(prev => ({ ...prev, [coachId]: data }));
+              setTeamData(prev => {
+                const newData = { ...prev, [coachId]: data };
+                // Update parent component with team member counts
+                if (onTeamMembersCountChange) {
+                  const counts: Record<string, number> = {};
+                  Object.entries(newData).forEach(([id, teamData]) => {
+                    counts[id] = teamData.totalMembers;
+                  });
+                  onTeamMembersCountChange(counts);
+                }
+                return newData;
+              });
             }
           } catch (error) {
             console.error(`Failed to load team members for coach ${coachId}:`, error);
@@ -109,6 +122,14 @@ export function CoachSelectionEnhanced({
       setTeamData(prev => {
         const newData = { ...prev };
         delete newData[coachId];
+        // Update parent component with updated team member counts
+        if (onTeamMembersCountChange) {
+          const counts: Record<string, number> = {};
+          Object.entries(newData).forEach(([id, teamData]) => {
+            counts[id] = teamData.totalMembers;
+          });
+          onTeamMembersCountChange(counts);
+        }
         return newData;
       });
     }
