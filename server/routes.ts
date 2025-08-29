@@ -1055,7 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (checkedInParticipants.length > 0 && accessDeniedParticipants.length > 0) {
         message = `Partial check-in: ${checkedInParticipants.length} successful, ${accessDeniedParticipants.length} access denied due to time restrictions`;
       } else if (accessDeniedParticipants.length > 0) {
-        // Get access details for the first denied participant
+        // All participants were denied access - return error status
         const firstDenied = await storage.getParticipantByParticipantId(participantIds[0]);
         if (firstDenied) {
           const accessCheck = await checkTimeBasedAccess(firstDenied);
@@ -1063,8 +1063,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           message = "Check-in access not yet available";
         }
+        return res.status(403).json({ message });
       } else {
         message = "No participants were eligible for check-in";
+        return res.status(400).json({ message });
       }
 
       res.json({ 
