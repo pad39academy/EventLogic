@@ -640,6 +640,31 @@ export default function CoachDashboard() {
                 </span>
               </div>
             </div>
+            
+            {/* Top-level Action Buttons - only show when no action mode is active */}
+            {actionMode === 'none' && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <Button 
+                  className="flex items-center justify-center py-2 px-4"
+                  onClick={handleTopLevelCheckin}
+                  disabled={pendingCount === 0 || checkinMutation.isPending}
+                  data-testid="button-checkin-top"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Check In ({pendingCount})
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex items-center justify-center py-2 px-4"
+                  onClick={handleTopLevelCheckout}
+                  disabled={checkedInCount === 0 || checkoutMutation.isPending}
+                  data-testid="button-checkout-top"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Check Out ({checkedInCount})
+                </Button>
+              </div>
+            )}
             {players.length > 0 && actionMode !== 'none' && (() => {
               const eligiblePlayers = players.filter(p => 
                 actionMode === 'checkin' ? p.checkinStatus === 'pending' :
