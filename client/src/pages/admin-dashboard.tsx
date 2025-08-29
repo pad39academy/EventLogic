@@ -605,8 +605,8 @@ export default function AdminDashboard() {
         )}
         */}
 
-        {/* Settings */}
-        {/* Settings temporarily commented out - activeTab === "settings" && (
+        {/* Settings temporarily disabled
+        {activeTab === "settings" && (
           <>
             <div className="mb-8">
               <div className="md:flex md:items-center md:justify-between">
@@ -621,7 +621,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Access Control Settings */}
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -637,7 +636,6 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
-            {/* Security Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
