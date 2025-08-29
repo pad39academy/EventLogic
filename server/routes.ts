@@ -947,12 +947,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Check if current time is within the allowed window
     if (now < allowedAccessTime) {
-      const timeDiff = allowedAccessTime.getTime() - now.getTime();
-      const hoursUntil = Math.ceil(timeDiff / (1000 * 60 * 60));
+      // Format the allowed access time in DD/MM/YYYY HH:mm:ss format
+      const day = allowedAccessTime.getDate().toString().padStart(2, '0');
+      const month = (allowedAccessTime.getMonth() + 1).toString().padStart(2, '0');
+      const year = allowedAccessTime.getFullYear();
+      const hours = allowedAccessTime.getHours().toString().padStart(2, '0');
+      const minutes = allowedAccessTime.getMinutes().toString().padStart(2, '0');
+      const seconds = allowedAccessTime.getSeconds().toString().padStart(2, '0');
+      
+      const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+      
       return { 
         allowed: false, 
-        message: `Check-in access will be available ${timeWindowHours} hours before your booking start time. Please try again in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`,
-        hoursUntil 
+        message: `You are allowed check-in time is after ${formattedDateTime}`,
+        hoursUntil: Math.ceil((allowedAccessTime.getTime() - now.getTime()) / (1000 * 60 * 60))
       };
     }
     
