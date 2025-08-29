@@ -105,12 +105,8 @@ export class UploadService {
             continue;
           }
 
-          // Mandatory: Enforce minimum 3-day stay (only for booking data)
-          const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Minimum 3-day stay required. Current duration: ${daysDiff} days`);
-            continue;
-          }
+          // Note: No minimum stay validation for hotel inventory - hotels can list any duration
+          // The 3-day minimum rule applies only when coaches/participants make actual bookings
 
           // Mandatory: Validate hotel ID references - check for overlapping dates
           const overlapping = await storage.getHotelsWithOverlappingDates(
@@ -226,13 +222,14 @@ export class UploadService {
             continue;
           }
 
-          // Validate minimum 3-day stay
+          // MANDATORY: Enforce 3-day minimum stay for coach/official bookings
+          // This business rule applies to actual participant bookings, not hotel inventory
           const startDate = new Date(data.Booking_Start_Date);
           const endDate = new Date(data.Booking_End_Date);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Booking duration must be at least 3 days`);
+            result.errors.push(`Row ${i + 1}: Coach/Official booking duration must be at least 3 days. Current: ${daysDiff} days`);
             continue;
           }
 
@@ -353,13 +350,14 @@ export class UploadService {
             continue;
           }
 
-          // Validate minimum 3-day stay
+          // MANDATORY: Enforce 3-day minimum stay for player bookings
+          // This business rule applies to actual participant bookings, not hotel inventory
           const startDate = new Date(data.Booking_Start_Date);
           const endDate = new Date(data.Booking_End_Date);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Booking duration must be at least 3 days`);
+            result.errors.push(`Row ${i + 1}: Player booking duration must be at least 3 days. Current: ${daysDiff} days`);
             continue;
           }
 
