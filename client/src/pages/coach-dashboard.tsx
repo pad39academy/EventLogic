@@ -276,6 +276,12 @@ export default function CoachDashboard() {
     }
   };
 
+  const handleCoachCheckout = () => {
+    if (dashboardData?.coach) {
+      checkoutMutation.mutate([dashboardData.coach.participantId]);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -619,6 +625,17 @@ export default function CoachDashboard() {
                 data-testid="button-coach-checkin"
               >
                 {checkinMutation.isPending ? "Checking In..." : "Check In Now"}
+              </Button>
+            )}
+            {coach?.checkinStatus === 'checked_in' && (
+              <Button 
+                variant="outline"
+                className="w-full mt-4 border-red-600 text-red-600 hover:bg-red-50"
+                onClick={handleCoachCheckout}
+                disabled={checkoutMutation.isPending}
+                data-testid="button-coach-checkout"
+              >
+                {checkoutMutation.isPending ? "Checking Out..." : "Check Out Now"}
               </Button>
             )}
           </CardContent>
