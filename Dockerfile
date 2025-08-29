@@ -18,13 +18,12 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built application
-COPY --from=build /app/client/build ./client/build
-COPY --from=build /app/build ./build
-COPY server ./server
-COPY shared ./shared
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/server ./server
+COPY --from=build /app/shared ./shared
 
 # Expose port
 EXPOSE 8080
