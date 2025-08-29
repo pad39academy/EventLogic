@@ -1080,10 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Coach ID not found" });
       }
 
-      // Check if coach is hotel verified
-      if (!req.session.user!.isHotelVerified) {
-        return res.status(403).json({ message: "Hotel verification required before checkout access" });
-      }
+      // Checkout does not require hotel verification - only check-in does
 
       const checkedOutParticipants: Participant[] = [];
       
