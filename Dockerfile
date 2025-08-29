@@ -21,8 +21,8 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 # Copy built application
-COPY --from=build /app/client/dist ./client/dist
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/client/build ./client/build
+COPY --from=build /app/build ./build
 COPY server ./server
 COPY shared ./shared
 
