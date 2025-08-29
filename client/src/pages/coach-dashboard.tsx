@@ -344,18 +344,6 @@ export default function CoachDashboard() {
               My Team
             </button>
             <button
-              onClick={() => setActiveTab("checkin")}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg ${
-                activeTab === "checkin"
-                  ? "bg-primary-100 text-primary-700 border-b-2 border-primary-500"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              data-testid="tab-checkin-checkout"
-            >
-              <LogIn className="h-4 w-4 inline mr-1" />
-              Check-in/Check-Out
-            </button>
-            <button
               onClick={() => setActiveTab("messages")}
               className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg relative ${
                 activeTab === "messages"
@@ -527,8 +515,8 @@ export default function CoachDashboard() {
           </Card>
         )}
 
-        {/* Team and Check-in/out Content */}
-        {(activeTab === "team" || activeTab === "checkin") && (
+        {/* Team Content */}
+        {activeTab === "team" && (
           <>
             {/* Coach Info Card */}
             <Card className="mb-6">
