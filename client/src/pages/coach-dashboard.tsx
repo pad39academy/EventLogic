@@ -561,7 +561,7 @@ export default function CoachDashboard() {
         {/* My Accommodation */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>My Accommodation</CardTitle>
+            <CardTitle>Coach Accommodation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
@@ -589,7 +589,7 @@ export default function CoachDashboard() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Status</span>
+              <span className="text-sm text-gray-500">Coach Status</span>
               <div className="text-right" data-testid="badge-coach-status">
                 {getStatusBadge(coach?.checkinStatus || 'pending')}
                 {coach?.checkinTime && (
