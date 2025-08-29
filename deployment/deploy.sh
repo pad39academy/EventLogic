@@ -4,7 +4,7 @@
 set -e
 
 PROJECT_ID="ievolve-event-management"
-REGION="us-central1"
+REGION="asia-south1"
 DB_INSTANCE="ievolve-postgres"
 DB_NAME="ievolve_db"
 DB_USER="ievolve_user"
