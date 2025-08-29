@@ -34,7 +34,7 @@ export default function CoachDashboard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const user = authData?.user || null;
+  const user = authData?.user;
 
   // Get unread notification count
   const { data: unreadCount = 0 } = useQuery({
