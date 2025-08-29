@@ -3,9 +3,9 @@
 # Deployment script for Ievolve Event Management System to Google Cloud
 set -e
 
-PROJECT_ID="ievolve-event-management"
+PROJECT_ID="vigilant-sol-470507-u9"
 REGION="asia-south1"
-DB_INSTANCE="ievolve-postgres"
+DB_INSTANCE="ievolve-db"
 DB_NAME="ievolve_db"
 DB_USER="ievolve_user"
 DB_PASSWORD="IevolveSecure2025!"
@@ -21,11 +21,22 @@ gcloud services enable run.googleapis.com
 gcloud services enable sqladmin.googleapis.com
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable secretmanager.googleapis.com
-gcloud services enable containerregistry.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
+
+# Create Artifact Registry repository (if it doesn't exist)
+echo "🖼️ Setting up Artifact Registry repository..."
+if ! gcloud artifacts repositories describe ievolve-repo --location=$REGION --quiet 2>/dev/null;
+then
+    gcloud artifacts repositories create ievolve-repo \
+      --repository-format=docker \
+      --location=$REGION \
+      --description="Docker repository for ievolve-app"
+fi
 
 # Create Cloud SQL instance (if it doesn't exist)
 echo "🗄️ Setting up Cloud SQL PostgreSQL instance..."
-if ! gcloud sql instances describe $DB_INSTANCE --quiet 2>/dev/null; then
+if ! gcloud sql instances describe $DB_INSTANCE --quiet 2>/dev/null;
+then
     gcloud sql instances create $DB_INSTANCE \
         --database-version=POSTGRES_15 \
         --tier=db-f1-micro \
@@ -59,26 +70,20 @@ echo "gcloud secrets create twilio-phone-number --data-file=- <<< 'your_twilio_p
 
 # Build and deploy the application
 echo "🏗️ Building and deploying the application..."
-gcloud builds submit --tag gcr.io/$PROJECT_ID/ievolve-app
+gcloud builds submit --tag asia-south1-docker.pkg.dev/$PROJECT_ID/ievolve-repo/ievolve-app --project=$PROJECT_ID
 
 # Deploy to Cloud Run
 echo "☁️ Deploying to Cloud Run..."
 gcloud run deploy ievolve-app \
-    --image gcr.io/$PROJECT_ID/ievolve-app \
+    --image asia-south1-docker.pkg.dev/$PROJECT_ID/ievolve-repo/ievolve-app \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
     --set-env-vars NODE_ENV=production \
-    --set-secrets DATABASE_URL=database-url:latest \
-    --set-secrets TWILIO_ACCOUNT_SID=twilio-account-sid:latest \
-    --set-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest \
-    --set-secrets TWILIO_PHONE_NUMBER=twilio-phone-number:latest \
     --add-cloudsql-instances $PROJECT_ID:$REGION:$DB_INSTANCE \
     --port 8080 \
     --memory 1Gi \
     --cpu 1 \
-    --max-instances 10 \
-    --min-instances 0 \
     --timeout 300s
 
 # Get the service URL
@@ -92,3 +97,4 @@ echo "Next steps:"
 echo "1. Update Twilio secrets with your actual credentials"
 echo "2. Run database migrations if needed"
 echo "3. Test the application at: $SERVICE_URL"
+

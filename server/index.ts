@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic, log } from "./viteProd";
+import { serveStatic, log } from "../viteProd";
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
@@ -85,7 +85,7 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
-     const { setupVite } = await import("./vitedev"); // dynamic import here
+     const { setupVite } = await import("../viteDev"); // dynamic import here
     await setupVite(app, server);
   } else {
     serveStatic(app);
