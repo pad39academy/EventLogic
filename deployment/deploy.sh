@@ -15,6 +15,24 @@ echo "🚀 Starting deployment to Google Cloud..."
 # Set the project
 gcloud config set project $PROJECT_ID
 
+# Check if billing is enabled
+echo "💳 Checking billing status..."
+BILLING_ACCOUNT=$(gcloud billing projects describe $PROJECT_ID --format="value(billingAccountName)" 2>/dev/null || echo "")
+
+if [ -z "$BILLING_ACCOUNT" ]; then
+    echo "❌ ERROR: Billing is not enabled for this project!"
+    echo ""
+    echo "Please enable billing before running this script:"
+    echo "1. Visit: https://console.cloud.google.com/billing"
+    echo "2. Select your project: $PROJECT_ID"
+    echo "3. Link a billing account"
+    echo "4. Re-run this script"
+    echo ""
+    exit 1
+fi
+
+echo "✅ Billing is enabled for project $PROJECT_ID"
+
 # Enable required APIs
 echo "📋 Enabling required APIs..."
 gcloud services enable run.googleapis.com

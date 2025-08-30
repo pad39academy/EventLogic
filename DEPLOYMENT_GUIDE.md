@@ -15,12 +15,21 @@
 # Create and set up project
 gcloud projects create ievolve-event-management
 gcloud config set project ievolve-event-management
-
-# Enable billing (you must do this in the Google Cloud Console)
-# Visit: https://console.cloud.google.com/billing
 ```
 
-### Step 2: Run the Automated Deployment
+### Step 2: Enable Billing (REQUIRED)
+
+**⚠️ CRITICAL: You MUST enable billing before proceeding!**
+
+1. Visit: https://console.cloud.google.com/billing
+2. Select your project: `ievolve-event-management`
+3. Click "Link a billing account"
+4. Choose or create a billing account
+5. Verify billing is enabled before continuing
+
+Without billing enabled, the deployment will fail when trying to create Cloud SQL, Cloud Run, or other services.
+
+### Step 3: Run the Automated Deployment
 
 ```bash
 # Make deployment script executable
@@ -30,7 +39,7 @@ chmod +x deployment/deploy.sh
 ./deployment/deploy.sh
 ```
 
-### Step 3: Configure Twilio Secrets
+### Step 4: Configure Twilio Secrets
 
 After the deployment script completes, update your Twilio credentials:
 
@@ -49,7 +58,7 @@ gcloud run deploy ievolve-app \
     --set-secrets TWILIO_PHONE_NUMBER=twilio-phone-number:latest
 ```
 
-### Step 4: Migrate Your Database
+### Step 5: Migrate Your Database
 
 ```bash
 # Export current database (run locally)
