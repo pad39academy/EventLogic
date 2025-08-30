@@ -1,37 +1,18 @@
 # Build stage
 FROM node:18-slim AS build
-
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
 RUN npm ci
-
-# Copy source and build
 COPY . .
 RUN npm run build
 
 # Production stage
 FROM node:18-slim AS production
-
 WORKDIR /app
-
-# Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy built application
-COPY --from=build /app/client/dist ./client/dist
+RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
-COPY server ./server
-COPY shared ./shared
-
-# Expose port
 EXPOSE 8080
-
-# Set environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
-
-# Start the application
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/server/index.js"]
