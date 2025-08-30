@@ -1,9 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-<<<<<<< HEAD
-=======
-import { serveStatic, log } from "../viteProd";
->>>>>>> 6065f72e0804aaf6c37500e4bd43f23d0007fc4b
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
@@ -89,20 +85,12 @@ app.use((req, res, next) => {
   app.use('/404.html', express.static('public/404.html'));
   app.use('/public', express.static('public'));
 
-<<<<<<< HEAD
   // Load appropriate modules based on environment
   if (process.env.NODE_ENV === "development") {
-    const { setupVite } = await import("./vite");
-=======
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-     const { setupVite } = await import("../viteDev"); // dynamic import here
->>>>>>> 6065f72e0804aaf6c37500e4bd43f23d0007fc4b
+    const { setupVite } = await import("../viteDev");
     await setupVite(app, server);
   } else {
-    const { serveStatic } = await import("./prod-static");
+    const { serveStatic } = await import("../viteProd");
     serveStatic(app);
   }
 
@@ -116,7 +104,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '8080', 10);
+  const port = parseInt(process.env.PORT || '5000', 10);
   // Windows compatibility: use localhost instead of 0.0.0.0
   const host = process.platform === 'win32' ? 'localhost' : "0.0.0.0";
   
@@ -126,8 +114,8 @@ app.use((req, res, next) => {
     reusePort: process.platform !== 'win32',
   }, async () => {
     const { log } = process.env.NODE_ENV === "development" 
-      ? await import("./vite")
-      : await import("./prod-static");
+      ? await import("../viteDev")
+      : await import("../viteProd");
     log(`serving on port ${port}`);
   });
 

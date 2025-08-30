@@ -4,13 +4,13 @@ import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 import { type Server } from "http";
-import viteConfig from "./vite.config";
+// import viteConfig from "./vite.config"; // Removed due to __dirname ES module issue
 
 const viteLogger = createLogger();
 
 export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
-    ...viteConfig,
+    root: 'client',
     configFile: false,
     server: {
       middlewareMode: true,
