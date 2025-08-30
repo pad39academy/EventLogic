@@ -273,7 +273,36 @@ Verify Cloud SQL instance and secrets
 #### 5. SMS not working
 Update Twilio credentials
 
-#### 6. Performance issues
+#### 6. "Already Exists" Errors During Re-deployment
+
+If you see errors like "database already exists" or "Secret already exists", these are normal for re-runs:
+
+```bash
+# The updated deployment script now handles these gracefully
+# Simply re-run the deployment script:
+./deployment/deploy.sh
+
+# Or continue with just the build and deploy steps:
+gcloud builds submit --tag asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app
+gcloud run deploy ievolve-app \
+    --image asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app \
+    --region asia-south1 \
+    --allow-unauthenticated
+```
+
+#### 7. Cloud Build "--no-cache" Error
+
+If you encounter "Cannot specify --no-cache if builds/use_kaniko property is False":
+
+```bash
+# Enable Kaniko for Cloud Build
+gcloud config set builds/use_kaniko True
+
+# Then retry the build
+gcloud builds submit --tag asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app
+```
+
+#### 8. Performance issues
 Increase memory/CPU allocation
 
 ### Useful Commands
