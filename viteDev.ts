@@ -12,6 +12,13 @@ export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     root: 'client',
     configFile: false,
+    resolve: {
+      alias: {
+        '@': path.resolve(import.meta.dirname, './client/src'),
+        '@shared': path.resolve(import.meta.dirname, './shared'),
+        '@assets': path.resolve(import.meta.dirname, './attached_assets'),
+      },
+    },
     server: {
       middlewareMode: true,
       hmr: { server },
