@@ -49,6 +49,12 @@ gcloud secrets create twilio-account-sid --data-file=- <<< 'YOUR_TWILIO_ACCOUNT_
 gcloud secrets create twilio-auth-token --data-file=- <<< 'YOUR_TWILIO_AUTH_TOKEN'
 gcloud secrets create twilio-phone-number --data-file=- <<< 'YOUR_TWILIO_PHONE_NUMBER'
 
+To validate the credentials:
+
+gcloud secrets versions access latest --secret="twilio-account-sid"
+gcloud secrets versions access latest --secret="twilio-auth-token"
+gcloud secrets versions access latest --secret="twilio-phone-number"
+
 # Redeploy with updated secrets
 gcloud run deploy ievolve-app \
     --image gcr.io/ievolve-event-management/ievolve-app \

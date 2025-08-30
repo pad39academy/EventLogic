@@ -3,7 +3,7 @@
 # Deployment script for Ievolve Event Management System to Google Cloud
 set -e
 
-PROJECT_ID="vigilant-sol-470507-u9"
+PROJECT_ID="ievolve-sports-2025"
 REGION="asia-south1"
 DB_INSTANCE="ievolve-db"
 DB_NAME="ievolve_db"
