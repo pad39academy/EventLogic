@@ -1,0 +1,12 @@
+runtime: nodejs18
+
+env_variables:
+  NODE_ENV: production
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+
+# Cloud SQL connection
+beta_settings:
+  cloud_sql_instances: ievolve-sports-2025:us-central1:ievolve-db
