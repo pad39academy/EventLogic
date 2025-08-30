@@ -253,6 +253,90 @@ export default function UploadModal({
             </div>
           )}
 
+          {uploadType === "coaches_officials" && (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-green-900 mb-1.5">Required Format (12 columns)</h4>
+                <div className="text-[8px] text-green-800 font-mono bg-green-100 p-1 rounded leading-tight">
+                  <div className="space-y-0.5">
+                    <div>ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID</div>
+                    <div>Hotel_Name|Stadium|Booking_Start_Date|Booking_End_Date</div>
+                    <div>Booking_Reference_Number|Transport_POC</div>
+                  </div>
+                </div>
+                <div className="mt-1 text-[8px] text-green-700">
+                  <strong>Role Values:</strong> coach, official
+                </div>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-amber-900 mb-1.5">Mandatory Validations</h4>
+                <div className="space-y-0.5 text-[8px] text-amber-800">
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Hotel ID must exist in inventory</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Minimum 3-day stay enforcement</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Unique COACH_id validation</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Mobile number auto-formatted (+91 prefix)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {uploadType === "players" && (
+            <div className="space-y-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-purple-900 mb-1.5">Required Format (12 columns)</h4>
+                <div className="text-[8px] text-purple-800 font-mono bg-purple-100 p-1 rounded leading-tight">
+                  <div className="space-y-0.5">
+                    <div>COACH_ID|PlayerID|Player_Name|Mobilenumber|Discipline</div>
+                    <div>District|Team_Name|Location|HOTEL_id|BOOKING_REFERENCE</div>
+                    <div>Booking_Start_Date|Booking_End_Date</div>
+                  </div>
+                </div>
+                <div className="mt-1 text-[8px] text-purple-700">
+                  <strong>Note:</strong> COACH_ID must exist in coaches database
+                </div>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                <h4 className="text-[10px] font-semibold text-amber-900 mb-1.5">Mandatory Validations</h4>
+                <div className="space-y-0.5 text-[8px] text-amber-800">
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Coach ID must exist in database</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Hotel ID must exist in inventory</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Minimum 3-day stay enforcement</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Unique Player ID validation</span>
+                  </div>
+                  <div className="flex items-start space-x-1">
+                    <div className="w-1 h-1 bg-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <span className="leading-tight">Auto room occupancy calculation</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Progress Bar */}
           {uploadMutation.isPending && (
             <div className="space-y-2">
