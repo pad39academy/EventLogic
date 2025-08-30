@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
 
 const app = express();
@@ -80,16 +79,16 @@ app.use((req, res, next) => {
   app.use('/404.html', express.static('public/404.html'));
   app.use('/public', express.static('public'));
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  // Load appropriate modules based on environment
+  if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
+    const { serveStatic } = await import("./prod-static");
     serveStatic(app);
   }
 
-  // Add custom error handlers to hide Replit branding AFTER vite setup
+  // Add custom error handlers to hide Replit branding AFTER setup
   app.use(customErrorHandler);
   
   // Handle 404s professionally LAST
@@ -107,15 +106,18 @@ app.use((req, res, next) => {
     port,
     host,
     reusePort: process.platform !== 'win32',
-  }, () => {
+  }, async () => {
+    const { log } = process.env.NODE_ENV === "development" 
+      ? await import("./vite")
+      : await import("./prod-static");
     log(`serving on port ${port}`);
   });
 
   // Handle graceful shutdown
   process.on('SIGTERM', () => {
-    log('SIGTERM received, shutting down gracefully');
+    console.log('SIGTERM received, shutting down gracefully');
     server.close(() => {
-      log('Process terminated');
+      console.log('Process terminated');
       process.exit(0);
     });
   });
