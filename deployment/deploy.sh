@@ -66,7 +66,12 @@ fi
 
 # Create database
 echo "📊 Creating database..."
-gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE --quiet || echo "Database already exists"
+if gcloud sql databases describe $DB_NAME --instance=$DB_INSTANCE --quiet 2>/dev/null; then
+    echo "Database $DB_NAME already exists"
+else
+    gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE --quiet
+    echo "Database $DB_NAME created successfully"
+fi
 
 # Create database user
 echo "👤 Creating database user..."
@@ -77,8 +82,19 @@ gcloud sql users create $DB_USER \
 
 # Create secrets
 echo "🔐 Creating secrets..."
-echo "$DB_PASSWORD" | gcloud secrets create db-password --data-file=- --quiet || echo "Secret already exists"
-echo "postgresql://$DB_USER:$DB_PASSWORD@/$DB_NAME?host=/cloudsql/$PROJECT_ID:$REGION:$DB_INSTANCE" | gcloud secrets create database-url --data-file=- --quiet || echo "Secret already exists"
+if gcloud secrets describe db-password --quiet 2>/dev/null; then
+    echo "Secret db-password already exists"
+else
+    echo "$DB_PASSWORD" | gcloud secrets create db-password --data-file=- --quiet
+    echo "Secret db-password created"
+fi
+
+if gcloud secrets describe database-url --quiet 2>/dev/null; then
+    echo "Secret database-url already exists"
+else
+    echo "postgresql://$DB_USER:$DB_PASSWORD@/$DB_NAME?host=/cloudsql/$PROJECT_ID:$REGION:$DB_INSTANCE" | gcloud secrets create database-url --data-file=- --quiet
+    echo "Secret database-url created"
+fi
 
 # You'll need to update these with your actual Twilio credentials
 echo "Please update the following secrets with your actual Twilio credentials:"
