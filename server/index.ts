@@ -90,8 +90,10 @@ app.use((req, res, next) => {
     const { setupVite } = await import("../viteDev");
     await setupVite(app, server);
   } else {
+    console.log('Loading production static files...');
     const { serveStatic } = await import("../viteProd");
     serveStatic(app);
+    console.log('Production static files configured');
   }
 
   // Add custom error handlers to hide Replit branding AFTER setup

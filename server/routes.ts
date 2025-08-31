@@ -218,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user has exceeded maximum failed attempts
-      if (currentUser.verificationFailedAttempts >= 10) {
+      if ((currentUser.verificationFailedAttempts || 0) >= 10) {
         return res.status(429).json({ 
           message: "Maximum verification attempts exceeded. Please logout and try again." 
         });
@@ -1919,7 +1919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               teamName: member.teamName,
               discipline: member.discipline,
               notificationType,
-              audienceType: 'team_members',
+              audienceType: 'all_participants',
               targetDisciplines: [],
               subject,
               message: message.replace('{checkoutDate}', checkoutDate ? new Date(checkoutDate).toLocaleDateString('en-IN') : ''),
