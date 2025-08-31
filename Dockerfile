@@ -16,4 +16,4 @@ COPY --from=build /app/public ./public
 EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "dist/server/index.cjs"]
