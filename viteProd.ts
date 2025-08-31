@@ -8,7 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Express) {
-  const distPath = "/app/dist";
+  // Use container path for production, local path for testing
+  const distPath = process.env.NODE_ENV === 'production' && process.env.PORT === '8080' 
+    ? "/app/dist" 
+    : path.resolve(process.cwd(), "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -19,7 +22,10 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   app.use("*", (_req, res) => {
-    res.sendFile("/app/dist/index.html");
+    const indexPath = process.env.NODE_ENV === 'production' && process.env.PORT === '8080'
+      ? "/app/dist/index.html"
+      : path.resolve(process.cwd(), "dist", "index.html");
+    res.sendFile(indexPath);
   });
 }
 
