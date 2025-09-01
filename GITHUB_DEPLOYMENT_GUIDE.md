@@ -48,7 +48,16 @@
    cd YOUR-REPO
    ```
 
-2. **Run deployment script**:
+2. **Configure Docker Authentication**:
+   ```bash
+   # Required for Docker deployment to Artifact Registry
+   gcloud auth configure-docker asia-south1-docker.pkg.dev
+   
+   # Verify authentication
+   gcloud auth list
+   ```
+
+3. **Run deployment script**:
    ```bash
    chmod +x deployment/deploy.sh
    ./deployment/deploy.sh

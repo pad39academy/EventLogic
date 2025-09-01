@@ -51,6 +51,10 @@ then
       --description="Docker repository for ievolve-app"
 fi
 
+# Configure Docker authentication for Artifact Registry
+echo "🔐 Configuring Docker authentication..."
+gcloud auth configure-docker $REGION-docker.pkg.dev
+
 # Create Cloud SQL instance (if it doesn't exist)
 echo "🗄️ Setting up Cloud SQL PostgreSQL instance..."
 if ! gcloud sql instances describe $DB_INSTANCE --quiet 2>/dev/null;

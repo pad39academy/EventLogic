@@ -53,6 +53,20 @@ gcloud projects add-iam-policy-binding your-unique-project-id \
     --role="roles/storage.admin"
 ```
 
+### Step 2.6: Configure Docker Authentication
+
+**Required for Docker deployment:**
+
+```bash
+# Configure Docker to authenticate with Google Artifact Registry
+gcloud auth configure-docker asia-south1-docker.pkg.dev
+
+# Verify authentication is working
+gcloud auth list
+```
+
+**Note**: This step is essential for pushing Docker images to Google Artifact Registry. Without proper authentication, you'll receive "Unauthenticated request" errors when deploying.
+
 ### Step 3: Run the Automated Deployment
 
 ```bash
