@@ -77,6 +77,32 @@ chmod +x deployment/deploy.sh
 ./deployment/deploy.sh
 ```
 
+## Manual Docker Deployment (Alternative)
+
+If you prefer to build and deploy manually instead of using the automated script:
+
+### Step 3A: Manual Docker Build and Push
+
+```bash
+# Build the Docker image
+docker buildx build --no-cache --platform linux/amd64 -f Dockerfile-fixed -t asia-south1-docker.pkg.dev/ievolve-sports-2025/ievolve-repo/ievolve-app:latest .
+
+# Push to Artifact Registry
+docker push asia-south1-docker.pkg.dev/ievolve-sports-2025/ievolve-repo/ievolve-app:latest
+
+# Deploy to Cloud Run
+gcloud run deploy ievolve-app \
+  --image=asia-south1-docker.pkg.dev/ievolve-sports-2025/ievolve-repo/ievolve-app:latest \
+  --region=asia-south1 \
+  --allow-unauthenticated \
+  --set-env-vars='DATABASE_URL=postgresql://ievolve_user:IevolveSecure2025!@/ievolve_db?host=/cloudsql/ievolve-sports-2025:asia-south1:ievolve-db,NODE_ENV=production' \
+  --add-cloudsql-instances=ievolve-sports-2025:asia-south1:ievolve-db \
+  --memory=1Gi \
+  --cpu=1 \
+  --timeout=300 \
+  --project=ievolve-sports-2025
+```
+
 ### Step 4: Configure Twilio Secrets
 
 After the deployment script completes, update your Twilio credentials:
