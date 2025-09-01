@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Phone, Mail, Lock, Shield, ArrowRight, RefreshCw } from "lucide-react";
+import ievolveFullLogo from "@/assets/logos/ievolve-full-logo.png";
 import HotelVerification from "@/components/hotel-verification";
 
 // Login form schemas
@@ -276,7 +277,13 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Sports Event Management System</h1>
+          <div className="flex justify-center mb-4">
+            <img 
+              src={ievolveFullLogo} 
+              alt="Ievolve Events" 
+              className="h-20 w-auto object-contain"
+            />
+          </div>
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold py-2 px-4 rounded-lg">
             CHIEF MINISTER TROPHY
           </div>

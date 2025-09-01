@@ -41,8 +41,9 @@ export const customErrorHandler = (err: any, req: Request, res: Response, next: 
               text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
           }
           .logo {
-              background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px 30px;
+              background: linear-gradient(135deg, #FFD700, #FFA500); color: #1e293b; padding: 15px 30px;
               border-radius: 8px; font-size: 18px; font-weight: bold; margin-bottom: 30px; display: inline-block;
+              box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3);
           }
           h1 { color: #333; font-size: 28px; margin-bottom: 15px; }
           .subtitle { color: #666; font-size: 18px; margin-bottom: 30px; }

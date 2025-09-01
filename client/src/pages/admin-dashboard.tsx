@@ -11,6 +11,7 @@ import {
   Calendar, Bell, User, Upload, Download, Plus, Menu,
   Building, UserCheck, Users as UsersIcon, LogOut, Clock, Shield
 } from "lucide-react";
+import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
 import StatsCards from "@/components/stats-cards";
 import UploadModal from "@/components/upload-modal";
 import ParticipantTable from "@/components/participant-table";
@@ -153,8 +154,12 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="flex-shrink-0 flex items-center">
-                <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-white" />
+                <div className="h-8 w-8 rounded-lg overflow-hidden">
+                  <img 
+                    src={ievolveSymbol} 
+                    alt="Ievolve" 
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <span className="ml-3 text-xl font-semibold text-gray-900">Ievolve Events</span>
               </div>

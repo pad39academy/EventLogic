@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { 
   Calendar, LogOut, Phone, LogIn, Users as UsersIcon, Bell
 } from "lucide-react";
+import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
 import { NotificationsList } from "@/components/notifications-list";
 import HotelVerificationModal from "@/components/hotel-verification-modal";
 import type { Participant } from "@/lib/types";
@@ -318,8 +319,12 @@ export default function CoachDashboard() {
         <div className="max-w-md mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 rounded-lg overflow-hidden">
+                <img 
+                  src={ievolveSymbol} 
+                  alt="Ievolve" 
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900" data-testid="header-title">Ievolve Events</h1>
