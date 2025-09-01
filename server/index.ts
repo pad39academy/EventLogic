@@ -81,15 +81,7 @@ app.use((req, res, next) => {
   app.use('/404.html', express.static('public/404.html'));
   app.use('/public', express.static('public'));
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-     const { setupVite } = await import("../viteDev"); // dynamic import here
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  serveStatic(app);
 
   // Add custom error handlers to hide Replit branding AFTER vite setup
   app.use(customErrorHandler);

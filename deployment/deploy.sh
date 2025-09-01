@@ -3,7 +3,7 @@
 # Deployment script for Ievolve Event Management System to Google Cloud
 set -e
 
-PROJECT_ID="vigilant-sol-470507-u9"
+PROJECT_ID="ievolve-sports-2025"
 REGION="asia-south1"
 DB_INSTANCE="ievolve-db"
 DB_NAME="ievolve_db"
@@ -70,7 +70,7 @@ echo "gcloud secrets create twilio-phone-number --data-file=- <<< 'your_twilio_p
 
 # Build and deploy the application
 echo "🏗️ Building and deploying the application..."
-gcloud builds submit --tag asia-south1-docker.pkg.dev/$PROJECT_ID/ievolve-repo/ievolve-app --project=$PROJECT_ID
+gcloud builds submit --no-cache --tag asia-south1-docker.pkg.dev/$PROJECT_ID/ievolve-repo/ievolve-app --project=$PROJECT_ID
 
 # Deploy to Cloud Run
 echo "☁️ Deploying to Cloud Run..."
@@ -84,7 +84,8 @@ gcloud run deploy ievolve-app \
     --port 8080 \
     --memory 1Gi \
     --cpu 1 \
-    --timeout 300s
+    --timeout 300s \
+    --set-secrets=DATABASE_URL=database-url:latest
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe ievolve-app --region=$REGION --format="value(status.url)")

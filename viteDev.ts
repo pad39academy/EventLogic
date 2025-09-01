@@ -4,14 +4,21 @@ import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 import { type Server } from "http";
-import viteConfig from "./vite.config";
+// import viteConfig from "./vite.config"; // Removed due to __dirname ES module issue
 
 const viteLogger = createLogger();
 
 export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
-    ...viteConfig,
+    root: 'client',
     configFile: false,
+    resolve: {
+      alias: {
+        '@': path.resolve(import.meta.dirname, './client/src'),
+        '@shared': path.resolve(import.meta.dirname, './shared'),
+        '@assets': path.resolve(import.meta.dirname, './attached_assets'),
+      },
+    },
     server: {
       middlewareMode: true,
       hmr: { server },
@@ -33,14 +40,13 @@ export async function setupVite(app: Express, server: Server) {
     try {
       const clientTemplate = path.resolve(
         import.meta.dirname,
-        "..",
         "client",
         "index.html"
       );
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
+        `src="/src/main.tsx?v=${nanoid()}`
       );
       const page = await vite.transformIndexHtml(req.originalUrl, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
