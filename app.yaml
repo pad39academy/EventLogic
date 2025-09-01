@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+runtime: nodejs20
+
+env_variables:
+  NODE_ENV: production
+  DATABASE_URL: "postgresql://ievolve_user:IevolveSecure2025!@/ievolve_db?host=/cloudsql/ievolve-sports-2025:asia-south1:ievolve-db"
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 5
+
+beta_settings:
+  cloud_sql_instances: ievolve-sports-2025:asia-south1:ievolve-db
+=======
 runtime: nodejs18
 
 env_variables:
@@ -10,3 +24,4 @@ automatic_scaling:
 # Cloud SQL connection
 beta_settings:
   cloud_sql_instances: ievolve-sports-2025:us-central1:ievolve-db
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1

@@ -1,0 +1,15 @@
+FROM node:18-slim
+WORKDIR /app
+# Copy package files
+COPY package*.json ./
+# Install dependencies (including dev for TypeScript)
+RUN npm ci
+# Copy source code
+COPY . .
+# Build frontend only (skip backend bundling)
+RUN npx vite build
+# Install tsx for running TypeScript directly
+RUN npm install -g tsx
+# Start with TypeScript directly (no bundling)
+CMD ["tsx", "server/index.ts"]
+EXPOSE 8080
