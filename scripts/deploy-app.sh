@@ -46,6 +46,7 @@ gcloud run deploy $SERVICE_NAME \
     --allow-unauthenticated \
     --set-env-vars="DATABASE_URL=postgresql://ievolve_user:IevolveSecure2025!@/ievolve_db?host=/cloudsql/${PROJECT_ID}:${REGION}:ievolve-db,NODE_ENV=production" \
     --add-cloudsql-instances="${PROJECT_ID}:${REGION}:ievolve-db" \
+    --set-secrets="TWILIO_ACCOUNT_SID=twilio-account-sid:latest,TWILIO_AUTH_TOKEN=twilio-auth-token:latest,TWILIO_PHONE_NUMBER=twilio-phone-number:latest" \
     --memory=1Gi \
     --cpu=1 \
     --timeout=300 \
