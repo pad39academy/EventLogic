@@ -128,7 +128,19 @@ gcloud run deploy ievolve-app \
     --set-secrets TWILIO_PHONE_NUMBER=twilio-phone-number:latest
 ```
 
-### Step 5: Migrate Your Database
+### Step 5: Setup Database Schema
+
+**Option A: Create Tables from Scratch (New Database)**
+
+```bash
+# Push database schema to production (creates all tables)
+npm run db:push
+
+# Note: You may need to add --force if there are data loss warnings
+# npm run db:push -- --force
+```
+
+**Option B: Migrate Existing Data**
 
 ```bash
 # Export current database (run locally)
