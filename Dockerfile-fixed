@@ -30,6 +30,7 @@ COPY shared/ ./shared/
 COPY viteProd.ts ./viteProd.ts
 COPY viteDev.ts ./viteDev.ts
 COPY drizzle.config.ts ./drizzle.config.ts
+COPY tsconfig.json ./tsconfig.json
 
 # Copy built frontend assets from build stage
 COPY --from=frontend-build /app/dist ./dist
@@ -39,13 +40,16 @@ COPY public/ ./public/
 COPY error-page.html ./error-page.html
 COPY mobile-iframe.html ./mobile-iframe.html
 
-# Install tsx globally for TypeScript runtime
+# Install tsx globally for TypeScript runtime  
 RUN npm install -g tsx
+
+# Install tsconfig-paths for runtime path resolution
+RUN npm install --save tsconfig-paths
 
 # Expose port
 EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Use tsx to run TypeScript directly (no bundling)
-CMD ["tsx", "server/index.ts"]
+# Use tsx with tsconfig-paths for proper alias resolution
+CMD ["tsx", "--require", "tsconfig-paths/register", "server/index.ts"]
