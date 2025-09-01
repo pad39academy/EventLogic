@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { logout } from "@/lib/auth";
@@ -30,6 +31,7 @@ export default function AdminDashboard() {
   const [addHotelModalOpen, setAddHotelModalOpen] = useState(false);
   const [hotelAddMode, setHotelAddMode] = useState<"new" | "instance">("new");
   const [uploadType, setUploadType] = useState<"hotel_inventory" | "coaches_officials" | "players" | "">("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -207,13 +209,13 @@ export default function AdminDashboard() {
                   >
                     Send Notification
                   </button>
-                  <button 
+                  {/* <button 
                     onClick={() => setActiveTab("settings")}
                     className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "settings" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
                     data-testid="nav-settings"
                   >
                     Settings
-                  </button>
+                  </button> */}
                   {/* Temporarily disabled
                   <button 
                     onClick={() => setActiveTab("sent-notifications")}
@@ -260,9 +262,93 @@ export default function AdminDashboard() {
             </div>
             
             <div className="md:hidden">
-              <Button variant="ghost" size="sm" className="bg-gray-100 inline-flex items-center justify-center p-2 rounded-md text-gray-400" data-testid="button-mobile-menu">
-                <Menu className="h-6 w-6" />
-              </Button>
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="bg-gray-100 inline-flex items-center justify-center p-2 rounded-md text-gray-400" data-testid="button-mobile-menu">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80">
+                  <SheetHeader>
+                    <SheetTitle>Navigation</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6 space-y-1">
+                    <button
+                      onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "dashboard" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-dashboard-mobile"
+                    >
+                      <Calendar className="h-4 w-4 mr-3 inline" />
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("participants"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "participants" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-participants-mobile"
+                    >
+                      <UsersIcon className="h-4 w-4 mr-3 inline" />
+                      Participants
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("hotels"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "hotels" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-hotels-mobile"
+                    >
+                      <Building className="h-4 w-4 mr-3 inline" />
+                      Hotels
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("checkin"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "checkin" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-checkin-mobile"
+                    >
+                      <UserCheck className="h-4 w-4 mr-3 inline" />
+                      Check-in Board
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("checkout"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "checkout" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-checkout-mobile"
+                    >
+                      <UserCheck className="h-4 w-4 mr-3 inline" />
+                      Check-out Board
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("notifications"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "notifications" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-notifications-mobile"
+                    >
+                      <Bell className="h-4 w-4 mr-3 inline" />
+                      Send Notification
+                    </button>
+                    <div className="border-t pt-4 mt-4">
+                      <div className="px-3 py-2">
+                        <p className="text-sm font-medium text-gray-700">{user?.name || "Admin User"}</p>
+                      </div>
+                      <button
+                        onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50"
+                        data-testid="button-logout-mobile"
+                      >
+                        <LogOut className="h-4 w-4 mr-3 inline" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
@@ -605,7 +691,7 @@ export default function AdminDashboard() {
         )}
         */}
 
-        {/* Settings */}
+        {/* Settings temporarily disabled
         {activeTab === "settings" && (
           <>
             <div className="mb-8">
@@ -621,7 +707,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Access Control Settings */}
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -637,7 +722,6 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
-            {/* Security Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -681,6 +765,14 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </>
+        )}
+        */}
+
+        {/* Placeholder to prevent empty tab error when settings is removed */}
+        {activeTab === "settings" && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">Settings temporarily disabled</p>
+          </div>
         )}
       </div>
 

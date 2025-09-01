@@ -5,7 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
+<<<<<<< HEAD
     "build": "vite build && NODE_ENV=production esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/server/index.js --external:express --external:body-parser --external:express-session",
+=======
+    "build":"vite build && NODE_ENV=production esbuild server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js --external:express --external:body-parser --external:express-session --external:pg",
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1
     "start": "NODE_ENV=production node dist/server/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
@@ -67,6 +71,7 @@
     "next-themes": "^0.4.6",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pg": "^8.16.3",
     "postgres": "^3.4.7",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -112,4 +117,9 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   }
+<<<<<<< HEAD
 }
+=======
+ 
+}
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1

@@ -14,9 +14,15 @@ export async function setupVite(app: Express, server: Server) {
     configFile: false,
     resolve: {
       alias: {
+<<<<<<< HEAD
         '@': path.resolve(import.meta.dirname, './client/src'),
         '@shared': path.resolve(import.meta.dirname, './shared'),
         '@assets': path.resolve(import.meta.dirname, './attached_assets'),
+=======
+        '@': path.resolve(process.cwd(), './client/src'),
+        '@shared': path.resolve(process.cwd(), './shared'),
+        '@assets': path.resolve(process.cwd(), './attached_assets'),
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1
       },
     },
     server: {
@@ -39,7 +45,11 @@ export async function setupVite(app: Express, server: Server) {
   app.use("*", async (req, res, next) => {
     try {
       const clientTemplate = path.resolve(
+<<<<<<< HEAD
         import.meta.dirname,
+=======
+        process.cwd(),
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1
         "client",
         "index.html"
       );

@@ -1,9 +1,14 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// Convert import.meta.url to __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  const distPath = "/app/dist";
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -14,7 +19,7 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile("/app/dist/index.html");
   });
 }
 

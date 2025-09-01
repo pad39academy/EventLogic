@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic, log } from "../viteProd";
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
@@ -62,7 +61,12 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      log(logLine);
+      console.log(`${new Date().toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      })} [express] ${logLine}`);
     }
   });
 
@@ -81,27 +85,50 @@ app.use((req, res, next) => {
   app.use('/404.html', express.static('public/404.html'));
   app.use('/public', express.static('public'));
 
+<<<<<<< HEAD
   serveStatic(app);
+=======
+  // Load appropriate modules based on environment
+  if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("../viteDev");
+    await setupVite(app, server);
+  } else {
+    console.log('Loading production static files...');
+    const { serveStatic } = await import("../viteProd");
+    serveStatic(app);
+    console.log('Production static files configured');
+  }
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1
 
-  // Add custom error handlers to hide Replit branding AFTER vite setup
+  // Add custom error handlers to hide Replit branding AFTER setup
   app.use(customErrorHandler);
   
   // Handle 404s professionally LAST
   app.use('*', handle404);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '8080', 10);
-  // Windows compatibility: use localhost instead of 0.0.0.0
-  const host = process.platform === 'win32' ? 'localhost' : "0.0.0.0";
+  // For Google Cloud Run, this MUST be 8080. For Replit dev, default to 5000.
+  const port = parseInt(process.env.PORT || (process.env.NODE_ENV === 'production' ? '8080' : '5000'), 10);
+  // Always bind to 0.0.0.0 for containerized deployments
+  const host = "0.0.0.0";
   
   server.listen({
     port,
     host,
     reusePort: process.platform !== 'win32',
-  }, () => {
+  }, async () => {
+    const { log } = process.env.NODE_ENV === "development" 
+      ? await import("../viteDev")
+      : await import("../viteProd");
     log(`serving on port ${port}`);
+  });
+
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+      process.exit(0);
+    });
   });
 })();

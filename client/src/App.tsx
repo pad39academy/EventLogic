@@ -1,3 +1,4 @@
+import React from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -31,10 +32,8 @@ function AuthWrapper() {
     return <Login />;
   }
 
-  // For coaches, check if hotel verification is required
-  if (user.role === 'coach' && !user.isHotelVerified) {
-    return <Login />;
-  }
+  // Hotel verification will happen when coaches try to check-in
+  // No longer blocking access to coach dashboard
 
   return (
     <Switch>

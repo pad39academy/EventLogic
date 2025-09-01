@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatToIndianDate, formatToIST } from "@/../../shared/dateUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +13,7 @@ import {
   Calendar, LogOut, Phone, LogIn, Users as UsersIcon, Bell
 } from "lucide-react";
 import { NotificationsList } from "@/components/notifications-list";
+import HotelVerificationModal from "@/components/hotel-verification-modal";
 import type { Participant } from "@/lib/types";
 
 interface CoachDashboardData {
@@ -21,7 +23,10 @@ interface CoachDashboardData {
 
 export default function CoachDashboard() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [actionMode, setActionMode] = useState<'none' | 'checkin' | 'checkout'>('none');
   const [activeTab, setActiveTab] = useState("team");
+  const [showHotelVerificationModal, setShowHotelVerificationModal] = useState(false);
+  const [pendingCheckinAction, setPendingCheckinAction] = useState<(() => void) | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -31,7 +36,7 @@ export default function CoachDashboard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const user = authData?.user || null;
+  const user = authData?.user || {};
 
   // Get unread notification count
   const { data: unreadCount = 0 } = useQuery({
@@ -145,6 +150,8 @@ export default function CoachDashboard() {
         title: "Success",
         description: `${data.checkedOut} participants checked out successfully`,
       });
+      setSelectedPlayers([]); // Clear selection after checkout
+      setActiveTab("team"); // Return to team view
     },
     onError: (error: any) => {
       toast({
@@ -170,8 +177,34 @@ export default function CoachDashboard() {
     }
   };
 
+  // Check if hotel verification is required before check-in
+  const requiresHotelVerification = () => {
+    return !user?.isHotelVerified;
+  };
+
+  const handleCheckinWithVerification = (checkinAction: () => void) => {
+    if (requiresHotelVerification()) {
+      setPendingCheckinAction(() => checkinAction);
+      setShowHotelVerificationModal(true);
+    } else {
+      checkinAction();
+    }
+  };
+
+  const onHotelVerificationSuccess = () => {
+    // Execute the pending check-in action after successful verification
+    if (pendingCheckinAction) {
+      pendingCheckinAction();
+      setPendingCheckinAction(null);
+    }
+    // Close the modal
+    setShowHotelVerificationModal(false);
+  };
+
   const handleSingleCheckin = (participantId: string) => {
-    checkinMutation.mutate([participantId]);
+    handleCheckinWithVerification(() => {
+      checkinMutation.mutate([participantId]);
+    });
   };
 
   const handleSingleCheckout = (participantId: string) => {
@@ -186,8 +219,32 @@ export default function CoachDashboard() {
     });
     if (pendingSelected.length > 0) {
       checkinMutation.mutate(pendingSelected);
-      setSelectedPlayers([]); // Clear selection after action
+      clearActionMode(); // Clear action mode and selection after action
     }
+  };
+
+  // Handle top-level check-in (shows hotel verification modal first)
+  const handleTopLevelCheckin = () => {
+    if (pendingCount === 0) return;
+    
+    handleCheckinWithVerification(() => {
+      // This will be executed after successful hotel verification
+      setActionMode('checkin');
+      setSelectedPlayers([]); // Clear previous selections
+    });
+  };
+
+  // Handle top-level check-out (shows player selection directly)
+  const handleTopLevelCheckout = () => {
+    if (checkedInCount === 0) return;
+    setActionMode('checkout');
+    setSelectedPlayers([]); // Clear previous selections
+  };
+
+  // Clear action mode
+  const clearActionMode = () => {
+    setActionMode('none');
+    setSelectedPlayers([]);
   };
 
   // Handle selected players check-out
@@ -198,20 +255,30 @@ export default function CoachDashboard() {
     });
     if (checkedInSelected.length > 0) {
       checkoutMutation.mutate(checkedInSelected);
-      setSelectedPlayers([]); // Clear selection after action
+      clearActionMode(); // Clear action mode and selection after action
     }
   };
 
   const handleBulkCheckin = () => {
     const pendingPlayers = dashboardData?.players.filter(p => p.checkinStatus === 'pending').map(p => p.participantId) || [];
     if (pendingPlayers.length > 0) {
-      checkinMutation.mutate(pendingPlayers);
+      handleCheckinWithVerification(() => {
+        checkinMutation.mutate(pendingPlayers);
+      });
     }
   };
 
   const handleCoachCheckin = () => {
     if (dashboardData?.coach) {
-      checkinMutation.mutate([dashboardData.coach.participantId]);
+      handleCheckinWithVerification(() => {
+        checkinMutation.mutate([dashboardData.coach.participantId]);
+      });
+    }
+  };
+
+  const handleCoachCheckout = () => {
+    if (dashboardData?.coach) {
+      checkoutMutation.mutate([dashboardData.coach.participantId]);
     }
   };
 
@@ -242,6 +309,7 @@ export default function CoachDashboard() {
   const { coach, players } = dashboardData;
   const checkedInCount = players.filter(p => p.checkinStatus === 'checked_in').length;
   const pendingCount = players.filter(p => p.checkinStatus === 'pending').length;
+  const checkedOutCount = players.filter(p => p.checkinStatus === 'checked_out').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -289,18 +357,6 @@ export default function CoachDashboard() {
               My Team
             </button>
             <button
-              onClick={() => setActiveTab("checkin")}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg ${
-                activeTab === "checkin"
-                  ? "bg-primary-100 text-primary-700 border-b-2 border-primary-500"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              data-testid="tab-checkin-checkout"
-            >
-              <LogIn className="h-4 w-4 inline mr-1" />
-              Check-in/Check-Out
-            </button>
-            <button
               onClick={() => setActiveTab("messages")}
               className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg relative ${
                 activeTab === "messages"
@@ -330,8 +386,150 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* Team and Check-in/out Content */}
-        {(activeTab === "team" || activeTab === "checkin") && (
+        {/* Check-in Selection Content */}
+        {activeTab === "checkin-selection" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <LogIn className="h-5 w-5 mr-2" />
+                  Select Players to Check In
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActiveTab("team")}
+                  data-testid="button-back-to-team"
+                >
+                  Back
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {players.filter(p => p.checkinStatus === 'pending').map((player) => (
+                <div key={player.participantId} className="flex items-center space-x-3 p-3 border rounded-lg">
+                  <Checkbox
+                    checked={selectedPlayers.includes(player.participantId)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedPlayers([...selectedPlayers, player.participantId]);
+                      } else {
+                        setSelectedPlayers(selectedPlayers.filter(id => id !== player.participantId));
+                      }
+                    }}
+                    data-testid={`checkbox-checkin-${player.participantId}`}
+                  />
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs bg-gray-200">
+                      {getInitials(player.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{player.name}</p>
+                    <p className="text-xs text-gray-500">{player.participantId}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex space-x-3 pt-4">
+                <Button 
+                  onClick={handleSelectedCheckin}
+                  disabled={selectedPlayers.length === 0 || checkinMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-confirm-checkin"
+                >
+                  Check In Selected ({selectedPlayers.length})
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPlayers([]);
+                    setActiveTab("team");
+                  }}
+                  data-testid="button-cancel-checkin"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Checkout Selection Content */}
+        {activeTab === "checkout-selection" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Select Players to Check Out
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActiveTab("team")}
+                  data-testid="button-back-to-team-checkout"
+                >
+                  Back
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {players.filter(p => p.checkinStatus === 'checked_in').map((player) => (
+                <div key={player.participantId} className="flex items-center space-x-3 p-3 border rounded-lg">
+                  <Checkbox
+                    checked={selectedPlayers.includes(player.participantId)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedPlayers([...selectedPlayers, player.participantId]);
+                      } else {
+                        setSelectedPlayers(selectedPlayers.filter(id => id !== player.participantId));
+                      }
+                    }}
+                    data-testid={`checkbox-checkout-${player.participantId}`}
+                  />
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs bg-gray-200">
+                      {getInitials(player.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{player.name}</p>
+                    <p className="text-xs text-gray-500">{player.participantId}</p>
+                    {player.checkinTime && (
+                      <p className="text-xs text-gray-400">
+                        Checked in: {formatToIST(player.checkinTime)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div className="flex space-x-3 pt-4">
+                <Button 
+                  onClick={handleSelectedCheckout}
+                  disabled={selectedPlayers.length === 0 || checkoutMutation.isPending}
+                  variant="outline"
+                  className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
+                  data-testid="button-confirm-checkout"
+                >
+                  Check Out Selected ({selectedPlayers.length})
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPlayers([]);
+                    setActiveTab("team");
+                  }}
+                  data-testid="button-cancel-checkout"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Team Content */}
+        {activeTab === "team" && (
           <>
             {/* Coach Info Card */}
             <Card className="mb-6">
@@ -376,7 +574,7 @@ export default function CoachDashboard() {
         {/* My Accommodation */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>My Accommodation</CardTitle>
+            <CardTitle>Coach Accommodation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
@@ -404,7 +602,7 @@ export default function CoachDashboard() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Status</span>
+              <span className="text-sm text-gray-500">Coach Status</span>
               <div className="text-right" data-testid="badge-coach-status">
                 {getStatusBadge(coach?.checkinStatus || 'pending')}
                 {coach?.checkinTime && (
@@ -429,6 +627,17 @@ export default function CoachDashboard() {
                 {checkinMutation.isPending ? "Checking In..." : "Check In Now"}
               </Button>
             )}
+            {coach?.checkinStatus === 'checked_in' && (
+              <Button 
+                variant="outline"
+                className="w-full mt-4 border-red-600 text-red-600 hover:bg-red-50"
+                onClick={handleCoachCheckout}
+                disabled={checkoutMutation.isPending}
+                data-testid="button-coach-checkout"
+              >
+                {checkoutMutation.isPending ? "Checking Out..." : "Check Out Now"}
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -448,24 +657,68 @@ export default function CoachDashboard() {
                 </span>
               </div>
             </div>
-            {players.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={selectedPlayers.length === players.length && players.length > 0}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedPlayers(players.map(p => p.participantId));
-                    } else {
-                      setSelectedPlayers([]);
-                    }
-                  }}
-                  className="rounded border-gray-300"
-                  data-testid="checkbox-select-all"
-                />
-                <label className="text-sm text-gray-600">Select All</label>
+            
+            {/* Top-level Action Buttons - only show when no action mode is active */}
+            {actionMode === 'none' && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <Button 
+                  className="flex items-center justify-center py-2 px-4"
+                  onClick={handleTopLevelCheckin}
+                  disabled={pendingCount === 0 || checkinMutation.isPending}
+                  data-testid="button-checkin-top"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Check In ({pendingCount})
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex items-center justify-center py-2 px-4"
+                  onClick={handleTopLevelCheckout}
+                  disabled={checkedInCount === 0 || checkoutMutation.isPending}
+                  data-testid="button-checkout-top"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Check Out ({checkedInCount})
+                </Button>
               </div>
             )}
+            {players.length > 0 && actionMode !== 'none' && (() => {
+              const eligiblePlayers = players.filter(p => 
+                actionMode === 'checkin' ? p.checkinStatus === 'pending' :
+                actionMode === 'checkout' ? p.checkinStatus === 'checked_in' : false
+              );
+              if (eligiblePlayers.length === 0) return null;
+              return (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={eligiblePlayers.length > 0 && eligiblePlayers.every(p => selectedPlayers.includes(p.participantId))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedPlayers(eligiblePlayers.map(p => p.participantId));
+                        } else {
+                          setSelectedPlayers([]);
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                      data-testid="checkbox-select-all"
+                    />
+                    <label className="text-sm text-gray-600">
+                      Select All {actionMode === 'checkin' ? 'Pending' : 'Checked In'} ({eligiblePlayers.length})
+                    </label>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearActionMode}
+                    data-testid="button-cancel-action"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              );
+            })()}
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Selected Actions */}
@@ -518,19 +771,30 @@ export default function CoachDashboard() {
                 data-testid={`player-card-${player.participantId}`}
               >
                 <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedPlayers.includes(player.participantId)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedPlayers(prev => [...prev, player.participantId]);
-                      } else {
-                        setSelectedPlayers(prev => prev.filter(id => id !== player.participantId));
-                      }
-                    }}
-                    className="rounded border-gray-300"
-                    data-testid={`checkbox-${player.participantId}`}
-                  />
+                  {(() => {
+                    const showCheckbox = actionMode !== 'none' && (
+                      (actionMode === 'checkin' && player.checkinStatus === 'pending') ||
+                      (actionMode === 'checkout' && player.checkinStatus === 'checked_in')
+                    );
+                    
+                    return showCheckbox ? (
+                      <input
+                        type="checkbox"
+                        checked={selectedPlayers.includes(player.participantId)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPlayers(prev => [...prev, player.participantId]);
+                          } else {
+                            setSelectedPlayers(prev => prev.filter(id => id !== player.participantId));
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                        data-testid={`checkbox-${player.participantId}`}
+                      />
+                    ) : (
+                      <div className="w-4"></div> // Placeholder to maintain spacing
+                    );
+                  })()}
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className={
                       player.checkinStatus === 'checked_in' ? 'bg-success-100' :
@@ -567,32 +831,15 @@ export default function CoachDashboard() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center">
                   {player.checkinStatus === 'pending' ? (
-                    <Button 
-                      size="sm"
-                      onClick={() => handleSingleCheckin(player.participantId)}
-                      disabled={checkinMutation.isPending}
-                      data-testid={`button-checkin-${player.participantId}`}
-                    >
-                      {checkinMutation.isPending ? "..." : "Check In"}
-                    </Button>
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300" data-testid={`status-${player.participantId}`}>
+                      Pending
+                    </Badge>
                   ) : player.checkinStatus === 'checked_in' ? (
-                    <>
-                      <Badge className="bg-success-100 text-success-800" data-testid={`status-${player.participantId}`}>
-                        Checked In
-                      </Badge>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="border-error-600 text-error-600 hover:bg-error-50"
-                        onClick={() => handleSingleCheckout(player.participantId)}
-                        disabled={checkoutMutation.isPending}
-                        data-testid={`button-checkout-${player.participantId}`}
-                      >
-                        Check Out
-                      </Button>
-                    </>
+                    <Badge className="bg-success-100 text-success-800" data-testid={`status-${player.participantId}`}>
+                      Checked In
+                    </Badge>
                   ) : (
                     <Badge variant="secondary" data-testid={`status-${player.participantId}`}>
                       Checked Out
@@ -609,32 +856,78 @@ export default function CoachDashboard() {
             )}
 
 
-            {/* Quick Actions */}
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button 
-                variant="outline"
-                className="flex items-center justify-center py-2 px-4"
-                onClick={handleBulkCheckin}
-                disabled={pendingCount === 0 || checkinMutation.isPending}
-                data-testid="button-bulk-checkin"
-              >
-                <LogIn className="h-4 w-4 mr-2" />
-                Bulk Check In ({pendingCount})
-              </Button>
-              <Button 
-                variant="outline"
-                className="flex items-center justify-center py-2 px-4"
-                data-testid="button-contact-support"
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                Contact Support
-              </Button>
-            </div>
+            {/* Main Actions - only show when no action mode is active */}
+            {actionMode === 'none' && (
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Button 
+                  className="flex items-center justify-center py-3 px-4"
+                  onClick={handleTopLevelCheckin}
+                  disabled={pendingCount === 0 || checkinMutation.isPending}
+                  data-testid="button-checkin"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Check In ({pendingCount})
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex items-center justify-center py-3 px-4"
+                  onClick={handleTopLevelCheckout}
+                  disabled={checkedInCount === 0 || checkoutMutation.isPending}
+                  data-testid="button-checkout"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Check Out ({checkedInCount})
+                </Button>
+              </div>
+            )}
+
+            {/* Action Mode Buttons - show when action mode is active */}
+            {actionMode !== 'none' && selectedPlayers.length > 0 && (
+              <div className="mt-6 flex space-x-3">
+                {actionMode === 'checkin' && (
+                  <Button 
+                    className="flex-1"
+                    onClick={handleSelectedCheckin}
+                    disabled={checkinMutation.isPending}
+                    data-testid="button-confirm-checkin"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Check In Selected ({selectedPlayers.length})
+                  </Button>
+                )}
+                {actionMode === 'checkout' && (
+                  <Button 
+                    variant="outline"
+                    className="flex-1 border-red-600 text-red-600 hover:bg-red-50"
+                    onClick={handleSelectedCheckout}
+                    disabled={checkoutMutation.isPending}
+                    data-testid="button-confirm-checkout"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Check Out Selected ({selectedPlayers.length})
+                  </Button>
+                )}
+                <Button 
+                  variant="outline"
+                  onClick={clearActionMode}
+                  data-testid="button-cancel-action-bottom"
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
           </>
         )}
       </div>
+
+      {/* Hotel Verification Modal */}
+      <HotelVerificationModal
+        open={showHotelVerificationModal}
+        onOpenChange={setShowHotelVerificationModal}
+        onVerificationSuccess={onHotelVerificationSuccess}
+      />
     </div>
   );
 }

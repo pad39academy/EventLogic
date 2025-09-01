@@ -37,4 +37,8 @@ try {
 } catch (error) {
   console.error('Build failed:', error);
   process.exit(1);
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1

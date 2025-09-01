@@ -12,15 +12,48 @@
 ### Step 1: Setup Google Cloud Project
 
 ```bash
-# Create and set up project
-gcloud projects create ievolve-event-management
-gcloud config set project ievolve-event-management
+# Create and set up project (use your own unique project ID)
+gcloud projects create your-unique-project-id
+gcloud config set project your-unique-project-id
 
-# Enable billing (you must do this in the Google Cloud Console)
-# Visit: https://console.cloud.google.com/billing
+# Update deployment/deploy.sh with your project ID
+# Edit the PROJECT_ID variable to match your actual project
 ```
 
-### Step 2: Run the Automated Deployment
+**Important**: Update the `PROJECT_ID` variable in `deployment/deploy.sh` to match your actual Google Cloud project ID.
+
+### Step 2: Enable Billing (REQUIRED)
+
+**⚠️ CRITICAL: You MUST enable billing before proceeding!**
+
+1. Visit: https://console.cloud.google.com/billing
+2. Select your project: `your-unique-project-id`
+3. Click "Link a billing account"
+4. Choose or create a billing account
+5. Verify billing is enabled before continuing
+
+Without billing enabled, the deployment will fail when trying to create Cloud SQL, Cloud Run, or other services.
+
+### Step 2.5: Setup IAM Permissions (If Needed)
+
+If you encounter permission errors, add necessary roles to your account:
+
+```bash
+# Replace with your actual project ID and email
+gcloud projects add-iam-policy-binding your-unique-project-id \
+    --member="user:your-email@domain.com" \
+    --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding your-unique-project-id \
+    --member="user:your-email@domain.com" \
+    --role="roles/iam.serviceAccountUser"
+
+gcloud projects add-iam-policy-binding your-unique-project-id \
+    --member="user:your-email@domain.com" \
+    --role="roles/storage.admin"
+```
+
+### Step 3: Run the Automated Deployment
 
 ```bash
 # Make deployment script executable
@@ -30,7 +63,7 @@ chmod +x deployment/deploy.sh
 ./deployment/deploy.sh
 ```
 
-### Step 3: Configure Twilio Secrets
+### Step 4: Configure Twilio Secrets
 
 After the deployment script completes, update your Twilio credentials:
 
@@ -39,6 +72,12 @@ After the deployment script completes, update your Twilio credentials:
 gcloud secrets create twilio-account-sid --data-file=- <<< 'YOUR_TWILIO_ACCOUNT_SID'
 gcloud secrets create twilio-auth-token --data-file=- <<< 'YOUR_TWILIO_AUTH_TOKEN'
 gcloud secrets create twilio-phone-number --data-file=- <<< 'YOUR_TWILIO_PHONE_NUMBER'
+
+To validate the credentials:
+
+gcloud secrets versions access latest --secret="twilio-account-sid"
+gcloud secrets versions access latest --secret="twilio-auth-token"
+gcloud secrets versions access latest --secret="twilio-phone-number"
 
 # Redeploy with updated secrets
 gcloud run deploy ievolve-app \
@@ -49,7 +88,7 @@ gcloud run deploy ievolve-app \
     --set-secrets TWILIO_PHONE_NUMBER=twilio-phone-number:latest
 ```
 
-### Step 4: Migrate Your Database
+### Step 5: Migrate Your Database
 
 ```bash
 # Export current database (run locally)
@@ -188,10 +227,83 @@ gcloud run services update ievolve-app \
 
 ### Common Issues
 
-1. **Build fails**: Check Dockerfile and dependencies
-2. **Database connection fails**: Verify Cloud SQL instance and secrets
-3. **SMS not working**: Update Twilio credentials
-4. **Performance issues**: Increase memory/CPU allocation
+#### 1. Permission Errors During Deployment
+
+If you get permission errors like "does not have permission to access namespaces", fix IAM permissions:
+
+```bash
+# Add necessary Cloud Run roles
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="user:your-email@domain.com" \
+    --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="user:your-email@domain.com" \
+    --role="roles/iam.serviceAccountUser"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="user:your-email@domain.com" \
+    --role="roles/storage.admin"
+```
+
+#### 2. Project ID Mismatch
+
+If image paths don't match your project, ensure consistency:
+
+```bash
+# Set correct project
+gcloud config set project YOUR_ACTUAL_PROJECT_ID
+
+# Build image in correct project
+gcloud builds submit --tag gcr.io/YOUR_ACTUAL_PROJECT_ID/ievolve-app
+
+# Deploy with matching image path
+gcloud run deploy ievolve-app \
+    --image gcr.io/YOUR_ACTUAL_PROJECT_ID/ievolve-app \
+    --region us-central1 \
+    --allow-unauthenticated
+```
+
+#### 3. Build fails
+Check Dockerfile and dependencies
+
+#### 4. Database connection fails
+Verify Cloud SQL instance and secrets
+
+#### 5. SMS not working
+Update Twilio credentials
+
+#### 6. "Already Exists" Errors During Re-deployment
+
+If you see errors like "database already exists" or "Secret already exists", these are normal for re-runs:
+
+```bash
+# The updated deployment script now handles these gracefully
+# Simply re-run the deployment script:
+./deployment/deploy.sh
+
+# Or continue with just the build and deploy steps:
+gcloud builds submit --tag asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app
+gcloud run deploy ievolve-app \
+    --image asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app \
+    --region asia-south1 \
+    --allow-unauthenticated
+```
+
+#### 7. Cloud Build "--no-cache" Error
+
+If you encounter "Cannot specify --no-cache if builds/use_kaniko property is False":
+
+```bash
+# Enable Kaniko for Cloud Build
+gcloud config set builds/use_kaniko True
+
+# Then retry the build
+gcloud builds submit --tag asia-south1-docker.pkg.dev/YOUR_PROJECT_ID/ievolve-repo/ievolve-app
+```
+
+#### 8. Performance issues
+Increase memory/CPU allocation
 
 ### Useful Commands
 
