@@ -8,7 +8,33 @@ PORT="5432"
 PID_FILE="/tmp/cloud_sql_proxy.pid"
 LOG_FILE="/tmp/cloud_sql_proxy.log"
 
+# Find cloud_sql_proxy binary
+PROXY_BINARY=""
+if command -v cloud_sql_proxy > /dev/null 2>&1; then
+    PROXY_BINARY="cloud_sql_proxy"
+elif [ -f "./cloud_sql_proxy" ]; then
+    PROXY_BINARY="./cloud_sql_proxy"
+elif [ -f "../cloud_sql_proxy" ]; then
+    PROXY_BINARY="../cloud_sql_proxy"
+elif [ -f "~/cloud_sql_proxy" ]; then
+    PROXY_BINARY="~/cloud_sql_proxy"
+else
+    echo "❌ Cloud SQL Proxy binary not found!"
+    echo ""
+    echo "📥 Please download it first:"
+    echo "   wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy"
+    echo "   chmod +x cloud_sql_proxy"
+    echo ""
+    echo "   Or install via package manager:"
+    echo "   curl -o cloud_sql_proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64"
+    echo "   chmod +x cloud_sql_proxy"
+    echo ""
+    echo "   Then run this script again."
+    exit 1
+fi
+
 echo "🔄 Starting Cloud SQL Proxy for $INSTANCE_CONNECTION_NAME..."
+echo "📦 Using binary: $PROXY_BINARY"
 
 # Check if proxy is already running
 if [ -f "$PID_FILE" ]; then
@@ -24,7 +50,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Start proxy in background with nohup
-nohup ./cloud_sql_proxy -instances="$INSTANCE_CONNECTION_NAME=tcp:$PORT" > "$LOG_FILE" 2>&1 &
+nohup $PROXY_BINARY -instances="$INSTANCE_CONNECTION_NAME=tcp:$PORT" > "$LOG_FILE" 2>&1 &
 PROXY_PID=$!
 
 # Save PID to file
