@@ -17,3 +17,4 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 CMD ["node", "dist/server/index.cjs"]
+CMD ["pnpm","run","preview","-","-host","0.0.0.0","-port,","8080"]
