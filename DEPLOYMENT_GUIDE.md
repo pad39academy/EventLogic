@@ -322,6 +322,53 @@ Check Dockerfile and dependencies
 #### 4. Database connection fails
 Verify Cloud SQL instance and secrets
 
+#### 4.1. Database Schema Setup in Cloud Shell
+
+When setting up the database schema from Google Cloud Shell, follow these specific steps:
+
+```bash
+# 1. Set the correct project
+gcloud config set project ievolve-sports-2025
+
+# 2. Navigate to the project directory (important!)
+cd ~/Ievolve-mvp1.0
+
+# 3. Set DATABASE_URL for localhost connection
+# Use localhost instead of external IP to avoid connection timeouts
+export DATABASE_URL='postgresql://ievolve_user:IevolveSecure2025!@localhost:5432/ievolve_db'
+
+# 4. Push database schema
+npm run db:push
+```
+
+**Important Notes:**
+- **Directory**: Always ensure you're in the correct project directory (`~/Ievolve-mvp1.0`) before running npm commands
+- **Database URL**: Use `localhost` instead of external IP addresses to avoid `ETIMEDOUT` errors
+- **Connection**: The localhost connection works because Cloud Shell provides secure access to Cloud SQL instances within the same project
+
+**Common Errors and Solutions:**
+
+❌ **Error: `ENOENT: no such file or directory, open '/home/username/package.json'`**
+```bash
+# Solution: Navigate to the correct directory
+cd ~/Ievolve-mvp1.0
+```
+
+❌ **Error: `connect ETIMEDOUT 34.93.185.14:5432`**
+```bash
+# Problem: Using external IP address
+export DATABASE_URL='postgresql://ievolve_user:IevolveSecure2025!@34.93.185.14:5432/ievolve_db'
+
+# Solution: Use localhost instead
+export DATABASE_URL='postgresql://ievolve_user:IevolveSecure2025!@localhost:5432/ievolve_db'
+```
+
+✅ **Successful Output:**
+```
+[✓] Pulling schema from database...
+[✓] Changes applied
+```
+
 #### 5. SMS not working
 Update Twilio credentials
 
