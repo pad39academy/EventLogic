@@ -13,8 +13,8 @@ COPY postcss.config.js ./postcss.config.js
 COPY tsconfig.json ./tsconfig.json
 COPY components.json ./components.json
 
-# Build only the frontend (no server bundling)
-RUN cd client && npx vite build --outDir ../dist
+# Build frontend from project root (not from client dir)
+RUN npx vite build --emptyOutDir
 
 # Production stage with no-bundle server
 FROM node:18-slim AS production
