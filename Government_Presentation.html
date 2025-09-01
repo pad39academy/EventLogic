@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolve Events - Digital Event Management Solution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .presentation-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .slide {
+            width: 100%;
+            height: 100%;
+            padding: 60px 80px;
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #f0f0f0;
+            padding-bottom: 20px;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo {
+            height: 60px;
+            margin-right: 20px;
+        }
+        
+        .slide-number {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        h1 {
+            color: #1e3a8a;
+            font-size: 3em;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #1e3a8a;
+            font-size: 2.2em;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+        
+        h3 {
+            color: #3b82f6;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+        
+        .pain-point {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        
+        .solution {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        
+        .feature-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .feature-card h4 {
+            color: #1e3a8a;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .tech-item {
+            background: #1e3a8a;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .security-feature {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .security-feature::before {
+            content: "🔒";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .benefit-item {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+        
+        .navigation {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+        }
+        
+        .nav-btn {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        .nav-btn:hover {
+            background: #1e40af;
+        }
+        
+        .nav-btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        
+        .slide-indicator {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .indicator-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .indicator-dot.active {
+            background: #1e3a8a;
+        }
+        
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+        
+        .cta-section {
+            background: #1e3a8a;
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .demo-box {
+            background: #f0f9ff;
+            border: 2px dashed #3b82f6;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .architecture-diagram {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        
+        <!-- Slide 1: Title Slide -->
+        <div class="slide active">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">1 / 10</div>
+            </div>
+            <div class="content">
+                <h1>Digital Event Management Solution</h1>
+                <div style="text-align: center; margin-top: 40px;">
+                    <h2 style="color: #3b82f6; margin-bottom: 20px;">Transforming Sports Event Management for Government Organizations</h2>
+                    <p style="font-size: 1.3em; color: #64748b; margin-bottom: 30px;">A comprehensive digital platform for accommodation management, participant tracking, and real-time coordination</p>
+                    <div style="background: #f0f9ff; padding: 30px; border-radius: 12px; margin-top: 40px;">
+                        <h3 style="color: #1e3a8a; margin-bottom: 15px;">Presented by Evolve Events</h3>
+                        <p style="color: #64748b; font-size: 1.1em;">Leading provider of comprehensive event management solutions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: Current Pain Points -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">2 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Current Challenges in Sports Event Management</h2>
+                <div class="two-column">
+                    <div>
+                        <div class="pain-point">
+                            <h3>❌ Check-in/Check-out Tracking</h3>
+                            <p>No real-time visibility into when teams arrive at hotels. Manual processes lead to confusion and delays.</p>
+                        </div>
+                        <div class="pain-point">
+                            <h3>❌ Extended Stay Management</h3>
+                            <p>Unable to track early checkouts or players staying beyond allocated time, leading to resource wastage.</p>
+                        </div>
+                        <div class="pain-point">
+                            <h3>❌ Limited Communication</h3>
+                            <p>Difficulty in sending targeted notifications to specific teams, coaches, or all participants simultaneously.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="pain-point">
+                            <h3>❌ Transit Hotel Management</h3>
+                            <p>Lack of integrity and transparency in hotel accommodation processes, leading to disputes and inefficiencies.</p>
+                        </div>
+                        <div class="pain-point">
+                            <h3>❌ Travel Coordination</h3>
+                            <p>Poor advance communication with traveling teams results in last-minute coordination issues.</p>
+                        </div>
+                        <div class="pain-point">
+                            <h3>❌ Manual Oversight</h3>
+                            <p>Paper-based processes require extensive manual supervision and are prone to errors.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Solution Overview -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">3 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Our Digital Solution</h2>
+                <div class="two-column">
+                    <div>
+                        <div class="solution">
+                            <h3>✅ Real-time Check-in Tracking</h3>
+                            <p>Instant visibility into team arrivals with precise timestamps and automated notifications to stakeholders.</p>
+                        </div>
+                        <div class="solution">
+                            <h3>✅ Smart Room Management</h3>
+                            <p>Automated tracking of early checkouts and extended stays with immediate alerts and room reallocation capabilities.</p>
+                        </div>
+                        <div class="solution">
+                            <h3>✅ Advanced Notification System</h3>
+                            <p>Targeted SMS and app notifications to specific teams, coaches, or broadcast messages to all participants.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="solution">
+                            <h3>✅ Transparent Hotel Management</h3>
+                            <p>Complete audit trail of all accommodation processes with role-based access and real-time reporting.</p>
+                        </div>
+                        <div class="solution">
+                            <h3>✅ Proactive Travel Communication</h3>
+                            <p>Advanced notifications and travel updates sent automatically to teams with customizable lead times.</p>
+                        </div>
+                        <div class="solution">
+                            <h3>✅ Digital Process Management</h3>
+                            <p>Fully digital workflows eliminate paperwork and provide instant access to all event data.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Key Features -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">4 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Core Platform Features</h2>
+                <div class="two-column">
+                    <div>
+                        <div class="feature-card">
+                            <h4>🏨 Hotel Management</h4>
+                            <p>Real-time occupancy tracking, room allocation optimization, and automated check-in/check-out processes.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>👥 Participant Management</h4>
+                            <p>Complete participant database with role-based access for coaches, officials, and administrators.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📊 Analytics Dashboard</h4>
+                            <p>Real-time insights, occupancy reports, and comprehensive event analytics for decision making.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="feature-card">
+                            <h4>📱 Mobile-Responsive Interface</h4>
+                            <p>Optimized for field operations with offline capabilities and instant synchronization.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔔 Smart Notifications</h4>
+                            <p>Automated SMS and push notifications with customizable templates and scheduling.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📋 Audit & Compliance</h4>
+                            <p>Complete activity logging, role-based permissions, and transparent reporting for accountability.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Technical Architecture -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">5 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Technical Architecture</h2>
+                <div class="architecture-diagram">
+                    <h3>Robust, Scalable & Secure Cloud Infrastructure</h3>
+                    <div style="margin: 20px 0; font-size: 1.1em;">
+                        <strong>Frontend:</strong> Modern Web Application + Mobile-Responsive Design<br>
+                        ↕<br>
+                        <strong>Backend:</strong> RESTful API with Authentication & Authorization<br>
+                        ↕<br>
+                        <strong>Database:</strong> PostgreSQL with Automated Backups<br>
+                        ↕<br>
+                        <strong>Infrastructure:</strong> Cloud Hosting with Auto-Scaling
+                    </div>
+                </div>
+                <div class="tech-stack">
+                    <div class="tech-item">PostgreSQL Database</div>
+                    <div class="tech-item">Cloud Infrastructure</div>
+                    <div class="tech-item">RESTful APIs</div>
+                    <div class="tech-item">Mobile-First Design</div>
+                    <div class="tech-item">Real-time Updates</div>
+                    <div class="tech-item">SMS Integration</div>
+                </div>
+                <div style="margin-top: 30px; padding: 20px; background: #f0f9ff; border-radius: 8px;">
+                    <h3>Future Integration Capabilities</h3>
+                    <p>The platform is designed to integrate with existing government systems when needed, providing seamless data exchange and workflow automation.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Security Features -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">6 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Security & Compliance</h2>
+                <div class="two-column">
+                    <div>
+                        <h3>Data Security</h3>
+                        <div class="security-feature">End-to-end data encryption</div>
+                        <div class="security-feature">Secure API authentication</div>
+                        <div class="security-feature">Regular automated backups</div>
+                        <div class="security-feature">Role-based access control</div>
+                        <div class="security-feature">Session management</div>
+                        
+                        <h3 style="margin-top: 30px;">Infrastructure Security</h3>
+                        <div class="security-feature">Cloud-native security</div>
+                        <div class="security-feature">Network-level protection</div>
+                        <div class="security-feature">Regular security updates</div>
+                    </div>
+                    <div>
+                        <h3>Compliance & Governance</h3>
+                        <div class="security-feature">Complete audit trails</div>
+                        <div class="security-feature">Activity logging</div>
+                        <div class="security-feature">Data privacy compliance</div>
+                        <div class="security-feature">Administrative oversight</div>
+                        <div class="security-feature">Transparent reporting</div>
+                        
+                        <h3 style="margin-top: 30px;">Government Standards</h3>
+                        <div class="security-feature">Multi-level authentication</div>
+                        <div class="security-feature">Secure data handling</div>
+                        <div class="security-feature">Regulatory compliance ready</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Benefits & ROI -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">7 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Benefits for Government Organizations</h2>
+                <div class="two-column">
+                    <div>
+                        <h3>Operational Benefits</h3>
+                        <div class="benefit-item">
+                            <strong>80% Reduction</strong> in manual oversight requirements
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Real-time Visibility</strong> into all event operations
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Automated Workflows</strong> for faster processing
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Instant Communication</strong> with teams and officials
+                        </div>
+                        
+                        <h3 style="margin-top: 25px;">Financial Benefits</h3>
+                        <div class="benefit-item">
+                            <strong>Cost Savings</strong> through optimal resource utilization
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Reduced Overhead</strong> with digital processes
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Strategic Benefits</h3>
+                        <div class="benefit-item">
+                            <strong>Enhanced Transparency</strong> in government operations
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Improved Accountability</strong> with complete audit trails
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Better Decision Making</strong> with real-time data
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Scalable Solution</strong> for events of any size
+                        </div>
+                        
+                        <h3 style="margin-top: 25px;">Stakeholder Benefits</h3>
+                        <div class="benefit-item">
+                            <strong>Participant Satisfaction</strong> through better coordination
+                        </div>
+                        <div class="benefit-item">
+                            <strong>Official Efficiency</strong> with streamlined processes
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Implementation Timeline -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">8 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Implementation Roadmap</h2>
+                <div style="display: flex; justify-content: space-between; margin-top: 40px;">
+                    <div style="flex: 1; padding: 20px; background: #f8fafc; border-radius: 12px; margin-right: 15px;">
+                        <h3 style="color: #059669; text-align: center;">Phase 1 (Weeks 1-2)</h3>
+                        <ul>
+                            <li>System setup and configuration</li>
+                            <li>Data migration and validation</li>
+                            <li>Initial user training</li>
+                            <li>Security configuration</li>
+                        </ul>
+                    </div>
+                    <div style="flex: 1; padding: 20px; background: #f8fafc; border-radius: 12px; margin-right: 15px;">
+                        <h3 style="color: #dc2626; text-align: center;">Phase 2 (Weeks 3-4)</h3>
+                        <ul>
+                            <li>Pilot event execution</li>
+                            <li>User feedback collection</li>
+                            <li>System optimization</li>
+                            <li>Extended training sessions</li>
+                        </ul>
+                    </div>
+                    <div style="flex: 1; padding: 20px; background: #f8fafc; border-radius: 12px;">
+                        <h3 style="color: #7c3aed; text-align: center;">Phase 3 (Ongoing)</h3>
+                        <ul>
+                            <li>Full production deployment</li>
+                            <li>24/7 technical support</li>
+                            <li>Regular system updates</li>
+                            <li>Performance monitoring</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="cta-section" style="margin-top: 40px;">
+                    <h3>Ready to Deploy in 4 Weeks</h3>
+                    <p style="margin-top: 15px; font-size: 1.1em;">Complete solution including training, support, and ongoing maintenance</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Live Demo Structure -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">9 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Live System Demonstration</h2>
+                <div class="demo-box">
+                    <h3 style="color: #1e3a8a; margin-bottom: 20px;">Interactive Platform Tour</h3>
+                    <p style="margin-bottom: 20px;">We'll now demonstrate the live system with real data from the Chief Minister Trophy 2025</p>
+                </div>
+                
+                <div class="two-column" style="margin-top: 30px;">
+                    <div>
+                        <h3>Admin Dashboard Demo</h3>
+                        <ul>
+                            <li>Real-time hotel occupancy monitoring</li>
+                            <li>Participant management and tracking</li>
+                            <li>Automated notification system</li>
+                            <li>Comprehensive reporting features</li>
+                            <li>Security and audit capabilities</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3>Coach Portal Demo</h3>
+                        <ul>
+                            <li>Team check-in/check-out process</li>
+                            <li>OTP-based secure authentication</li>
+                            <li>Team roster management</li>
+                            <li>Real-time status updates</li>
+                            <li>Communication with officials</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div style="background: #1e3a8a; color: white; padding: 25px; border-radius: 12px; margin-top: 30px; text-align: center;">
+                    <h3>Live Data: 60+ Hotels | 500+ Participants | 50+ Teams</h3>
+                    <p style="margin-top: 10px;">Experience the platform with actual event data</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 10: Next Steps -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="logo-container">
+                    <img src="@assets/image_1756720785212.png" alt="Evolve Events" class="logo">
+                </div>
+                <div class="slide-number">10 / 10</div>
+            </div>
+            <div class="content">
+                <h2>Partnership Opportunity</h2>
+                <div class="two-column">
+                    <div>
+                        <div style="background: #f0f9ff; padding: 30px; border-radius: 12px;">
+                            <h3 style="color: #1e3a8a;">What We Offer</h3>
+                            <ul style="margin-top: 20px;">
+                                <li>Complete digital transformation</li>
+                                <li>Proven technology solution</li>
+                                <li>Comprehensive training and support</li>
+                                <li>Ongoing system maintenance</li>
+                                <li>Regular feature updates</li>
+                                <li>24/7 technical assistance</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="background: #f0fdf4; padding: 30px; border-radius: 12px;">
+                            <h3 style="color: #059669;">Expected Outcomes</h3>
+                            <ul style="margin-top: 20px;">
+                                <li>Streamlined event management</li>
+                                <li>Enhanced operational efficiency</li>
+                                <li>Improved stakeholder satisfaction</li>
+                                <li>Transparent and accountable processes</li>
+                                <li>Significant cost reductions</li>
+                                <li>Future-ready infrastructure</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="cta-section" style="margin-top: 40px;">
+                    <h3>Ready to Transform Your Event Management?</h3>
+                    <p style="margin-top: 15px; font-size: 1.2em;">Let's discuss how Evolve Events can digitize your sports event operations</p>
+                    <div style="margin-top: 25px; display: flex; justify-content: center; gap: 30px;">
+                        <div style="text-align: left;">
+                            <strong>Contact Information:</strong><br>
+                            Evolve Events<br>
+                            Email: info@evolveevents.com<br>
+                            Phone: +91 XXX XXX XXXX
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Navigation -->
+    <div class="navigation">
+        <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)">Previous</button>
+        <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">Next</button>
+    </div>
+
+    <!-- Slide Indicators -->
+    <div class="slide-indicator" id="slideIndicator"></div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        // Initialize slide indicators
+        function initializeIndicators() {
+            const indicatorContainer = document.getElementById('slideIndicator');
+            for (let i = 0; i < totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'indicator-dot';
+                if (i === 0) dot.classList.add('active');
+                dot.onclick = () => goToSlide(i);
+                indicatorContainer.appendChild(dot);
+            }
+        }
+
+        function showSlide(n) {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                if (index === n) {
+                    slide.classList.add('active');
+                }
+            });
+
+            // Update indicators
+            const indicators = document.querySelectorAll('.indicator-dot');
+            indicators.forEach((dot, index) => {
+                dot.classList.remove('active');
+                if (index === n) {
+                    dot.classList.add('active');
+                }
+            });
+
+            // Update navigation buttons
+            document.getElementById('prevBtn').disabled = n === 0;
+            document.getElementById('nextBtn').disabled = n === totalSlides - 1;
+        }
+
+        function changeSlide(direction) {
+            currentSlide += direction;
+            if (currentSlide < 0) currentSlide = 0;
+            if (currentSlide >= totalSlides) currentSlide = totalSlides - 1;
+            showSlide(currentSlide);
+        }
+
+        function goToSlide(n) {
+            currentSlide = n;
+            showSlide(currentSlide);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') changeSlide(-1);
+            if (e.key === 'ArrowRight') changeSlide(1);
+            if (e.key === 'Home') goToSlide(0);
+            if (e.key === 'End') goToSlide(totalSlides - 1);
+        });
+
+        // Initialize
+        initializeIndicators();
+        showSlide(0);
+    </script>
+</body>
+</html>
