@@ -11,7 +11,7 @@ const viteLogger = createLogger();
 export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     root: 'client',
-    configFile: false,
+    configFile: path.resolve(process.cwd(), 'vite.config.ts'),
     resolve: {
       alias: {
         '@': path.resolve(process.cwd(), './client/src'),
