@@ -119,6 +119,23 @@ gcloud secrets versions access latest --secret="twilio-account-sid"
 gcloud secrets versions access latest --secret="twilio-auth-token"
 gcloud secrets versions access latest --secret="twilio-phone-number"
 
+# CRITICAL: Grant Cloud Run service account access to secrets
+# Get your project number (needed for the service account)
+PROJECT_NUMBER=$(gcloud projects describe ievolve-sports-2025 --format="value(projectNumber)")
+
+# Grant access to each secret
+gcloud secrets add-iam-policy-binding twilio-account-sid \
+    --role="roles/secretmanager.secretAccessor" \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+gcloud secrets add-iam-policy-binding twilio-auth-token \
+    --role="roles/secretmanager.secretAccessor" \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+gcloud secrets add-iam-policy-binding twilio-phone-number \
+    --role="roles/secretmanager.secretAccessor" \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
 # Redeploy with updated secrets
 gcloud run deploy ievolve-app \
     --image gcr.io/ievolve-event-management/ievolve-app \
