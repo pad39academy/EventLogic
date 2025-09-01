@@ -20,6 +20,12 @@ else
     ENVIRONMENT="local"
 fi
 
+# Auto-enable cloud logs if in cloud environment
+if [ "$ENVIRONMENT" = "cloud" ] && [ "$SHOW_APP" = true ] && [ "$SHOW_DB" = false ] && [ "$SHOW_CLOUD" = false ]; then
+    SHOW_CLOUD=true
+    echo "🔍 Detected cloud environment - enabling cloud logs automatically"
+fi
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -147,23 +153,40 @@ if [ "$SHOW_CLOUD" = true ] && command -v gcloud >/dev/null; then
     SERVICE_NAME="ievolve-app"
     REGION="asia-south1"
     
-    echo "📊 Checking cloud service status..."
+    echo "📊 Fetching cloud service logs..."
+    echo "Project: $PROJECT_ID"
+    echo "Service: $SERVICE_NAME"
+    echo "Region: $REGION"
+    echo ""
     
     # Check if service exists and get logs
     if gcloud run services describe $SERVICE_NAME --region=$REGION --project=$PROJECT_ID >/dev/null 2>&1; then
         echo "✅ Cloud service found: $SERVICE_NAME"
         echo ""
-        echo "📄 Recent cloud logs (last $LINES lines):"
         
         if [ "$FOLLOW" = true ]; then
-            echo "Following cloud logs (Ctrl+C to stop)..."
+            echo "📄 Following cloud logs (Ctrl+C to stop)..."
+            echo "Running: gcloud run services logs tail $SERVICE_NAME --region=$REGION --project=$PROJECT_ID"
+            echo ""
             gcloud run services logs tail $SERVICE_NAME --region=$REGION --project=$PROJECT_ID
         else
+            echo "📄 Recent cloud logs (last $LINES entries):"
+            echo "Running: gcloud run services logs read $SERVICE_NAME --region=$REGION --project=$PROJECT_ID --limit=$LINES"
+            echo ""
             gcloud run services logs read $SERVICE_NAME --region=$REGION --project=$PROJECT_ID --limit=$LINES
         fi
     else
         echo "❌ Cloud service not found or not accessible"
-        echo "💡 Deploy first: ./scripts/deploy-app.sh"
+        echo ""
+        echo "🔍 Troubleshooting:"
+        echo "1. Check if service exists:"
+        echo "   gcloud run services list --region=$REGION --project=$PROJECT_ID"
+        echo ""
+        echo "2. Manual log command:"
+        echo "   gcloud run services logs read $SERVICE_NAME --region=$REGION --project=$PROJECT_ID"
+        echo ""
+        echo "3. Deploy service first:"
+        echo "   ./scripts/deploy-app.sh"
     fi
 fi
 
