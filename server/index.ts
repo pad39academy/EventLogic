@@ -85,9 +85,6 @@ app.use((req, res, next) => {
   app.use('/404.html', express.static('public/404.html'));
   app.use('/public', express.static('public'));
 
-<<<<<<< HEAD
-  serveStatic(app);
-=======
   // Load appropriate modules based on environment
   if (process.env.NODE_ENV === "development") {
     const { setupVite } = await import("../viteDev");
@@ -98,7 +95,6 @@ app.use((req, res, next) => {
     serveStatic(app);
     console.log('Production static files configured');
   }
->>>>>>> 46e143b452e019a2e6d60cfdc85100a13f24e5e1
 
   // Add custom error handlers to hide Replit branding AFTER setup
   app.use(customErrorHandler);
