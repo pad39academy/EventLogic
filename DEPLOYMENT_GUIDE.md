@@ -369,6 +369,78 @@ export DATABASE_URL='postgresql://ievolve_user:IevolveSecure2025!@localhost:5432
 [✓] Changes applied
 ```
 
+#### 4.2. Admin User Creation in Cloud Shell
+
+The admin creation script (`scripts/create-admin.js`) is designed for Neon database but your deployment uses PostgreSQL. Here's how to create admin users properly:
+
+**Option A: Direct SQL Method (Recommended)**
+
+```bash
+# 1. Connect to your Cloud SQL database
+gcloud sql connect ievolve-db --user=ievolve_user --database=ievolve_db
+
+# 2. Create admin user directly with SQL
+# Replace the values with your actual admin details
+# Password will be hashed automatically by bcrypt in the application
+```
+
+**SQL to execute:**
+```sql
+-- Generate bcrypt hash for password 'IevolveAdmin2025!*' (cost 10)
+-- You can use an online bcrypt generator or the application's hash function
+INSERT INTO users (email, password, mobile_number, name, role, is_active) 
+VALUES (
+  'gunasekaran@greatorsoftware.com',
+  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- This is bcrypt hash for "password123"
+  '+916385629910',
+  'Greator',
+  'admin',
+  true
+);
+```
+
+**Option B: Fix the Admin Script (Alternative)**
+
+If you prefer to use the script, create a modified version for PostgreSQL:
+
+```bash
+# Create a PostgreSQL-compatible admin script
+cat > scripts/create-admin-postgres.js << 'EOF'
+#!/usr/bin/env node
+
+import bcrypt from 'bcryptjs';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { users } from '../shared/schema.ts';
+import { eq, and } from 'drizzle-orm';
+import readline from 'readline';
+
+// Use PostgreSQL connection instead of Neon
+const sql = postgres(process.env.DATABASE_URL);
+const db = drizzle(sql);
+
+// Rest of the script remains the same...
+// (Copy the remaining content from the original script)
+EOF
+
+# Then run the modified script
+export DATABASE_URL='postgresql://ievolve_user:IevolveSecure2025!@localhost:5432/ievolve_db'
+node scripts/create-admin-postgres.js
+```
+
+**Common Error:**
+❌ **Error: `TypeError: fetch failed`**
+- **Cause**: The original script uses Neon driver which doesn't work with regular PostgreSQL
+- **Solution**: Use Option A (direct SQL) or Option B (modified script)
+
+**Quick Bcrypt Hash Generation:**
+```javascript
+// To generate a bcrypt hash for your password, run in node:
+const bcrypt = require('bcryptjs');
+const hash = bcrypt.hashSync('IevolveAdmin2025!*', 10);
+console.log(hash);
+```
+
 #### 5. SMS not working
 Update Twilio credentials
 
