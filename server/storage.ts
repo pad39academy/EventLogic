@@ -418,7 +418,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async bulkCreateParticipants(insertParticipants: InsertParticipant[]): Promise<Participant[]> {
-    return await db.insert(participants).values(insertParticipants).returning();
+    const result = await db.insert(participants).values(insertParticipants).returning();
+    // Invalidate cache since new participants affect dashboard stats
+    this.invalidateDashboardCache();
+    return result;
   }
 
   async createReassignment(insertReassignment: InsertReassignment): Promise<Reassignment> {
@@ -516,7 +519,27 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDashboardStats(date?: string): Promise<DashboardStats> {
+  // Cache for dashboard stats (5 minutes TTL)
+  private dashboardStatsCache: { data: DashboardStats; timestamp: number } | null = null;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Invalidate dashboard cache when data changes
+  invalidateDashboardCache(): void {
+    this.dashboardStatsCache = null;
+    console.log('🗑️ Dashboard cache invalidated');
+  }
+
+  async getDashboardStats(date?: string, forceRefresh = false): Promise<DashboardStats> {
+    // Return cached data if available and not expired
+    if (!forceRefresh && this.dashboardStatsCache) {
+      const isExpired = Date.now() - this.dashboardStatsCache.timestamp > this.CACHE_TTL;
+      if (!isExpired) {
+        console.log('📊 Dashboard stats served from cache');
+        return this.dashboardStatsCache.data;
+      }
+    }
+
+    console.log('📊 Calculating fresh dashboard stats...');
     // Get total participants
     const totalParticipants = await db.select().from(participants);
     
@@ -542,8 +565,12 @@ export class DatabaseStorage implements IStorage {
     const teams = await db.selectDistinct({ teamName: participants.teamName }).from(participants).where(isNotNull(participants.teamName));
     const players = await db.select().from(participants).where(eq(participants.role, 'player'));
 
-    // Update all hotel occupancy before calculating stats
-    await this.updateAllHotelOccupancy();
+    // Skip expensive hotel occupancy updates for cached requests
+    // Only update if cache is expired or forced refresh
+    if (forceRefresh || !this.dashboardStatsCache) {
+      console.log('🔄 Updating hotel occupancy data...');
+      await this.updateAllHotelOccupancy();
+    }
 
     // Get updated hotel statistics
     const allHotels = await db.select().from(hotels);
@@ -560,7 +587,7 @@ export class DatabaseStorage implements IStorage {
     const occupiedRooms = allHotels.reduce((sum, hotel) => sum + (hotel.occupiedRooms || 0), 0);
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-    return {
+    const stats = {
       totalParticipants: totalParticipants.length,
       totalTeams: teams.length,
       totalPlayers: players.length,
@@ -574,6 +601,15 @@ export class DatabaseStorage implements IStorage {
       occupancyRate: Math.round(occupancyRate),
       estimatedRoomsNeeded,
     };
+
+    // Cache the results
+    this.dashboardStatsCache = {
+      data: stats,
+      timestamp: Date.now()
+    };
+    console.log('💾 Dashboard stats cached for 5 minutes');
+
+    return stats;
   }
 
   // Notification methods

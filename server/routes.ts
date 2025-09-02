@@ -501,7 +501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard routes
   app.get("/api/admin/dashboard/stats", requireAdmin, async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats();
+      const forceRefresh = req.query.forceRefresh === 'true';
+      const stats = await storage.getDashboardStats(undefined, forceRefresh);
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get stats" });
