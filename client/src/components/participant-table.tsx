@@ -350,10 +350,23 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                   <TableCell>
                     <div className="text-sm text-gray-900 capitalize">
                       {participant.role}
+                      {participant.teamName && ` • ${participant.teamName}`}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {participant.discipline}
-                      {participant.district && ` • ${participant.district}`}
+                      {participant.role !== 'player' && participant.discipline}
+                      {participant.role !== 'player' && participant.district && ` • ${participant.district}`}
+                      {participant.role !== 'player' && participant.location && ` • ${participant.location}`}
+                      {participant.role === 'player' && participant.discipline && (
+                        <div className="flex items-center gap-1">
+                          <span>{participant.discipline}</span>
+                          {participant.district && ` • ${participant.district}`}
+                          {participant.location && ` • ${participant.location}`}
+                          <span className="text-gray-400 text-xs ml-1 bg-gray-100 px-1 rounded">from coach</span>
+                        </div>
+                      )}
+                      {participant.role === 'player' && !participant.discipline && participant.coachId && (
+                        <span className="text-orange-500 text-xs">⚠ Missing inherited data from coach</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -373,7 +386,9 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-gray-900">{participant.hotelName}</div>
+                    <div className="text-sm text-gray-900">
+                      {participant.hotelName || `Hotel ID: ${participant.hotelId}`}
+                    </div>
                     <div className="text-sm text-gray-500 font-mono">
                       {participant.bookingReference}
                     </div>

@@ -323,7 +323,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipants(filters: ParticipantFilters = {}): Promise<Participant[]> {
-    let query = db.select().from(participants);
+    let query = db.select({
+      ...participants,
+      hotelName: hotels.hotelName
+    }).from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId));
     const conditions = [];
 
     if (filters.search) {
@@ -418,7 +422,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async bulkCreateParticipants(insertParticipants: InsertParticipant[]): Promise<Participant[]> {
-    return await db.insert(participants).values(insertParticipants).returning();
+    const result = await db.insert(participants).values(insertParticipants).returning();
+    // Invalidate cache since new participants affect dashboard stats
+    this.invalidateDashboardCache();
+    return result;
   }
 
   async createReassignment(insertReassignment: InsertReassignment): Promise<Reassignment> {
@@ -516,7 +523,27 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDashboardStats(date?: string): Promise<DashboardStats> {
+  // Cache for dashboard stats (5 minutes TTL)
+  private dashboardStatsCache: { data: DashboardStats; timestamp: number } | null = null;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Invalidate dashboard cache when data changes (kept for backward compatibility)
+  invalidateDashboardCache(): void {
+    this.dashboardStatsCache = null;
+    console.log('🗑️ Dashboard cache invalidated');
+  }
+
+  async getDashboardStats(date?: string, forceRefresh = false): Promise<DashboardStats> {
+    // Return cached data if available and not expired
+    if (!forceRefresh && this.dashboardStatsCache) {
+      const isExpired = Date.now() - this.dashboardStatsCache.timestamp > this.CACHE_TTL;
+      if (!isExpired) {
+        console.log('📊 Dashboard stats served from cache');
+        return this.dashboardStatsCache.data;
+      }
+    }
+
+    console.log('📊 Calculating fresh dashboard stats...');
     // Get total participants
     const totalParticipants = await db.select().from(participants);
     
@@ -542,8 +569,12 @@ export class DatabaseStorage implements IStorage {
     const teams = await db.selectDistinct({ teamName: participants.teamName }).from(participants).where(isNotNull(participants.teamName));
     const players = await db.select().from(participants).where(eq(participants.role, 'player'));
 
-    // Update all hotel occupancy before calculating stats
-    await this.updateAllHotelOccupancy();
+    // Skip expensive hotel occupancy updates for cached requests
+    // Only update if cache is expired or forced refresh
+    if (forceRefresh || !this.dashboardStatsCache) {
+      console.log('🔄 Updating hotel occupancy data...');
+      await this.updateAllHotelOccupancy();
+    }
 
     // Get updated hotel statistics
     const allHotels = await db.select().from(hotels);
@@ -560,7 +591,7 @@ export class DatabaseStorage implements IStorage {
     const occupiedRooms = allHotels.reduce((sum, hotel) => sum + (hotel.occupiedRooms || 0), 0);
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-    return {
+    const stats = {
       totalParticipants: totalParticipants.length,
       totalTeams: teams.length,
       totalPlayers: players.length,
@@ -573,6 +604,74 @@ export class DatabaseStorage implements IStorage {
       occupiedRooms: occupiedRooms,
       occupancyRate: Math.round(occupancyRate),
       estimatedRoomsNeeded,
+    };
+
+    // Cache the results
+    this.dashboardStatsCache = {
+      data: stats,
+      timestamp: Date.now()
+    };
+    console.log('💾 Dashboard stats cached for 5 minutes');
+
+    return stats;
+  }
+
+  // Job execution tracking methods using direct SQL  
+  async updateJobExecution(
+    jobName: string, 
+    durationMs: number, 
+    status: 'success' | 'error', 
+    errorMessage?: string
+  ): Promise<void> {
+    await db.execute(
+      sql`INSERT INTO dashboard_jobs (job_name, last_execution, execution_duration_ms, status, error_message, updated_at)
+          VALUES (${jobName}, NOW(), ${durationMs}, ${status}, ${errorMessage || null}, NOW())
+          ON CONFLICT (job_name) 
+          DO UPDATE SET 
+            last_execution = NOW(),
+            execution_duration_ms = ${durationMs},
+            status = ${status},
+            error_message = ${errorMessage || null},
+            updated_at = NOW()`
+    );
+  }
+
+  async getJobExecution(jobName: string): Promise<any> {
+    const result = await db.execute(
+      sql`SELECT * FROM dashboard_jobs WHERE job_name = ${jobName}`
+    );
+    return result.rows[0] || null;
+  }
+
+  // Fast dashboard stats using pre-aggregated views
+  async getDashboardStatsFromViews(): Promise<DashboardStats & { lastUpdated: Date }> {
+    const result = await db.execute(
+      sql`SELECT 
+        ds.*,
+        hs.*,
+        dj.last_execution as last_updated
+      FROM dashboard_stats_view ds
+      CROSS JOIN hotel_stats_view hs
+      CROSS JOIN dashboard_jobs dj 
+      WHERE dj.job_name = 'dashboard_stats_aggregation'`
+    );
+    
+    const row = result.rows[0] as any;
+    
+    return {
+      totalParticipants: parseInt(row.total_participants),
+      totalTeams: parseInt(row.total_teams),
+      totalPlayers: parseInt(row.total_players),
+      checkedInCount: parseInt(row.checked_in_count),
+      checkedOutCount: parseInt(row.checked_out_count),
+      pendingActions: parseInt(row.pending_actions),
+      totalHotels: parseInt(row.total_hotels),
+      totalAvailableRooms: parseInt(row.available_rooms),
+      totalRooms: parseInt(row.total_rooms),
+      occupiedRooms: parseInt(row.occupied_rooms),
+      occupancyRate: parseInt(row.occupancy_rate),
+      estimatedRoomsNeeded: parseInt(row.estimated_rooms_needed),
+      lastUpdated: new Date(row.last_updated)
     };
   }
 

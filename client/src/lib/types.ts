@@ -18,6 +18,7 @@ export interface DashboardStats {
   estimatedRoomsNeeded: number;
   totalRooms: number;
   occupiedRooms: number;
+  lastUpdated?: string; // ISO timestamp of last stats update
 }
 
 export interface ParticipantFilters {
@@ -39,17 +40,22 @@ export interface Participant {
   name: string;
   mobileNumber?: string;
   role: 'coach' | 'official' | 'player';
-  discipline: string;
-  district?: string;
+  discipline?: string; // Only for coaches and officials, players get from coach
+  district?: string; // Only for coaches and officials, players get from coach
+  location?: string; // Only for coaches and officials, players get from coach
   teamName?: string;
   coachId?: string;
   hotelId: string;
-  hotelName: string;
+  hotelName?: string; // Fetched from hotels table via join
   stadium?: string;
   bookingStartDate: string;
   bookingEndDate: string;
   bookingReference: string;
-  transportPoc?: string;
+  notifyTransport?: string; // Renamed from transportPoc
+  travelPocName?: string; // New field for coaches
+  travelPocMobile?: string; // New field for coaches
+  venuePocName?: string; // New field for coaches
+  venuePocMobile?: string; // New field for coaches
   checkinStatus: 'pending' | 'checked_in' | 'checked_out';
   checkinTime?: string;
   checkoutTime?: string;

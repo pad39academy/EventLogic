@@ -8,11 +8,11 @@ This guide provides comprehensive specifications for uploading coach and officia
 
 **File Format**: PSV with pipe separator `|`
 **Header Row**: Required (must match exactly)
-**Columns**: 12 columns as specified below
+**Columns**: 15 columns as specified below
 **File Extension**: `.psv` or `.csv`
 
 ```
-ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_Start_Date|Booking_End_Date|Booking_Reference_Number|Transport_POC
+ROLE|COACH_ID|NAME|MOBILE_NUMBER|DISCIPLINE|LOCATION|DISTRICT|HOTEL_ID|STADIUM|BOOKING_START_DATE|BOOKING_END_DATE|BOOKING_REFERENCE_NUMBER|NOTIFY_TRANSPORT_CONTACT|TRAVEL_POC_NAME|TRAVEL_POC_MOBILE|VENUE_POC_NAME|VENUE_POC_MOBILE
 ```
 
 ## Required Columns & Validation Rules
@@ -24,14 +24,14 @@ ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_
 - **Case Sensitive**: No (system normalizes to lowercase)
 - **Example**: `coach` or `official`
 
-### 2. COACH_id
+### 2. COACH_ID
 - **Type**: Text (Unique Identifier)
 - **Required**: Yes
 - **Format**: Alphanumeric with hyphens/underscores allowed
 - **Validation**: Must be unique across all participants
 - **Example**: `COACH-001`, `OFF-2025-015`, `TN-COACH-25`
 
-### 3. Name
+### 3. NAME
 - **Type**: Text
 - **Required**: Yes
 - **Min Length**: 2 characters
@@ -39,7 +39,7 @@ ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_
 - **Format**: Full name with proper capitalization
 - **Example**: `Dr. Rajesh Kumar`, `Ms. Priya Sharma`
 
-### 4. Mobile_Number
+### 4. MOBILE_NUMBER
 - **Type**: Text
 - **Required**: No (but recommended)
 - **Format**: Indian mobile number with/without country code
@@ -49,33 +49,38 @@ ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_
   - `9876543210` (auto-converted to +919876543210)
   - `+919876543210`
 
-### 5. Discipline
+### 5. DISCIPLINE
 - **Type**: Text
 - **Required**: Yes
 - **Format**: Sport/activity name
 - **Example**: `Cricket`, `Football`, `Badminton`, `Athletics`, `Swimming`
 
-### 6. Hotel_ID
+### 6. LOCATION
+- **Type**: Text
+- **Required**: Yes
+- **Format**: City/venue location
+- **Example**: `Chennai`, `Coimbatore`, `Madurai`, `Tiruchirappalli`
+
+### 7. DISTRICT
+- **Type**: Text
+- **Required**: Yes
+- **Format**: Tamil Nadu district name
+- **Example**: `Chennai`, `Coimbatore`, `Madurai`, `Tiruchirappalli`, `Salem`
+
+### 8. HOTEL_ID
 - **Type**: Text
 - **Required**: Yes
 - **Validation**: Must exist in hotel inventory
-- **Cross-Reference**: System validates against uploaded hotel data
+- **Cross-Reference**: System validates against uploaded hotel data, hotel name automatically fetched
 - **Example**: `HOTEL-001`, `CHN-HOTEL-5`, `CM2025-015`
 
-### 7. Hotel_Name
-- **Type**: Text
-- **Required**: Yes
-- **Format**: Full hotel name
-- **Validation**: Should match hotel inventory (warning if mismatch)
-- **Example**: `The Leela Palace Chennai`, `Hotel Savera`
-
-### 8. Stadium
+### 9. STADIUM
 - **Type**: Text
 - **Required**: No
 - **Format**: Venue/stadium name
 - **Example**: `M. A. Chidambaram Stadium`, `Nehru Stadium`
 
-### 9. Booking_Start_Date
+### 10. BOOKING_START_DATE
 - **Type**: Date
 - **Required**: Yes
 - **Format**: DD/MM/YYYY
@@ -83,7 +88,7 @@ ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_
 - **Business Rule**: Check-in date for accommodation
 - **Example**: `15/08/2025`
 
-### 10. Booking_End_Date
+### 11. BOOKING_END_DATE
 - **Type**: Date
 - **Required**: Yes
 - **Format**: DD/MM/YYYY
@@ -91,39 +96,66 @@ ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_
 - **Business Rule**: Minimum 3-day stay duration required
 - **Example**: `20/08/2025`
 
-### 11. Booking_Reference_Number
+### 12. BOOKING_REFERENCE_NUMBER
 - **Type**: Text
 - **Required**: No
 - **Format**: Reference/confirmation number
 - **Example**: `BK2025001`, `REF-CHN-001`
 
-### 12. Transport_POC
+### 13. NOTIFY_TRANSPORT_CONTACT
 - **Type**: Text
 - **Required**: No
-- **Format**: Transport point of contact details
+- **Format**: Transport notification contact details
 - **Example**: `Mr. Kumar - 9876543210`, `Chennai Bus Stand`
+
+### 14. TRAVEL_POC_NAME
+- **Type**: Text
+- **Required**: No
+- **Format**: Travel point of contact name
+- **Example**: `Mr. Rajesh Kumar`, `Ms. Priya Sharma`
+
+### 15. TRAVEL_POC_MOBILE
+- **Type**: Text
+- **Required**: No
+- **Format**: Travel POC mobile number
+- **Auto-Processing**: System adds +91 prefix if missing
+- **Example**: `9876543210`, `+919876543210`
+
+### 16. VENUE_POC_NAME
+- **Type**: Text
+- **Required**: No
+- **Format**: Venue point of contact name
+- **Example**: `Mr. Venue Manager`, `Stadium Coordinator`
+
+### 17. VENUE_POC_MOBILE
+- **Type**: Text
+- **Required**: No
+- **Format**: Venue POC mobile number
+- **Auto-Processing**: System adds +91 prefix if missing
+- **Example**: `9876543210`, `+919876543210`
 
 ## Business Rules & Validations
 
 ### Mandatory Validations
 1. **Minimum Stay Duration**: 3 days minimum booking period
-2. **Hotel Existence**: Hotel_ID must exist in inventory system
-3. **Unique Participant ID**: COACH_id must be unique across all participants
-4. **Date Logic**: Booking_End_Date must be after Booking_Start_Date
+2. **Hotel Existence**: HOTEL_ID must exist in inventory system
+3. **Unique Participant ID**: COACH_ID must be unique across all participants
+4. **Date Logic**: BOOKING_END_DATE must be after BOOKING_START_DATE
 
 ### Data Processing Rules
-1. **Mobile Number Normalization**: Auto-adds +91 country code
+1. **Mobile Number Normalization**: Auto-adds +91 country code for all mobile fields
 2. **Role Standardization**: Converts to lowercase
 3. **Duplicate Handling**: Warnings for existing participants
-4. **Hotel Validation**: Cross-checks against hotel inventory
+4. **Hotel Validation**: Cross-checks against hotel inventory, hotel name fetched automatically
+5. **Location Inheritance**: Players inherit location/district/discipline from coaches
 
 ## Sample Data Format
 
 ```
-ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID|Hotel_Name|Stadium|Booking_Start_Date|Booking_End_Date|Booking_Reference_Number|Transport_POC
-coach|COACH-001|Dr. Rajesh Kumar|9876543210|Cricket|HOTEL-001|The Leela Palace Chennai|M. A. Chidambaram Stadium|15/08/2025|20/08/2025|BK2025001|Mr. Kumar Transport
-official|OFF-001|Ms. Priya Sharma|9987654321|Football|HOTEL-002|ITC Grand Chola|Nehru Stadium|16/08/2025|22/08/2025|BK2025002|Chennai Central
-coach|TN-COACH-25|Mr. Suresh Babu|8765432109|Badminton|CHN-001|Hotel Savera|Express Sports Complex|14/08/2025|18/08/2025|REF-CHN-001|Bus Terminal POC
+ROLE|COACH_ID|NAME|MOBILE_NUMBER|DISCIPLINE|LOCATION|DISTRICT|HOTEL_ID|STADIUM|BOOKING_START_DATE|BOOKING_END_DATE|BOOKING_REFERENCE_NUMBER|NOTIFY_TRANSPORT_CONTACT|TRAVEL_POC_NAME|TRAVEL_POC_MOBILE|VENUE_POC_NAME|VENUE_POC_MOBILE
+coach|COACH-001|DR. RAJESH KUMAR|9876543210|Cricket|Chennai|Chennai|HOTEL-001|M. A. Chidambaram Stadium|15/08/2025|20/08/2025|BK2025001|Mr. Kumar Transport|Mr. Travel POC|9876543211|Mr. Venue POC|9876543212
+official|OFF-001|MS. PRIYA SHARMA|9987654321|Football|Chennai|Chennai|HOTEL-002|Nehru Stadium|16/08/2025|22/08/2025|BK2025002|Chennai Central|Ms. Official Travel|9987654322|Ms. Stadium Manager|9987654323
+coach|TN-COACH-25|MR. SURESH BABU|8765432109|Badminton|Coimbatore|Coimbatore|CHN-001|Express Sports Complex|14/08/2025|18/08/2025|REF-CHN-001|Bus Terminal POC|Mr. Coimbatore Travel|8765432110|Mr. Complex Manager|8765432111
 ```
 
 ## Common Validation Errors

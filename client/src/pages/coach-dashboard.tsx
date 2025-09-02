@@ -37,7 +37,7 @@ export default function CoachDashboard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const user = authData?.user || {};
+  const user = authData?.user as any;
 
   // Get unread notification count
   const { data: unreadCount = 0 } = useQuery({
@@ -48,7 +48,7 @@ export default function CoachDashboard() {
   const unreadCountNumber = typeof unreadCount === 'number' ? unreadCount : 0;
 
   // Get coach dashboard data
-  const { data: dashboardData, isLoading, error } = useQuery({
+  const { data: dashboardData, isLoading, error, refetch } = useQuery({
     queryKey: ["/api/coach/dashboard"],
     queryFn: async (): Promise<CoachDashboardData> => {
       const response = await fetch("/api/coach/dashboard", {
@@ -60,7 +60,7 @@ export default function CoachDashboard() {
       return await response.json();
     },
     retry: 2,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 0, // No caching - always fetch fresh data
   });
 
   // Handle errors gracefully
@@ -180,7 +180,7 @@ export default function CoachDashboard() {
 
   // Check if hotel verification is required before check-in
   const requiresHotelVerification = () => {
-    return !user?.isHotelVerified;
+    return !(user as any)?.isHotelVerified;
   };
 
   const handleCheckinWithVerification = (checkinAction: () => void) => {
@@ -585,7 +585,7 @@ export default function CoachDashboard() {
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Hotel</span>
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-hotel">
-                {coach?.hotelName || 'No hotel assigned'}
+                {coach?.hotelId ? `Hotel ID: ${coach.hotelId}` : 'No hotel assigned'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -606,6 +606,39 @@ export default function CoachDashboard() {
                 {coach?.bookingEndDate ? formatToIndianDate(coach.bookingEndDate) : 'N/A'}
               </span>
             </div>
+            {/* New coach fields */}
+            {coach?.location && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Location</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-location">
+                  {coach.location}
+                </span>
+              </div>
+            )}
+            {coach?.district && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">District</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-district">
+                  {coach.district}
+                </span>
+              </div>
+            )}
+            {(coach?.travelPocName || coach?.travelPocMobile) && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Travel POC</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-travel-poc">
+                  {coach.travelPocName} {coach.travelPocMobile && `(${coach.travelPocMobile})`}
+                </span>
+              </div>
+            )}
+            {(coach?.venuePocName || coach?.venuePocMobile) && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Venue POC</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-venue-poc">
+                  {coach.venuePocName} {coach.venuePocMobile && `(${coach.venuePocMobile})`}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Coach Status</span>
               <div className="text-right" data-testid="badge-coach-status">
