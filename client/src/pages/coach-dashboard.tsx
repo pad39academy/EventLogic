@@ -48,7 +48,7 @@ export default function CoachDashboard() {
   const unreadCountNumber = typeof unreadCount === 'number' ? unreadCount : 0;
 
   // Get coach dashboard data
-  const { data: dashboardData, isLoading, error } = useQuery({
+  const { data: dashboardData, isLoading, error, refetch } = useQuery({
     queryKey: ["/api/coach/dashboard"],
     queryFn: async (): Promise<CoachDashboardData> => {
       const response = await fetch("/api/coach/dashboard", {
@@ -60,7 +60,7 @@ export default function CoachDashboard() {
       return await response.json();
     },
     retry: 2,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 0, // No caching - always fetch fresh data
   });
 
   // Handle errors gracefully
