@@ -296,16 +296,15 @@ export default function UploadModal({
           {uploadType === "players" && (
             <div className="space-y-4">
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
-                <h4 className="text-[10px] font-semibold text-purple-900 mb-1.5">Required Format (12 columns)</h4>
+                <h4 className="text-[10px] font-semibold text-purple-900 mb-1.5">Required Format (9 columns)</h4>
                 <div className="text-[8px] text-purple-800 font-mono bg-purple-100 p-1 rounded leading-tight">
                   <div className="space-y-0.5">
-                    <div>COACH_ID|PlayerID|Player_Name|Mobilenumber|Discipline</div>
-                    <div>District|Team_Name|Location|HOTEL_id|BOOKING_REFERENCE</div>
-                    <div>Booking_Start_Date|Booking_End_Date</div>
+                    <div>COACH_ID|PlayerID|Player_Name|Mobilenumber|Team_Name</div>
+                    <div>HOTEL_id|BOOKING_REFERENCE|Booking_Start_Date|Booking_End_Date</div>
                   </div>
                 </div>
                 <div className="mt-1 text-[8px] text-purple-700">
-                  <strong>Note:</strong> COACH_ID must exist in coaches database
+                  <strong>Note:</strong> Players inherit discipline, district, location from assigned coach
                 </div>
               </div>
               
