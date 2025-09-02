@@ -323,7 +323,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipants(filters: ParticipantFilters = {}): Promise<Participant[]> {
-    let query = db.select().from(participants);
+    let query = db.select({
+      ...participants,
+      hotelName: hotels.hotelName
+    }).from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId));
     const conditions = [];
 
     if (filters.search) {

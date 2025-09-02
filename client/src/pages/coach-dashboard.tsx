@@ -631,19 +631,19 @@ export default function CoachDashboard() {
                 </span>
               </div>
             )}
-            {coach?.travelpoc && (
+            {(coach?.travelPocName || coach?.travelPocMobile) && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Travel POC</span>
                 <span className="text-sm font-medium text-gray-900" data-testid="text-coach-travel-poc">
-                  {coach.travelpoc}
+                  {coach.travelPocName} {coach.travelPocMobile && `(${coach.travelPocMobile})`}
                 </span>
               </div>
             )}
-            {coach?.venuepoc && (
+            {(coach?.venuePocName || coach?.venuePocMobile) && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Venue POC</span>
                 <span className="text-sm font-medium text-gray-900" data-testid="text-coach-venue-poc">
-                  {coach.venuepoc}
+                  {coach.venuePocName} {coach.venuePocMobile && `(${coach.venuePocMobile})`}
                 </span>
               </div>
             )}

@@ -266,7 +266,7 @@ export default function UploadModal({
                   </div>
                 </div>
                 <div className="mt-1 text-[8px] text-green-700">
-                  <strong>Role Values:</strong> coach, official • <strong>New:</strong> POC fields for travel & venue contacts
+                  <strong>Role Values:</strong> coach, official
                 </div>
               </div>
               

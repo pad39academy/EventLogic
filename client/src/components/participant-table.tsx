@@ -387,10 +387,7 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">
-                      {participant.role === 'player' 
-                        ? `Hotel ID: ${participant.hotelId}` 
-                        : `Hotel ID: ${participant.hotelId}`
-                      }
+                      {participant.hotelName || `Hotel ID: ${participant.hotelId}`}
                     </div>
                     <div className="text-sm text-gray-500 font-mono">
                       {participant.bookingReference}

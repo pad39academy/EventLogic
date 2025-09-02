@@ -46,7 +46,7 @@ export interface Participant {
   teamName?: string;
   coachId?: string;
   hotelId: string;
-  // hotelName removed - players get this from coach's hotel
+  hotelName?: string; // Fetched from hotels table via join
   stadium?: string;
   bookingStartDate: string;
   bookingEndDate: string;
