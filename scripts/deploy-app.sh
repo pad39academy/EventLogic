@@ -14,6 +14,11 @@ REPOSITORY="ievolve-repo"
 IMAGE_TAG=${1:-latest}
 FULL_IMAGE_URL="${IMAGE_REGISTRY}/${PROJECT_ID}/${REPOSITORY}/${SERVICE_NAME}:${IMAGE_TAG}"
 
+# Change to project root directory if we're in scripts/
+if [ "$(basename "$PWD")" = "scripts" ]; then
+    cd ..
+fi
+
 echo "🚀 Deploying Ievolve Event Management System"
 echo "=============================================="
 echo "📦 Image: $FULL_IMAGE_URL"

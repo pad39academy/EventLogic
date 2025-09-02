@@ -35,6 +35,11 @@ if ! gcloud auth list --filter="account~docker" --format="value(account)" | grep
     gcloud auth configure-docker ${REGION}-docker.pkg.dev
 fi
 
+# Change to project root directory if we're in scripts/
+if [ "$(basename "$PWD")" = "scripts" ]; then
+    cd ..
+fi
+
 # Check if Dockerfile exists
 if [ ! -f "Dockerfile-fixed" ]; then
     echo "❌ Dockerfile-fixed not found in current directory"
