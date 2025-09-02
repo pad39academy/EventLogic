@@ -52,8 +52,10 @@ export interface Participant {
   bookingEndDate: string;
   bookingReference: string;
   notifyTransport?: string; // Renamed from transportPoc
-  travelpoc?: string; // New field for coaches
-  venuepoc?: string; // New field for coaches
+  travelPocName?: string; // New field for coaches
+  travelPocMobile?: string; // New field for coaches
+  venuePocName?: string; // New field for coaches
+  venuePocMobile?: string; // New field for coaches
   checkinStatus: 'pending' | 'checked_in' | 'checked_out';
   checkinTime?: string;
   checkoutTime?: string;

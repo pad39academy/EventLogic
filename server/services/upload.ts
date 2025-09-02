@@ -195,9 +195,10 @@ export class UploadService {
       const headers = rows[0];
       
       const expectedHeaders = [
-        'ROLE', 'COACH_id', 'Name', 'Mobile_Number', 'Discipline', 'District', 'Location',
-        'Hotel_ID', 'Stadium', 'Booking_Start_Date',
-        'Booking_End_Date', 'Booking_Reference_Number', 'Notify_Transport', 'Travel_POC', 'Venue_POC'
+        'ROLE', 'COACH_ID', 'NAME', 'MOBILE_NUMBER', 'DISCIPLINE', 'LOCATION', 'DISTRICT',
+        'HOTEL_ID', 'STADIUM', 'BOOKING_START_DATE', 'BOOKING_END_DATE', 
+        'BOOKING_REFERENCE_NUMBER', 'NOTIFY_TRANSPORT_CONTACT', 'TRAVEL_POC_NAME', 
+        'TRAVEL_POC_MOBILE', 'VENUE_POC_NAME', 'VENUE_POC_MOBILE'
       ];
 
       const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
@@ -216,16 +217,16 @@ export class UploadService {
 
         try {
           // Validate hotel exists
-          const hotel = await storage.getHotelByHotelIdAndInstance(data.Hotel_ID, '1');
+          const hotel = await storage.getHotelByHotelIdAndInstance(data.HOTEL_ID, '1');
           if (!hotel) {
-            result.errors.push(`Row ${i + 1}: Hotel ${data.Hotel_ID} not found in inventory`);
+            result.errors.push(`Row ${i + 1}: Hotel ${data.HOTEL_ID} not found in inventory`);
             continue;
           }
 
           // MANDATORY: Enforce 3-day minimum stay for coach/official bookings
           // This business rule applies to actual participant bookings, not hotel inventory
-          const startDate = new Date(data.Booking_Start_Date);
-          const endDate = new Date(data.Booking_End_Date);
+          const startDate = new Date(data.BOOKING_START_DATE);
+          const endDate = new Date(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
@@ -234,14 +235,14 @@ export class UploadService {
           }
 
           // Check if participant already exists
-          const existing = await storage.getParticipantByParticipantId(data.COACH_id);
+          const existing = await storage.getParticipantByParticipantId(data.COACH_ID);
           if (existing) {
-            result.warnings.push(`Row ${i + 1}: Participant ${data.COACH_id} already exists`);
+            result.warnings.push(`Row ${i + 1}: Participant ${data.COACH_ID} already exists`);
             continue;
           }
 
           // Normalize mobile number format (ensure +91 prefix for Indian numbers)
-          let normalizedMobile = data.Mobile_Number;
+          let normalizedMobile = data.MOBILE_NUMBER;
           if (normalizedMobile && !normalizedMobile.startsWith('+')) {
             if (normalizedMobile.startsWith('91')) {
               normalizedMobile = '+' + normalizedMobile;
@@ -253,7 +254,7 @@ export class UploadService {
           // Create coach user account if role is COACH
           if (data.ROLE === 'COACH') {
             // Check if user exists by coachId or mobile number
-            let existingUser = await storage.getUserByCoachId(data.COACH_id);
+            let existingUser = await storage.getUserByCoachId(data.COACH_ID);
             if (!existingUser) {
               existingUser = await storage.getUserByMobile(normalizedMobile);
             }
@@ -261,43 +262,45 @@ export class UploadService {
             if (!existingUser) {
               await storage.createUser({
                 mobileNumber: normalizedMobile,
-                name: data.Name,
+                name: data.NAME,
                 role: "coach",
-                coachId: data.COACH_id,
+                coachId: data.COACH_ID,
                 isActive: true,
               });
-            } else if (existingUser.coachId !== data.COACH_id) {
+            } else if (existingUser.coachId !== data.COACH_ID) {
               // Update existing user with coachId if missing
               await storage.updateUser(existingUser.id, {
-                coachId: data.COACH_id,
-                name: data.Name, // Update name to match PSV data
+                coachId: data.COACH_ID,
+                name: data.NAME, // Update name to match PSV data
               });
             }
           }
 
           const insertParticipant: InsertParticipant = {
-            participantId: data.COACH_id,
-            name: data.Name,
+            participantId: data.COACH_ID,
+            name: data.NAME,
             mobileNumber: normalizedMobile,
             role: data.ROLE.toLowerCase() as "coach" | "official",
-            discipline: data.Discipline,
-            district: data.District,
-            location: data.Location,
-            hotelId: data.Hotel_ID,
-            stadium: data.Stadium,
+            discipline: data.DISCIPLINE,
+            district: data.DISTRICT,
+            location: data.LOCATION,
+            hotelId: data.HOTEL_ID,
+            stadium: data.STADIUM,
             bookingStartDate: startDate,
             bookingEndDate: endDate,
-            bookingReference: data.Booking_Reference_Number,
-            notifyTransport: data['Notify_Transport'],
-            travelpoc: data['Travel_POC'],
-            venuepoc: data['Venue_POC'],
+            bookingReference: data.BOOKING_REFERENCE_NUMBER,
+            notifyTransport: data.NOTIFY_TRANSPORT_CONTACT,
+            travelPocName: data.TRAVEL_POC_NAME,
+            travelPocMobile: data.TRAVEL_POC_MOBILE,
+            venuePocName: data.VENUE_POC_NAME,
+            venuePocMobile: data.VENUE_POC_MOBILE,
             checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
           await storage.createParticipant(insertParticipant);
           
           // Update hotel occupancy after adding participant
-          await storage.updateHotelOccupancy(data.Hotel_ID, '1');
+          await storage.updateHotelOccupancy(data.HOTEL_ID, '1');
           
           result.created++;
         } catch (error) {
@@ -326,8 +329,8 @@ export class UploadService {
       const headers = rows[0];
       
       const expectedHeaders = [
-        'COACH_ID', 'PlayerID', 'Player_Name', 'Mobilenumber', 'Team_Name',
-        'HOTEL_id', 'BOOKING_REFERENCE', 'Booking_Start_Date', 'Booking_End_Date'
+        'COACH_ID', 'PLAYER_ID', 'PLAYER_NAME', 'MOBILE_NUMBER', 'TEAM_NAME',
+        'HOTEL_ID', 'BOOKING_REFERENCE', 'BOOKING_START_DATE', 'BOOKING_END_DATE'
       ];
 
       for (let i = 1; i < rows.length; i++) {
@@ -346,16 +349,16 @@ export class UploadService {
           }
 
           // Validate hotel exists
-          const hotel = await storage.getHotelByHotelIdAndInstance(data.HOTEL_id, '1');
+          const hotel = await storage.getHotelByHotelIdAndInstance(data.HOTEL_ID, '1');
           if (!hotel) {
-            result.errors.push(`Row ${i + 1}: Hotel ${data.HOTEL_id} not found in inventory`);
+            result.errors.push(`Row ${i + 1}: Hotel ${data.HOTEL_ID} not found in inventory`);
             continue;
           }
 
           // MANDATORY: Enforce 3-day minimum stay for player bookings
           // This business rule applies to actual participant bookings, not hotel inventory
-          const startDate = new Date(data.Booking_Start_Date);
-          const endDate = new Date(data.Booking_End_Date);
+          const startDate = new Date(data.BOOKING_START_DATE);
+          const endDate = new Date(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
@@ -364,21 +367,21 @@ export class UploadService {
           }
 
           // Check if player already exists
-          const existing = await storage.getParticipantByParticipantId(data.PlayerID);
+          const existing = await storage.getParticipantByParticipantId(data.PLAYER_ID);
           if (existing) {
-            result.warnings.push(`Row ${i + 1}: Player ${data.PlayerID} already exists`);
+            result.warnings.push(`Row ${i + 1}: Player ${data.PLAYER_ID} already exists`);
             continue;
           }
 
           const insertParticipant: InsertParticipant = {
-            participantId: data.PlayerID,
-            name: data.Player_Name,
-            mobileNumber: data.Mobilenumber || null,
+            participantId: data.PLAYER_ID,
+            name: data.PLAYER_NAME,
+            mobileNumber: data.MOBILE_NUMBER || null,
             role: "player",
             // discipline, district, location removed - players get these from their coach
-            teamName: data.Team_Name,
+            teamName: data.TEAM_NAME,
             coachId: data.COACH_ID,
-            hotelId: data.HOTEL_id,
+            hotelId: data.HOTEL_ID,
             bookingStartDate: startDate,
             bookingEndDate: endDate,
             bookingReference: data.BOOKING_REFERENCE,
@@ -388,7 +391,7 @@ export class UploadService {
           await storage.createParticipant(insertParticipant);
           
           // Update hotel occupancy after adding participant
-          await storage.updateHotelOccupancy(data.HOTEL_id, '1');
+          await storage.updateHotelOccupancy(data.HOTEL_ID, '1');
           
           result.created++;
         } catch (error) {

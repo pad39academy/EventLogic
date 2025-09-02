@@ -256,16 +256,17 @@ export default function UploadModal({
           {uploadType === "coaches_officials" && (
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
-                <h4 className="text-[10px] font-semibold text-green-900 mb-1.5">Required Format (12 columns)</h4>
+                <h4 className="text-[10px] font-semibold text-green-900 mb-1.5">Required Format (15 columns)</h4>
                 <div className="text-[8px] text-green-800 font-mono bg-green-100 p-1 rounded leading-tight">
                   <div className="space-y-0.5">
-                    <div>ROLE|COACH_id|Name|Mobile_Number|Discipline|Hotel_ID</div>
-                    <div>Hotel_Name|Stadium|Booking_Start_Date|Booking_End_Date</div>
-                    <div>Booking_Reference_Number|Transport_POC</div>
+                    <div>ROLE|COACH_ID|NAME|MOBILE_NUMBER|DISCIPLINE|LOCATION</div>
+                    <div>DISTRICT|HOTEL_ID|STADIUM|BOOKING_START_DATE|BOOKING_END_DATE</div>
+                    <div>BOOKING_REFERENCE_NUMBER|NOTIFY_TRANSPORT_CONTACT</div>
+                    <div>TRAVEL_POC_NAME|TRAVEL_POC_MOBILE|VENUE_POC_NAME|VENUE_POC_MOBILE</div>
                   </div>
                 </div>
                 <div className="mt-1 text-[8px] text-green-700">
-                  <strong>Role Values:</strong> coach, official
+                  <strong>Role Values:</strong> coach, official • <strong>New:</strong> POC fields for travel & venue contacts
                 </div>
               </div>
               
@@ -299,8 +300,8 @@ export default function UploadModal({
                 <h4 className="text-[10px] font-semibold text-purple-900 mb-1.5">Required Format (9 columns)</h4>
                 <div className="text-[8px] text-purple-800 font-mono bg-purple-100 p-1 rounded leading-tight">
                   <div className="space-y-0.5">
-                    <div>COACH_ID|PlayerID|Player_Name|Mobilenumber|Team_Name</div>
-                    <div>HOTEL_id|BOOKING_REFERENCE|Booking_Start_Date|Booking_End_Date</div>
+                    <div>COACH_ID|PLAYER_ID|PLAYER_NAME|MOBILE_NUMBER|TEAM_NAME</div>
+                    <div>HOTEL_ID|BOOKING_REFERENCE|BOOKING_START_DATE|BOOKING_END_DATE</div>
                   </div>
                 </div>
                 <div className="mt-1 text-[8px] text-purple-700">

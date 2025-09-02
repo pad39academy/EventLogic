@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -75,9 +75,11 @@ export const participants = pgTable("participants", {
   bookingType: bookingTypeEnum("booking_type").default("regular"),
   // Renamed from transportPoc
   notifyTransport: text("notify_transport"), // For coaches and officials
-  // New fields for coaches
-  travelpoc: text("travel_poc"), // For coaches
-  venuepoc: text("venue_poc"), // For coaches
+  // New POC fields for coaches
+  travelPocName: text("travel_poc_name"), // For coaches
+  travelPocMobile: text("travel_poc_mobile"), // For coaches
+  venuePocName: text("venue_poc_name"), // For coaches
+  venuePocMobile: text("venue_poc_mobile"), // For coaches
   checkinStatus: checkinStatusEnum("checkin_status").default("pending"),
   checkinTime: timestamp("checkin_time"),
   checkoutTime: timestamp("checkout_time"),
