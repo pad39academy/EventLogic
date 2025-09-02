@@ -352,8 +352,12 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                       {participant.role}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {participant.discipline}
-                      {participant.district && ` • ${participant.district}`}
+                      {participant.role !== 'player' && participant.discipline}
+                      {participant.role !== 'player' && participant.district && ` • ${participant.district}`}
+                      {participant.role !== 'player' && participant.location && ` • ${participant.location}`}
+                      {participant.role === 'player' && participant.coachId && (
+                        <span className="text-gray-400 text-xs">Info from coach</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -373,7 +377,12 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-gray-900">{participant.hotelName}</div>
+                    <div className="text-sm text-gray-900">
+                      {participant.role === 'player' 
+                        ? `Hotel ID: ${participant.hotelId}` 
+                        : `Hotel ID: ${participant.hotelId}`
+                      }
+                    </div>
                     <div className="text-sm text-gray-500 font-mono">
                       {participant.bookingReference}
                     </div>

@@ -60,18 +60,24 @@ export const participants = pgTable("participants", {
   name: text("name").notNull(),
   mobileNumber: text("mobile_number"),
   role: participantRoleEnum("role").notNull(),
-  discipline: text("discipline").notNull(),
-  district: text("district"),
+  // discipline and hotelName removed - players get this from their coach
+  discipline: text("discipline"), // Only for coaches and officials
+  district: text("district"), // Only for coaches and officials - players get from coach
+  location: text("location"), // Only for coaches and officials - players get from coach
   teamName: text("team_name"),
   coachId: text("coach_id"), // For players, references coach
   hotelId: text("hotel_id").notNull(),
-  hotelName: text("hotel_name").notNull(),
+  // hotelName removed - players get this from their coach's hotel assignment
   stadium: text("stadium"),
   bookingStartDate: timestamp("booking_start_date").notNull(),
   bookingEndDate: timestamp("booking_end_date").notNull(),
   bookingReference: text("booking_reference").notNull(),
   bookingType: bookingTypeEnum("booking_type").default("regular"),
-  transportPoc: text("transport_poc"), // For coaches and officials
+  // Renamed from transportPoc
+  notifyTransport: text("notify_transport"), // For coaches and officials
+  // New fields for coaches
+  travelpoc: text("travel_poc"), // For coaches
+  venuepoc: text("venue_poc"), // For coaches
   checkinStatus: checkinStatusEnum("checkin_status").default("pending"),
   checkinTime: timestamp("checkin_time"),
   checkoutTime: timestamp("checkout_time"),

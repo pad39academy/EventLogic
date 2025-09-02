@@ -195,9 +195,9 @@ export class UploadService {
       const headers = rows[0];
       
       const expectedHeaders = [
-        'ROLE', 'COACH_id', 'Name', 'Mobile_Number', 'Discipline',
-        'Hotel_ID', 'Hotel_Name', 'Stadium', 'Booking_Start_Date',
-        'Booking_End_Date', 'Booking_Reference_Number', 'Transport_POC'
+        'ROLE', 'COACH_id', 'Name', 'Mobile_Number', 'Discipline', 'District', 'Location',
+        'Hotel_ID', 'Stadium', 'Booking_Start_Date',
+        'Booking_End_Date', 'Booking_Reference_Number', 'Notify_Transport', 'Travel_POC', 'Venue_POC'
       ];
 
       const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
@@ -281,13 +281,16 @@ export class UploadService {
             mobileNumber: normalizedMobile,
             role: data.ROLE.toLowerCase() as "coach" | "official",
             discipline: data.Discipline,
+            district: data.District,
+            location: data.Location,
             hotelId: data.Hotel_ID,
-            hotelName: data.Hotel_Name,
             stadium: data.Stadium,
             bookingStartDate: startDate,
             bookingEndDate: endDate,
             bookingReference: data.Booking_Reference_Number,
-            transportPoc: data['Transport_POC'],
+            notifyTransport: data['Notify_Transport'],
+            travelpoc: data['Travel_POC'],
+            venuepoc: data['Venue_POC'],
             checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
@@ -323,8 +326,7 @@ export class UploadService {
       const headers = rows[0];
       
       const expectedHeaders = [
-        'COACH_ID', 'PlayerID', 'Player_Name', 'Mobilenumber',
-        'Discipline', 'District', 'Team_Name', 'Location',
+        'COACH_ID', 'PlayerID', 'Player_Name', 'Mobilenumber', 'Team_Name',
         'HOTEL_id', 'BOOKING_REFERENCE', 'Booking_Start_Date', 'Booking_End_Date'
       ];
 
@@ -373,12 +375,10 @@ export class UploadService {
             name: data.Player_Name,
             mobileNumber: data.Mobilenumber || null,
             role: "player",
-            discipline: data.Discipline,
-            district: data.District,
+            // discipline, district, location removed - players get these from their coach
             teamName: data.Team_Name,
             coachId: data.COACH_ID,
             hotelId: data.HOTEL_id,
-            hotelName: data.Location,
             bookingStartDate: startDate,
             bookingEndDate: endDate,
             bookingReference: data.BOOKING_REFERENCE,

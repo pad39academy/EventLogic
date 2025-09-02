@@ -39,17 +39,20 @@ export interface Participant {
   name: string;
   mobileNumber?: string;
   role: 'coach' | 'official' | 'player';
-  discipline: string;
-  district?: string;
+  discipline?: string; // Only for coaches and officials, players get from coach
+  district?: string; // Only for coaches and officials, players get from coach
+  location?: string; // Only for coaches and officials, players get from coach
   teamName?: string;
   coachId?: string;
   hotelId: string;
-  hotelName: string;
+  // hotelName removed - players get this from coach's hotel
   stadium?: string;
   bookingStartDate: string;
   bookingEndDate: string;
   bookingReference: string;
-  transportPoc?: string;
+  notifyTransport?: string; // Renamed from transportPoc
+  travelpoc?: string; // New field for coaches
+  venuepoc?: string; // New field for coaches
   checkinStatus: 'pending' | 'checked_in' | 'checked_out';
   checkinTime?: string;
   checkoutTime?: string;

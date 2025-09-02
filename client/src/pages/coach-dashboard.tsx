@@ -37,7 +37,7 @@ export default function CoachDashboard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const user = authData?.user || {};
+  const user = authData?.user as any;
 
   // Get unread notification count
   const { data: unreadCount = 0 } = useQuery({
@@ -180,7 +180,7 @@ export default function CoachDashboard() {
 
   // Check if hotel verification is required before check-in
   const requiresHotelVerification = () => {
-    return !user?.isHotelVerified;
+    return !(user as any)?.isHotelVerified;
   };
 
   const handleCheckinWithVerification = (checkinAction: () => void) => {
@@ -585,7 +585,7 @@ export default function CoachDashboard() {
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Hotel</span>
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-hotel">
-                {coach?.hotelName || 'No hotel assigned'}
+                {coach?.hotelId ? `Hotel ID: ${coach.hotelId}` : 'No hotel assigned'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -606,6 +606,47 @@ export default function CoachDashboard() {
                 {coach?.bookingEndDate ? formatToIndianDate(coach.bookingEndDate) : 'N/A'}
               </span>
             </div>
+            {/* New coach fields */}
+            {coach?.location && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Location</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-location">
+                  {coach.location}
+                </span>
+              </div>
+            )}
+            {coach?.district && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">District</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-district">
+                  {coach.district}
+                </span>
+              </div>
+            )}
+            {coach?.notifyTransport && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Notify Transport</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-notify-transport">
+                  {coach.notifyTransport}
+                </span>
+              </div>
+            )}
+            {coach?.travelpoc && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Travel POC</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-travel-poc">
+                  {coach.travelpoc}
+                </span>
+              </div>
+            )}
+            {coach?.venuepoc && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Venue POC</span>
+                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-venue-poc">
+                  {coach.venuepoc}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Coach Status</span>
               <div className="text-right" data-testid="badge-coach-status">
