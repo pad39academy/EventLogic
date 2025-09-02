@@ -623,14 +623,6 @@ export default function CoachDashboard() {
                 </span>
               </div>
             )}
-            {coach?.notifyTransport && (
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Notify Transport</span>
-                <span className="text-sm font-medium text-gray-900" data-testid="text-coach-notify-transport">
-                  {coach.notifyTransport}
-                </span>
-              </div>
-            )}
             {(coach?.travelPocName || coach?.travelPocMobile) && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Travel POC</span>
