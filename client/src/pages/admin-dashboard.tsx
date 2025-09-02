@@ -374,6 +374,20 @@ export default function AdminDashboard() {
                   <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
                     Manage accommodations, check-ins, and event logistics
                   </p>
+                  {stats?.lastUpdated && (
+                    <div className="mt-2 flex items-center text-xs text-gray-400" data-testid="last-updated">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Last updated: {new Date(stats.lastUpdated).toLocaleString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        day: '2-digit',
+                        month: '2-digit', 
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })} IST (Updates every 15 minutes automatically)
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

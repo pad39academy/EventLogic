@@ -18,6 +18,7 @@ export interface DashboardStats {
   estimatedRoomsNeeded: number;
   totalRooms: number;
   occupiedRooms: number;
+  lastUpdated?: string; // ISO timestamp of last stats update
 }
 
 export interface ParticipantFilters {

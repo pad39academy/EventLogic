@@ -3,12 +3,12 @@
  * Handles periodic tasks like hotel occupancy updates to improve dashboard performance
  */
 
-import type { DatabaseStorage } from "./storage";
+import type { DatabaseStorage } from "./storage.js";
 
 export class BackgroundJobsService {
   private storage: DatabaseStorage;
   private intervalId: NodeJS.Timeout | null = null;
-  private readonly UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+  private readonly UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutes
   private isRunning = false;
 
   constructor(storage: DatabaseStorage) {
@@ -36,7 +36,7 @@ export class BackgroundJobsService {
     }, this.UPDATE_INTERVAL);
     
     this.isRunning = true;
-    console.log(`✅ Background jobs started (updating every ${this.UPDATE_INTERVAL / 60000} minutes)`);
+    console.log(`✅ Background jobs started (updating every ${this.UPDATE_INTERVAL / 60000} minutes)`)
   }
 
   /**
@@ -70,23 +70,27 @@ export class BackgroundJobsService {
   }
 
   /**
-   * Background job to update all hotel occupancy data
+   * Background job to update dashboard statistics views
    */
   private async updateHotelOccupancyJob(): Promise<void> {
     try {
-      console.log("🏨 [Background] Starting hotel occupancy update...");
+      console.log("📊 [Background] Starting dashboard stats aggregation...");
       const startTime = Date.now();
       
+      // Update hotel occupancy data first
       await this.storage.updateAllHotelOccupancy();
       
-      const duration = Date.now() - startTime;
-      console.log(`✅ [Background] Hotel occupancy updated in ${duration}ms`);
+      // Update job execution tracking
+      await this.storage.updateJobExecution('dashboard_stats_aggregation', Date.now() - startTime, 'success');
       
-      // Also invalidate dashboard cache to ensure fresh data
-      this.storage.invalidateDashboardCache();
+      const duration = Date.now() - startTime;
+      console.log(`✅ [Background] Dashboard stats updated in ${duration}ms`);
       
     } catch (error) {
-      console.error("❌ [Background] Hotel occupancy update failed:", error);
+      console.error("❌ [Background] Dashboard stats update failed:", error);
+      
+      // Record failure in tracking table
+      await this.storage.updateJobExecution('dashboard_stats_aggregation', 0, 'error', (error as Error).message || 'Unknown error');
     }
   }
 }

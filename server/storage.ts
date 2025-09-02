@@ -523,7 +523,7 @@ export class DatabaseStorage implements IStorage {
   private dashboardStatsCache: { data: DashboardStats; timestamp: number } | null = null;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  // Invalidate dashboard cache when data changes
+  // Invalidate dashboard cache when data changes (kept for backward compatibility)
   invalidateDashboardCache(): void {
     this.dashboardStatsCache = null;
     console.log('🗑️ Dashboard cache invalidated');
@@ -610,6 +610,65 @@ export class DatabaseStorage implements IStorage {
     console.log('💾 Dashboard stats cached for 5 minutes');
 
     return stats;
+  }
+
+  // Job execution tracking methods using direct SQL  
+  async updateJobExecution(
+    jobName: string, 
+    durationMs: number, 
+    status: 'success' | 'error', 
+    errorMessage?: string
+  ): Promise<void> {
+    await db.execute(
+      sql`INSERT INTO dashboard_jobs (job_name, last_execution, execution_duration_ms, status, error_message, updated_at)
+          VALUES (${jobName}, NOW(), ${durationMs}, ${status}, ${errorMessage || null}, NOW())
+          ON CONFLICT (job_name) 
+          DO UPDATE SET 
+            last_execution = NOW(),
+            execution_duration_ms = ${durationMs},
+            status = ${status},
+            error_message = ${errorMessage || null},
+            updated_at = NOW()`
+    );
+  }
+
+  async getJobExecution(jobName: string): Promise<any> {
+    const result = await db.execute(
+      sql`SELECT * FROM dashboard_jobs WHERE job_name = ${jobName}`
+    );
+    return result.rows[0] || null;
+  }
+
+  // Fast dashboard stats using pre-aggregated views
+  async getDashboardStatsFromViews(): Promise<DashboardStats & { lastUpdated: Date }> {
+    const result = await db.execute(
+      sql`SELECT 
+        ds.*,
+        hs.*,
+        dj.last_execution as last_updated
+      FROM dashboard_stats_view ds
+      CROSS JOIN hotel_stats_view hs
+      CROSS JOIN dashboard_jobs dj 
+      WHERE dj.job_name = 'dashboard_stats_aggregation'`
+    );
+    
+    const row = result.rows[0] as any;
+    
+    return {
+      totalParticipants: parseInt(row.total_participants),
+      totalTeams: parseInt(row.total_teams),
+      totalPlayers: parseInt(row.total_players),
+      checkedInCount: parseInt(row.checked_in_count),
+      checkedOutCount: parseInt(row.checked_out_count),
+      pendingActions: parseInt(row.pending_actions),
+      totalHotels: parseInt(row.total_hotels),
+      totalAvailableRooms: parseInt(row.available_rooms),
+      totalRooms: parseInt(row.total_rooms),
+      occupiedRooms: parseInt(row.occupied_rooms),
+      occupancyRate: parseInt(row.occupancy_rate),
+      estimatedRoomsNeeded: parseInt(row.estimated_rooms_needed),
+      lastUpdated: new Date(row.last_updated)
+    };
   }
 
   // Notification methods
