@@ -584,13 +584,23 @@ export default function CoachDashboard() {
           <CardContent className="space-y-3">
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Hotel</span>
-              <span className="text-sm font-medium text-gray-900" data-testid="text-coach-hotel">
+              <div className="text-right" data-testid="text-coach-hotel">
                 {coach?.hotelId ? (
-                  (user as any)?.isHotelVerified 
-                    ? `${coach.hotelName || 'Hotel'} (ID: ${coach.hotelId})`
-                    : `${coach.hotelName || 'Hotel assigned'} (ID provided at reception)`
-                ) : 'No hotel assigned'}
-              </span>
+                  <>
+                    <div className="text-sm font-medium text-gray-900">
+                      {coach.hotelName || 'Hotel assigned'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {(user as any)?.isHotelVerified 
+                        ? `ID: ${coach.hotelId}`
+                        : 'ID provided at reception'
+                      }
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-sm font-medium text-gray-900">No hotel assigned</span>
+                )}
+              </div>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Booking Reference</span>
