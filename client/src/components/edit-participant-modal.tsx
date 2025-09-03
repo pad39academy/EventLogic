@@ -38,13 +38,29 @@ const playerUpdateSchema = z.object({
   coachId: z.string().optional(),
   hotelId: z.string().min(1, "Hotel assignment is required"),
   stadium: z.string().optional(),
-  bookingStartDate: z.string().min(1, "Start date is required"),
-  bookingEndDate: z.string().min(1, "End date is required"),
+  bookingStartDate: z.string().min(1, "Start date is required")
+    .refine((date) => {
+      if (!date.includes('/')) return false;
+      const [day, month, year] = date.split('/');
+      return day?.length === 2 && month?.length === 2 && year?.length === 4;
+    }, "Please use DD/MM/YYYY format"),
+  bookingEndDate: z.string().min(1, "End date is required")
+    .refine((date) => {
+      if (!date.includes('/')) return false;
+      const [day, month, year] = date.split('/');
+      return day?.length === 2 && month?.length === 2 && year?.length === 4;
+    }, "Please use DD/MM/YYYY format"),
   bookingReference: z.string().min(1, "Booking reference is required"),
   changeReason: z.string().optional(),
 }).refine((data) => {
-  const startDate = new Date(data.bookingStartDate);
-  const endDate = new Date(data.bookingEndDate);
+  // Convert dd/mm/yyyy to Date for validation
+  const convertToDate = (dateStr: string) => {
+    const [day, month, year] = dateStr.split('/');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  };
+  
+  const startDate = convertToDate(data.bookingStartDate);
+  const endDate = convertToDate(data.bookingEndDate);
   const diffTime = endDate.getTime() - startDate.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays >= 3;
@@ -52,8 +68,14 @@ const playerUpdateSchema = z.object({
   message: "Booking must be at least 3 days",
   path: ["bookingEndDate"],
 }).refine((data) => {
-  const startDate = new Date(data.bookingStartDate);
-  const endDate = new Date(data.bookingEndDate);
+  // Convert dd/mm/yyyy to Date for validation
+  const convertToDate = (dateStr: string) => {
+    const [day, month, year] = dateStr.split('/');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  };
+  
+  const startDate = convertToDate(data.bookingStartDate);
+  const endDate = convertToDate(data.bookingEndDate);
   return endDate > startDate;
 }, {
   message: "End date must be after start date",
@@ -173,8 +195,18 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
       if (participant.role === "player") {
         defaultValues.teamName = participant.teamName || "";
         defaultValues.coachId = participant.coachId || "";
-        defaultValues.bookingStartDate = participant.bookingStartDate ? new Date(participant.bookingStartDate).toISOString().split('T')[0] : "";
-        defaultValues.bookingEndDate = participant.bookingEndDate ? new Date(participant.bookingEndDate).toISOString().split('T')[0] : "";
+        // Convert dates to dd/mm/yyyy format for display
+        const formatDateForInput = (dateString: string) => {
+          if (!dateString) return "";
+          const date = new Date(dateString);
+          // Ensure we use Indian timezone and format as dd/mm/yyyy
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+        defaultValues.bookingStartDate = formatDateForInput(participant.bookingStartDate);
+        defaultValues.bookingEndDate = formatDateForInput(participant.bookingEndDate);
         defaultValues.bookingReference = participant.bookingReference || "";
       } else if (participant.role === "coach") {
         defaultValues.discipline = participant.discipline || "";
@@ -337,6 +369,23 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
   });
 
   const onSubmit = (data: PlayerFormData | CoachFormData | OfficialFormData) => {
+    // Convert dd/mm/yyyy dates back to ISO format for backend
+    const convertDateToISO = (dateString: string) => {
+      if (!dateString || !dateString.includes('/')) return dateString;
+      const [day, month, year] = dateString.split('/');
+      if (day && month && year && day.length === 2 && month.length === 2 && year.length === 4) {
+        return `${year}-${month}-${day}`;
+      }
+      return dateString;
+    };
+
+    if ('bookingStartDate' in data && data.bookingStartDate) {
+      data.bookingStartDate = convertDateToISO(data.bookingStartDate);
+    }
+    if ('bookingEndDate' in data && data.bookingEndDate) {
+      data.bookingEndDate = convertDateToISO(data.bookingEndDate);
+    }
+
     updateMutation.mutate(data);
   };
 
@@ -445,7 +494,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                         <FormControl>
                           <Input 
                             {...field} 
-                            type="date" 
+                            placeholder="DD/MM/YYYY"
                             data-testid="input-booking-start-date" 
                           />
                         </FormControl>
@@ -463,7 +512,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                         <FormControl>
                           <Input 
                             {...field} 
-                            type="date" 
+                            placeholder="DD/MM/YYYY"
                             data-testid="input-booking-end-date" 
                           />
                         </FormControl>
@@ -672,15 +721,21 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                   
                   {dateSuggestion && (
                     <div className="text-sm text-orange-600 mt-1">
-                      💡 Hotel available from {new Date(dateSuggestion.start).toLocaleDateString()} to {new Date(dateSuggestion.end).toLocaleDateString()}
+                      💡 Hotel available from {new Date(dateSuggestion.start).toLocaleDateString('en-GB')} to {new Date(dateSuggestion.end).toLocaleDateString('en-GB')}
                       <Button 
                         type="button" 
                         variant="link" 
                         size="sm"
                         className="p-0 h-auto ml-2 text-orange-600"
                         onClick={() => {
-                          form.setValue("bookingStartDate", new Date(dateSuggestion.start).toISOString().split('T')[0]);
-                          form.setValue("bookingEndDate", new Date(dateSuggestion.end).toISOString().split('T')[0]);
+                          const formatDateForInput = (date: Date) => {
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            return `${day}/${month}/${year}`;
+                          };
+                          form.setValue("bookingStartDate", formatDateForInput(new Date(dateSuggestion.start)));
+                          form.setValue("bookingEndDate", formatDateForInput(new Date(dateSuggestion.end)));
                         }}
                       >
                         Use these dates
