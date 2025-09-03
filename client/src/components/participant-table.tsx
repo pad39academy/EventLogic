@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Edit, LogIn, LogOut, MoreHorizontal, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { Search, Edit, Plus, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import type { Participant, ParticipantFilters } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +35,7 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: participants = [], isLoading } = useQuery({
+  const { data: participantResponse = {}, isLoading } = useQuery({
     queryKey: [
       isAdmin ? "/api/admin/dashboard/participants" : "/api/coach/dashboard",
       filters
@@ -59,9 +59,12 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
       }
 
       const data = await response.json();
-      return isAdmin ? data : data.players || [];
+      return isAdmin ? data : { data: data.players || [], pagination: null };
     },
   });
+
+  const participants = participantResponse.data || [];
+  const pagination = participantResponse.pagination;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -235,11 +238,11 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             <div className="flex gap-2">
               <Button 
                 variant="outline"
+                size="sm"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard/participants"] })}
                 data-testid="button-refresh-participants"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+                <RefreshCw className="h-4 w-4" />
               </Button>
               <Button 
                 onClick={() => setShowAddParticipantDialog(true)}
@@ -317,25 +320,72 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             </Select>
             </div>
             
-            {/* Page Size Selector */}
-            <div className="flex items-center gap-4">
-              <label htmlFor="pageSize" className="text-sm font-medium text-gray-700">
-                Rows per page:
-              </label>
-              <Select
-                value={filters.limit?.toString() || "10"}
-                onValueChange={(value) => setFilters({ ...filters, limit: parseInt(value), page: 1 })}
-              >
-                <SelectTrigger className="w-20" data-testid="select-page-size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Page Size Selector and Top Pagination */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label htmlFor="pageSize" className="text-sm font-medium text-gray-700">
+                  Rows per page:
+                </label>
+                <Select
+                  value={filters.limit?.toString() || "10"}
+                  onValueChange={(value) => setFilters({ ...filters, limit: parseInt(value), page: 1 })}
+                >
+                  <SelectTrigger className="w-20" data-testid="select-page-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Pagination Controls - Top */}
+              {pagination && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
+                  <nav className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!pagination.hasPrev}
+                      onClick={() => setFilters({ ...filters, page: 1 })}
+                      data-testid="button-first-top"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!pagination.hasPrev}
+                      onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
+                      data-testid="button-prev-top"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!pagination.hasNext}
+                      onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
+                      data-testid="button-next-top"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!pagination.hasNext}
+                      onClick={() => setFilters({ ...filters, page: pagination.totalPages })}
+                      data-testid="button-last-top"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </nav>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -446,47 +496,9 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                   <TableCell>
                     <div className="flex space-x-2">
                       {isAdmin ? (
-                        <>
-                          <Button size="sm" variant="ghost" data-testid={`button-edit-${participant.participantId}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          {participant.checkinStatus === 'pending' ? (
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-success-600 hover:bg-success-50"
-                              onClick={() => handleAdminCheckin(participant.participantId)}
-                              disabled={checkinMutation.isPending}
-                              data-testid={`button-checkin-${participant.participantId}`}
-                            >
-                              <LogIn className="h-4 w-4" />
-                            </Button>
-                          ) : participant.checkinStatus === 'checked_in' ? (
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-error-600 hover:bg-error-50"
-                              onClick={() => handleAdminCheckout(participant.participantId)}
-                              disabled={checkoutMutation.isPending}
-                              data-testid={`button-checkout-${participant.participantId}`}
-                            >
-                              <LogOut className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-gray-400"
-                              disabled
-                              data-testid={`button-completed-${participant.participantId}`}
-                            >
-                              <LogOut className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost" data-testid={`button-more-${participant.participantId}`}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </>
+                        <Button size="sm" variant="ghost" data-testid={`button-edit-${participant.participantId}`}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       ) : (
                         <>
                           {participant.checkinStatus === 'pending' ? (
@@ -519,16 +531,55 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
           </Table>
         </div>
 
-        {/* Performance Info */}
-        {isAdmin && (
+        {/* Pagination Controls - Bottom */}
+        {isAdmin && pagination && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
             <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">{participants.length}</span> participants 
+              Showing <span className="font-medium">{pagination.startIndex}</span> to{' '}
+              <span className="font-medium">{pagination.endIndex}</span> of{' '}
+              <span className="font-medium">{pagination.total}</span> participants
               {filters.search && ` matching "${filters.search}"`}
-              {(filters.discipline || filters.role || filters.checkinStatus) && " with filters applied"}
             </div>
-            <div className="text-xs text-gray-500">
-              ⚡ Database indexed for fast queries
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
+              <nav className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: 1 })}
+                  data-testid="button-first-bottom"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
+                  data-testid="button-prev-bottom"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
+                  data-testid="button-next-bottom"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.totalPages })}
+                  data-testid="button-last-bottom"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </nav>
             </div>
           </div>
         )}
