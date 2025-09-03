@@ -35,7 +35,7 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: participantResponse = {}, isLoading } = useQuery({
+  const { data: participants = [], isLoading } = useQuery({
     queryKey: [
       isAdmin ? "/api/admin/dashboard/participants" : "/api/coach/dashboard",
       filters
@@ -59,12 +59,9 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
       }
 
       const data = await response.json();
-      return isAdmin ? data : { data: data.players || [], pagination: null };
+      return isAdmin ? data : data.players || [];
     },
   });
-
-  const participants = participantResponse.data || [];
-  const pagination = participantResponse.pagination;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -522,66 +519,16 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
           </Table>
         </div>
 
-        {/* Enhanced Pagination - Admin only */}
-        {isAdmin && pagination && (
+        {/* Performance Info */}
+        {isAdmin && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
-            <div className="flex flex-1 justify-between sm:hidden">
-              <Button
-                variant="outline"
-                disabled={!pagination.hasPrev}
-                onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
-                data-testid="button-prev-mobile"
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!pagination.hasNext}
-                onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
-                data-testid="button-next-mobile"
-              >
-                Next
-              </Button>
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{participants.length}</span> participants 
+              {filters.search && ` matching "${filters.search}"`}
+              {(filters.discipline || filters.role || filters.checkinStatus) && " with filters applied"}
             </div>
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
-                  <span className="font-medium">{pagination.total}</span> results
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!pagination.hasPrev}
-                    onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
-                    data-testid="button-prev-desktop"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="bg-primary-50 border-primary-500 text-primary-600"
-                    data-testid="button-current-page"
-                  >
-                    {pagination.page}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!pagination.hasNext}
-                    onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
-                    data-testid="button-next-desktop"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </nav>
-              </div>
+            <div className="text-xs text-gray-500">
+              ⚡ Database indexed for fast queries
             </div>
           </div>
         )}

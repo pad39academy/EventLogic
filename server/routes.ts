@@ -530,28 +530,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters = req.query;
       const participants = await storage.getParticipants(filters);
       
-      // Get total count without pagination for proper pagination info
-      const totalCountFilters = { ...filters };
-      delete totalCountFilters.page;
-      delete totalCountFilters.limit;
-      const totalParticipants = await storage.getParticipants(totalCountFilters);
-      const totalCount = totalParticipants.length;
-      
-      const page = parseInt(filters.page as string) || 1;
-      const limit = parseInt(filters.limit as string) || 10;
-      const totalPages = Math.ceil(totalCount / limit);
-      
-      res.json({
-        data: participants,
-        pagination: {
-          page,
-          limit,
-          total: totalCount,
-          totalPages,
-          hasNext: page < totalPages,
-          hasPrev: page > 1
-        }
-      });
+      // For now, return simple array for better performance
+      // TODO: Implement efficient pagination with single query using window functions
+      res.json(participants);
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get participants" });
     }
