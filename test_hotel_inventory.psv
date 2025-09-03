@@ -1,0 +1,6 @@
+hotelId|instanceCode|hotelName|location|district|address|pincode|pointOfContact|contactPhoneNumber|startDate|endDate|totalRooms|occupiedRooms|availableRooms
+HOTEL-001|1|Hotel Grand Palace Chennai|Chennai|Chennai|45, Anna Salai, Mount Road, Chennai|600002|Mr. Ramesh Kumar|9876543200|15/01/2025|20/01/2025|50|0|50
+HOTEL-002|1|The Residency Towers|Chennai|Chennai|115, Sir Thyagaraya Road, T. Nagar, Chennai|600017|Ms. Lakshmi Priya|9987654300|16/01/2025|22/01/2025|40|0|40
+HOTEL-003|1|Fortune Select Grand|Coimbatore|Coimbatore|68, RS Puram Main Road, Coimbatore|641002|Mr. Selvam Rajan|8765432100|14/01/2025|18/01/2025|35|0|35
+HOTEL-004|1|Hotel Supreme Madurai|Madurai|Madurai|110, West Perumal Maistry Street, Madurai|625001|Dr. Meera Devi|7654321000|17/01/2025|23/01/2025|45|0|45
+HOTEL-005|1|Sangam Hotel Trichy|Tiruchirappalli|Tiruchirappalli|Collector Office Road, Cantonment, Tiruchirappalli|620001|Mr. Karthik Vasan|6543210900|18/01/2025|25/01/2025|60|0|60
