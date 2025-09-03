@@ -374,8 +374,8 @@ export class UploadService {
 
         try {
           // Validate coach exists
-          const coach = await storage.getUserByCoachId(data.COACH_ID);
-          if (!coach) {
+          const coach = await storage.getParticipantByParticipantId(data.COACH_ID);
+          if (!coach || coach.role !== 'coach') {
             result.errors.push(`Row ${i + 1}: Coach ${data.COACH_ID} not found`);
             continue;
           }
