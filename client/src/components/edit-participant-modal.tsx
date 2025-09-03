@@ -699,7 +699,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                     <SelectContent>
                       {/* Current hotel - always show if assigned */}
                       {participant.hotelId && (
-                        <SelectItem key={participant.hotelId} value={participant.hotelId}>
+                        <SelectItem key={`${participant.hotelId}-current`} value={participant.hotelId}>
                           {participant.hotelName || "Current Hotel"} (Current)
                           {availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId) 
                             ? ` - ${availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId)?.availableRooms} available`
@@ -711,7 +711,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       {availableHotels
                         .filter((hotel: any) => hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId)
                         .map((hotel: any) => (
-                          <SelectItem key={hotel.hotelId} value={hotel.hotelId}>
+                          <SelectItem key={`${hotel.hotelId}-${hotel.instanceCode}`} value={hotel.hotelId}>
                             {hotel.hotelName} - {hotel.location} ({hotel.availableRooms} rooms available)
                           </SelectItem>
                         ))}
