@@ -247,10 +247,17 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
         return response.json();
       }
       
+      // Convert DD/MM/YYYY to YYYY-MM-DD for API
+      const convertToAPIDate = (dateStr: string) => {
+        if (!dateStr || !dateStr.includes('/')) return dateStr;
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month}-${day}`;
+      };
+      
       // Get hotels available for specific dates
       const params = new URLSearchParams({
-        startDate: watchedStartDate,
-        endDate: watchedEndDate,
+        startDate: convertToAPIDate(watchedStartDate),
+        endDate: convertToAPIDate(watchedEndDate),
         ...(participant?.id && { excludeParticipantId: participant.id })
       });
       
