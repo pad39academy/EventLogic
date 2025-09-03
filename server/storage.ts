@@ -324,8 +324,34 @@ export class DatabaseStorage implements IStorage {
 
   async getParticipants(filters: ParticipantFilters = {}): Promise<Participant[]> {
     let query = db.select({
-      ...participants,
-      hotelName: hotels.hotelName
+      id: participants.id,
+      participantId: participants.participantId,
+      name: participants.name,
+      mobileNumber: participants.mobileNumber,
+      role: participants.role,
+      discipline: participants.discipline,
+      district: participants.district,
+      location: participants.location,
+      teamName: participants.teamName,
+      coachId: participants.coachId,
+      hotelId: participants.hotelId,
+      hotelName: hotels.hotelName,
+      stadium: participants.stadium,
+      bookingStartDate: participants.bookingStartDate,
+      bookingEndDate: participants.bookingEndDate,
+      bookingReference: participants.bookingReference,
+      bookingType: participants.bookingType,
+      notifyTransport: participants.notifyTransport,
+      travelPocName: participants.travelPocName,
+      travelPocMobile: participants.travelPocMobile,
+      venuePocName: participants.venuePocName,
+      venuePocMobile: participants.venuePocMobile,
+      checkinStatus: participants.checkinStatus,
+      checkinTime: participants.checkinTime,
+      checkoutTime: participants.checkoutTime,
+      actualCheckoutDate: participants.actualCheckoutDate,
+      createdAt: participants.createdAt,
+      updatedAt: participants.updatedAt
     }).from(participants)
     .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId));
     const conditions = [];
@@ -385,19 +411,111 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipantById(id: string): Promise<Participant | undefined> {
-    const [participant] = await db.select().from(participants).where(eq(participants.id, id));
-    return participant || undefined;
+    const result = await db.select({
+      id: participants.id,
+      participantId: participants.participantId,
+      name: participants.name,
+      mobileNumber: participants.mobileNumber,
+      role: participants.role,
+      discipline: participants.discipline,
+      district: participants.district,
+      location: participants.location,
+      teamName: participants.teamName,
+      coachId: participants.coachId,
+      hotelId: participants.hotelId,
+      hotelName: hotels.hotelName,
+      stadium: participants.stadium,
+      bookingStartDate: participants.bookingStartDate,
+      bookingEndDate: participants.bookingEndDate,
+      bookingReference: participants.bookingReference,
+      bookingType: participants.bookingType,
+      notifyTransport: participants.notifyTransport,
+      travelPocName: participants.travelPocName,
+      travelPocMobile: participants.travelPocMobile,
+      venuePocName: participants.venuePocName,
+      venuePocMobile: participants.venuePocMobile,
+      checkinStatus: participants.checkinStatus,
+      checkinTime: participants.checkinTime,
+      checkoutTime: participants.checkoutTime,
+      actualCheckoutDate: participants.actualCheckoutDate,
+      createdAt: participants.createdAt,
+      updatedAt: participants.updatedAt
+    }).from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+    .where(eq(participants.id, id));
+    return result[0] || undefined;
   }
 
   async getParticipantByParticipantId(participantId: string): Promise<Participant | undefined> {
-    const [participant] = await db.select().from(participants).where(eq(participants.participantId, participantId));
-    return participant || undefined;
+    const result = await db.select({
+      id: participants.id,
+      participantId: participants.participantId,
+      name: participants.name,
+      mobileNumber: participants.mobileNumber,
+      role: participants.role,
+      discipline: participants.discipline,
+      district: participants.district,
+      location: participants.location,
+      teamName: participants.teamName,
+      coachId: participants.coachId,
+      hotelId: participants.hotelId,
+      hotelName: hotels.hotelName,
+      stadium: participants.stadium,
+      bookingStartDate: participants.bookingStartDate,
+      bookingEndDate: participants.bookingEndDate,
+      bookingReference: participants.bookingReference,
+      bookingType: participants.bookingType,
+      notifyTransport: participants.notifyTransport,
+      travelPocName: participants.travelPocName,
+      travelPocMobile: participants.travelPocMobile,
+      venuePocName: participants.venuePocName,
+      venuePocMobile: participants.venuePocMobile,
+      checkinStatus: participants.checkinStatus,
+      checkinTime: participants.checkinTime,
+      checkoutTime: participants.checkoutTime,
+      actualCheckoutDate: participants.actualCheckoutDate,
+      createdAt: participants.createdAt,
+      updatedAt: participants.updatedAt
+    }).from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+    .where(eq(participants.participantId, participantId));
+    return result[0] || undefined;
   }
 
   async getParticipantsByCoachId(coachId: string): Promise<Participant[]> {
     return await db
-      .select()
+      .select({
+        id: participants.id,
+        participantId: participants.participantId,
+        name: participants.name,
+        mobileNumber: participants.mobileNumber,
+        role: participants.role,
+        discipline: participants.discipline,
+        district: participants.district,
+        location: participants.location,
+        teamName: participants.teamName,
+        coachId: participants.coachId,
+        hotelId: participants.hotelId,
+        hotelName: hotels.hotelName,
+        stadium: participants.stadium,
+        bookingStartDate: participants.bookingStartDate,
+        bookingEndDate: participants.bookingEndDate,
+        bookingReference: participants.bookingReference,
+        bookingType: participants.bookingType,
+        notifyTransport: participants.notifyTransport,
+        travelPocName: participants.travelPocName,
+        travelPocMobile: participants.travelPocMobile,
+        venuePocName: participants.venuePocName,
+        venuePocMobile: participants.venuePocMobile,
+        checkinStatus: participants.checkinStatus,
+        checkinTime: participants.checkinTime,
+        checkoutTime: participants.checkoutTime,
+        actualCheckoutDate: participants.actualCheckoutDate,
+        createdAt: participants.createdAt,
+        updatedAt: participants.updatedAt
+      })
       .from(participants)
+      .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
       .where(eq(participants.coachId, coachId))
       .orderBy(asc(participants.name));
   }
