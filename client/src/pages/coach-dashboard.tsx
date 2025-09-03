@@ -585,7 +585,11 @@ export default function CoachDashboard() {
             <div className="flex justify-between">
               <span className="text-sm text-gray-500">Hotel</span>
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-hotel">
-                {coach?.hotelId ? `Hotel ID: ${coach.hotelId}` : 'No hotel assigned'}
+                {coach?.hotelId ? (
+                  (user as any)?.isHotelVerified 
+                    ? `Hotel ID: ${coach.hotelId}`
+                    : 'Hotel assigned (ID provided at reception)'
+                ) : 'No hotel assigned'}
               </span>
             </div>
             <div className="flex justify-between">
