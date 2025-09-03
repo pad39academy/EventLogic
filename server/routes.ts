@@ -525,6 +525,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update participant endpoint
+  app.put("/api/admin/participants/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      // Get current participant to determine role and check for hotel changes
+      const currentParticipant = await storage.getParticipantById(id);
+      if (!currentParticipant) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+
+      let validatedData;
+      const { role } = currentParticipant;
+
+      // Validate based on role
+      if (role === 'player') {
+        const { updatePlayerSchema } = await import('@shared/schema');
+        validatedData = updatePlayerSchema.parse(updateData);
+      } else if (role === 'coach') {
+        const { updateCoachSchema } = await import('@shared/schema');
+        validatedData = updateCoachSchema.parse(updateData);
+      } else if (role === 'official') {
+        const { updateOfficialSchema } = await import('@shared/schema');
+        validatedData = updateOfficialSchema.parse(updateData);
+      } else {
+        return res.status(400).json({ message: "Invalid participant role" });
+      }
+
+      // Check if hotel is being changed and reason is required
+      const hotelChanged = validatedData.hotelId && validatedData.hotelId !== currentParticipant.hotelId;
+      if (hotelChanged && !validatedData.changeReason?.trim()) {
+        return res.status(400).json({ message: "Change reason is required when updating hotel assignment" });
+      }
+
+      // Remove changeReason from update data as it's not a participant field
+      const { changeReason, ...participantUpdateData } = validatedData;
+
+      // Update participant
+      const updatedParticipant = await storage.updateParticipant(id, participantUpdateData);
+
+      // If hotel changed, create reassignment record
+      if (hotelChanged) {
+        await storage.createReassignment({
+          originalParticipantId: currentParticipant.participantId,
+          newParticipantId: currentParticipant.participantId, // Same participant, different assignment
+          newBookingReference: currentParticipant.bookingReference,
+          reason: changeReason,
+          reassignedBy: req.session.userId!,
+        });
+      }
+
+      // Create audit log
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        actionType: "edit",
+        targetEntity: "participant",
+        targetId: id,
+        details: {
+          changes: participantUpdateData,
+          hotelChanged,
+          reason: changeReason || null,
+        },
+      });
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error('Update participant error:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to update participant" });
+    }
+  });
+
+  // Get available hotels for participant assignment
+  app.get("/api/admin/available-hotels", requireAdmin, async (req, res) => {
+    try {
+      const availableHotels = await storage.getAvailableHotels();
+      res.json(availableHotels);
+    } catch (error) {
+      console.error('Get available hotels error:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get available hotels" });
+    }
+  });
+
   app.get("/api/admin/dashboard/participants", requireAdmin, async (req, res) => {
     try {
       const filters = req.query;

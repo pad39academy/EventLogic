@@ -246,6 +246,82 @@ export const insertParticipantSchema = createInsertSchema(participants).omit({
   updatedAt: true,
 });
 
+// Update schemas for different participant roles
+export const updatePlayerSchema = createInsertSchema(participants).omit({
+  id: true,
+  participantId: true, // Cannot change participant ID
+  role: true, // Cannot change role
+  discipline: true, // Inherited from coach
+  district: true, // Inherited from coach
+  location: true, // Inherited from coach
+  bookingStartDate: true, // Managed by admin separately
+  bookingEndDate: true, // Managed by admin separately
+  bookingReference: true, // Managed by admin separately
+  bookingType: true, // Managed by admin separately
+  checkinStatus: true, // Managed by check-in/out process
+  checkinTime: true, // Managed by check-in/out process
+  checkoutTime: true, // Managed by check-in/out process
+  actualCheckoutDate: true, // Managed by check-in/out process
+  notifyTransport: true, // Not applicable for players
+  travelPocName: true, // Not applicable for players
+  travelPocMobile: true, // Not applicable for players
+  venuePocName: true, // Not applicable for players
+  venuePocMobile: true, // Not applicable for players
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // Hotel change reason (optional - only required if hotel is changed)
+  changeReason: z.string().optional(),
+});
+
+export const updateCoachSchema = createInsertSchema(participants).omit({
+  id: true,
+  participantId: true, // Cannot change participant ID
+  role: true, // Cannot change role
+  teamName: true, // Not applicable for coaches
+  coachId: true, // Not applicable for coaches
+  stadium: true, // Optional field for coaches
+  bookingStartDate: true, // Managed by admin separately
+  bookingEndDate: true, // Managed by admin separately
+  bookingReference: true, // Managed by admin separately
+  bookingType: true, // Managed by admin separately
+  checkinStatus: true, // Managed by check-in/out process
+  checkinTime: true, // Managed by check-in/out process
+  checkoutTime: true, // Managed by check-in/out process
+  actualCheckoutDate: true, // Managed by check-in/out process
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // Hotel change reason (optional - only required if hotel is changed)
+  changeReason: z.string().optional(),
+});
+
+export const updateOfficialSchema = createInsertSchema(participants).omit({
+  id: true,
+  participantId: true, // Cannot change participant ID
+  role: true, // Cannot change role
+  teamName: true, // Not applicable for officials
+  coachId: true, // Not applicable for officials
+  stadium: true, // Optional field for officials
+  bookingStartDate: true, // Managed by admin separately
+  bookingEndDate: true, // Managed by admin separately
+  bookingReference: true, // Managed by admin separately
+  bookingType: true, // Managed by admin separately
+  checkinStatus: true, // Managed by check-in/out process
+  checkinTime: true, // Managed by check-in/out process
+  checkoutTime: true, // Managed by check-in/out process
+  actualCheckoutDate: true, // Managed by check-in/out process
+  travelPocName: true, // Not applicable for officials
+  travelPocMobile: true, // Not applicable for officials
+  venuePocName: true, // Not applicable for officials
+  venuePocMobile: true, // Not applicable for officials
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // Hotel change reason (optional - only required if hotel is changed)
+  changeReason: z.string().optional(),
+});
+
 export const insertReassignmentSchema = createInsertSchema(reassignments).omit({
   id: true,
   reassignedAt: true,
@@ -287,6 +363,9 @@ export type InsertHotel = z.infer<typeof insertHotelSchema>;
 export type UpdateHotel = z.infer<typeof updateHotelSchema>;
 export type Participant = typeof participants.$inferSelect;
 export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
+export type UpdatePlayer = z.infer<typeof updatePlayerSchema>;
+export type UpdateCoach = z.infer<typeof updateCoachSchema>;
+export type UpdateOfficial = z.infer<typeof updateOfficialSchema>;
 export type Reassignment = typeof reassignments.$inferSelect;
 export type InsertReassignment = z.infer<typeof insertReassignmentSchema>;
 export type AuditLog = typeof auditLog.$inferSelect;

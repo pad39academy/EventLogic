@@ -29,6 +29,7 @@ export interface IStorage {
   deleteHotel(id: string): Promise<boolean>;
   getHotelsWithOverlappingDates(hotelId: string, startDate: Date, endDate: Date): Promise<Hotel[]>;
   checkHotelDateConflicts(hotelId: string, excludeInstanceCode: string, startDate: Date, endDate: Date): Promise<Hotel[]>;
+  getAvailableHotels(): Promise<(Hotel & { availableRooms: number })[]>;
 
   // Participant management
   getParticipants(filters?: ParticipantFilters): Promise<Participant[]>;
@@ -857,6 +858,54 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(notifications)
       .orderBy(desc(notifications.sentAt));
+  }
+
+  async getAvailableHotels(): Promise<(Hotel & { availableRooms: number })[]> {
+    // Get all active hotels with their current occupancy
+    const hotelsWithOccupancy = await db
+      .select({
+        id: hotels.id,
+        hotelId: hotels.hotelId,
+        instanceCode: hotels.instanceCode,
+        hotelName: hotels.hotelName,
+        location: hotels.location,
+        district: hotels.district,
+        address: hotels.address,
+        pincode: hotels.pincode,
+        pointOfContact: hotels.pointOfContact,
+        contactPhoneNumber: hotels.contactPhoneNumber,
+        startDate: hotels.startDate,
+        endDate: hotels.endDate,
+        totalRooms: hotels.totalRooms,
+        occupiedRooms: hotels.occupiedRooms,
+        availableRooms: hotels.availableRooms,
+        createdAt: hotels.createdAt,
+        currentParticipants: sql<number>`COALESCE(COUNT(${participants.id}), 0)`.as('currentParticipants'),
+      })
+      .from(hotels)
+      .leftJoin(participants, eq(participants.hotelId, hotels.id))
+      .groupBy(hotels.id)
+      .orderBy(hotels.hotelName);
+
+    // Calculate actual available rooms based on room sharing rules
+    return hotelsWithOccupancy.map(hotel => {
+      const participantCount = Number(hotel.currentParticipants);
+      
+      // Room sharing rules: 3 players, 2 coaches, 1 official per room
+      // For simplicity, assuming average 2.5 people per room (mixed roles)
+      const estimatedRoomsNeeded = Math.ceil(participantCount / 2.5);
+      const actualAvailableRooms = Math.max(0, hotel.totalRooms - estimatedRoomsNeeded);
+
+      return {
+        ...hotel,
+        availableRooms: actualAvailableRooms,
+      };
+    }).filter(hotel => {
+      // Only return hotels that are currently active and have available rooms
+      const now = new Date();
+      const isActive = now >= hotel.startDate && now <= hotel.endDate;
+      return isActive && hotel.availableRooms > 0;
+    });
   }
 }
 
