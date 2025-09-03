@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Edit, LogIn, LogOut, MoreHorizontal, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Search, Edit, LogIn, LogOut, MoreHorizontal, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import type { Participant, ParticipantFilters } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +35,7 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: participants = [], isLoading } = useQuery({
+  const { data: participantResponse = {}, isLoading } = useQuery({
     queryKey: [
       isAdmin ? "/api/admin/dashboard/participants" : "/api/coach/dashboard",
       filters
@@ -60,9 +59,12 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
       }
 
       const data = await response.json();
-      return isAdmin ? data : data.players || [];
+      return isAdmin ? data : { data: data.players || [], pagination: null };
     },
   });
+
+  const participants = participantResponse.data || [];
+  const pagination = participantResponse.pagination;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -75,9 +77,6 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
     }
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
 
   // Admin check-in mutation
   const checkinMutation = useMutation({
@@ -236,19 +235,30 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             </p>
           </div>
           {isAdmin && (
-            <Button 
-              onClick={() => setShowAddParticipantDialog(true)}
-              data-testid="button-add-participant"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Participant
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard/participants"] })}
+                data-testid="button-refresh-participants"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button 
+                onClick={() => setShowAddParticipantDialog(true)}
+                data-testid="button-add-participant"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Participant
+              </Button>
+            </div>
           )}
         </div>
 
         {/* Search and Filters - Admin only */}
         {isAdmin && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-5 mt-6">
+          <div className="space-y-4 mt-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
             <div className="flex gap-2 sm:col-span-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -308,6 +318,28 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                 <SelectItem value="player">Player</SelectItem>
               </SelectContent>
             </Select>
+            </div>
+            
+            {/* Page Size Selector */}
+            <div className="flex items-center gap-4">
+              <label htmlFor="pageSize" className="text-sm font-medium text-gray-700">
+                Rows per page:
+              </label>
+              <Select
+                value={filters.limit?.toString() || "10"}
+                onValueChange={(value) => setFilters({ ...filters, limit: parseInt(value), page: 1 })}
+              >
+                <SelectTrigger className="w-20" data-testid="select-page-size">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
       </CardHeader>
@@ -318,7 +350,9 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             <TableHeader className="bg-gray-50">
               <TableRow>
                 <TableHead>Participant</TableHead>
-                <TableHead>Role/Team</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Discipline</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Coach ID</TableHead>
                 <TableHead>Hotel/Booking</TableHead>
                 <TableHead>Dates</TableHead>
@@ -330,44 +364,40 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
               {participants.map((participant: Participant) => (
                 <TableRow key={participant.id} className="hover:bg-gray-50" data-testid={`participant-row-${participant.participantId}`}>
                   <TableCell>
-                    <div className="flex items-center">
-                      <Avatar className="h-10 w-10 flex-shrink-0">
-                        <AvatarFallback className={getRoleColor(participant.role)}>
-                          {getInitials(participant.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900" data-testid={`participant-name-${participant.participantId}`}>
-                          {participant.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {participant.participantId}
-                          {participant.mobileNumber && ` • ${participant.mobileNumber}`}
-                        </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900" data-testid={`participant-name-${participant.participantId}`}>
+                        {participant.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {participant.participantId}
+                        {participant.mobileNumber && ` • ${participant.mobileNumber}`}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900 capitalize">
                       {participant.role}
-                      {participant.teamName && ` • ${participant.teamName}`}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {participant.role !== 'player' && participant.discipline}
-                      {participant.role !== 'player' && participant.district && ` • ${participant.district}`}
-                      {participant.role !== 'player' && participant.location && ` • ${participant.location}`}
-                      {participant.role === 'player' && participant.discipline && (
-                        <div className="flex items-center gap-1">
-                          <span>{participant.discipline}</span>
-                          {participant.district && ` • ${participant.district}`}
-                          {participant.location && ` • ${participant.location}`}
-                          <span className="text-gray-400 text-xs ml-1 bg-gray-100 px-1 rounded">from coach</span>
-                        </div>
-                      )}
-                      {participant.role === 'player' && !participant.discipline && participant.coachId && (
-                        <span className="text-orange-500 text-xs">⚠ Missing inherited data from coach</span>
-                      )}
+                    {participant.teamName && (
+                      <div className="text-sm text-gray-500">
+                        {participant.teamName}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      {participant.discipline || '-'}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      {participant.location || '-'}
+                    </div>
+                    {participant.district && (
+                      <div className="text-sm text-gray-500">
+                        {participant.district}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">
@@ -492,21 +522,22 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
           </Table>
         </div>
 
-        {/* Pagination - Admin only */}
-        {isAdmin && (
+        {/* Enhanced Pagination - Admin only */}
+        {isAdmin && pagination && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
             <div className="flex flex-1 justify-between sm:hidden">
               <Button
                 variant="outline"
-                disabled={filters.page === 1}
-                onClick={() => setFilters({ ...filters, page: (filters.page || 1) - 1 })}
+                disabled={!pagination.hasPrev}
+                onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
                 data-testid="button-prev-mobile"
               >
                 Previous
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setFilters({ ...filters, page: (filters.page || 1) + 1 })}
+                disabled={!pagination.hasNext}
+                onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
                 data-testid="button-next-mobile"
               >
                 Next
@@ -515,18 +546,19 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">1</span> to{' '}
-                  <span className="font-medium">{Math.min(filters.limit || 10, participants.length)}</span> of{' '}
-                  <span className="font-medium">{participants.length}</span> results
+                  Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
+                  <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
+                  <span className="font-medium">{pagination.total}</span> results
                 </p>
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={filters.page === 1}
-                    onClick={() => setFilters({ ...filters, page: (filters.page || 1) - 1 })}
+                    disabled={!pagination.hasPrev}
+                    onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
                     data-testid="button-prev-desktop"
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -537,12 +569,13 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
                     className="bg-primary-50 border-primary-500 text-primary-600"
                     data-testid="button-current-page"
                   >
-                    {filters.page || 1}
+                    {pagination.page}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setFilters({ ...filters, page: (filters.page || 1) + 1 })}
+                    disabled={!pagination.hasNext}
+                    onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
                     data-testid="button-next-desktop"
                   >
                     <ChevronRight className="h-5 w-5" />
