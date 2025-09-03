@@ -234,19 +234,6 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
   const watchedEndDate = form.watch("bookingEndDate");
   const watchedHotelId = form.watch("hotelId");
 
-  // Get all hotels for finding current hotel name
-  const { data: allHotels = [] } = useQuery({
-    queryKey: ["/api/admin/hotels"],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/hotels", {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch hotels');
-      return response.json();
-    },
-    enabled: isOpen,
-  });
-
   // Get available hotels based on selected dates
   const { data: availableHotels = [], refetch: refetchHotels } = useQuery({
     queryKey: ["/api/admin/available-hotels", watchedStartDate, watchedEndDate, participant?.id],
@@ -260,17 +247,10 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
         return response.json();
       }
       
-      // Convert DD/MM/YYYY to YYYY-MM-DD for API
-      const convertToAPIDate = (dateStr: string) => {
-        if (!dateStr || !dateStr.includes('/')) return dateStr;
-        const [day, month, year] = dateStr.split('/');
-        return `${year}-${month}-${day}`;
-      };
-      
       // Get hotels available for specific dates
       const params = new URLSearchParams({
-        startDate: convertToAPIDate(watchedStartDate),
-        endDate: convertToAPIDate(watchedEndDate),
+        startDate: watchedStartDate,
+        endDate: watchedEndDate,
         ...(participant?.id && { excludeParticipantId: participant.id })
       });
       
@@ -696,23 +676,13 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
               </>
             )}
 
-            {/* Current Hotel Display */}
-            {participant?.hotelId && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-md border">
-                <div className="text-sm font-medium text-blue-800 dark:text-blue-200">Current Hotel Assignment:</div>
-                <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                  {allHotels.find((h: any) => h.hotelId === participant.hotelId)?.hotelName || "Unknown Hotel"} - {allHotels.find((h: any) => h.hotelId === participant.hotelId)?.location || "Unknown Location"}
-                </div>
-              </div>
-            )}
-
             {/* Hotel assignment */}
             <FormField
               control={form.control}
               name="hotelId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{participant?.hotelId ? "Change Hotel Assignment" : "Hotel Assignment"}</FormLabel>
+                  <FormLabel>Hotel Assignment</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-hotel">
@@ -721,20 +691,20 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                     </FormControl>
                     <SelectContent>
                       {/* Current hotel - always show if assigned */}
-                      {participant?.hotelId && (
-                        <SelectItem key={`current-${participant.hotelId}`} value={participant.hotelId}>
-                          {allHotels.find((h: any) => h.hotelId === participant.hotelId)?.hotelName || "Current Hotel"} (Current)
+                      {participant.hotelId && (
+                        <SelectItem key={participant.hotelId} value={participant.hotelId}>
+                          {participant.hotelName || "Current Hotel"} (Current)
                           {availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId) 
                             ? ` - ${availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId)?.availableRooms} available`
-                            : " - Currently assigned"}
+                            : " - Not available for these dates"}
                         </SelectItem>
                       )}
                       
                       {/* Available hotels */}
                       {availableHotels
-                        .filter((hotel: any) => hotel.availableRooms > 0 && hotel.hotelId !== participant?.hotelId)
+                        .filter((hotel: any) => hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId)
                         .map((hotel: any) => (
-                          <SelectItem key={`available-${hotel.hotelId}`} value={hotel.hotelId}>
+                          <SelectItem key={hotel.hotelId} value={hotel.hotelId}>
                             {hotel.hotelName} - {hotel.location} ({hotel.availableRooms} rooms available)
                           </SelectItem>
                         ))}

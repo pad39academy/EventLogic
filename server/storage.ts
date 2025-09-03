@@ -884,7 +884,7 @@ export class DatabaseStorage implements IStorage {
         currentParticipants: sql<number>`COALESCE(COUNT(${participants.id}), 0)`.as('currentParticipants'),
       })
       .from(hotels)
-      .leftJoin(participants, eq(participants.hotelId, hotels.hotelId))
+      .leftJoin(participants, eq(participants.hotelId, hotels.id))
       .groupBy(hotels.id)
       .orderBy(hotels.hotelName);
 
@@ -902,8 +902,10 @@ export class DatabaseStorage implements IStorage {
         availableRooms: actualAvailableRooms,
       };
     }).filter(hotel => {
-      // Only return hotels that have available rooms (remove strict date filtering for general availability)
-      return hotel.availableRooms > 0;
+      // Only return hotels that are currently active and have available rooms
+      const now = new Date();
+      const isActive = now >= hotel.startDate && now <= hotel.endDate;
+      return isActive && hotel.availableRooms > 0;
     });
   }
 
@@ -934,15 +936,15 @@ export class DatabaseStorage implements IStorage {
       })
       .from(hotels)
       .leftJoin(participants, and(
-        eq(participants.hotelId, hotels.hotelId),
+        eq(participants.hotelId, hotels.id),
         // Only count participants whose booking dates overlap with the requested dates
         lte(participants.bookingStartDate, endDate),
         gte(participants.bookingEndDate, startDate)
       ))
       .where(and(
-        // Hotel availability period must overlap with requested dates
-        lte(hotels.startDate, endDate),
-        gte(hotels.endDate, startDate)
+        // Hotel must be available for the entire requested period
+        lte(hotels.startDate, startDate),
+        gte(hotels.endDate, endDate)
       ))
       .groupBy(hotels.id)
       .orderBy(hotels.hotelName);
