@@ -587,8 +587,8 @@ export default function CoachDashboard() {
               <span className="text-sm font-medium text-gray-900" data-testid="text-coach-hotel">
                 {coach?.hotelId ? (
                   (user as any)?.isHotelVerified 
-                    ? `Hotel ID: ${coach.hotelId}`
-                    : 'Hotel assigned (ID provided at reception)'
+                    ? `${coach.hotelName || 'Hotel'} (ID: ${coach.hotelId})`
+                    : `${coach.hotelName || 'Hotel assigned'} (ID provided at reception)`
                 ) : 'No hotel assigned'}
               </span>
             </div>
