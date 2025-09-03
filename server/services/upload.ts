@@ -410,7 +410,10 @@ export class UploadService {
             name: data.PLAYER_NAME,
             mobileNumber: data.MOBILE_NUMBER || null,
             role: "player",
-            // discipline, district, location removed - players get these from their coach
+            // Players inherit discipline, district, location from their coach
+            discipline: coach.discipline,
+            district: coach.district,
+            location: coach.location,
             teamName: data.TEAM_NAME,
             coachId: data.COACH_ID,
             hotelId: data.HOTEL_ID,
