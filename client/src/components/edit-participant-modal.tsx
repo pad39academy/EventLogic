@@ -697,24 +697,70 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Current hotel - always show if assigned */}
-                      {participant.hotelId && (
-                        <SelectItem key={`${participant.hotelId}-current`} value={participant.hotelId}>
-                          {participant.hotelName || "Current Hotel"} (Current)
-                          {availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId) 
-                            ? ` - ${availableHotels.find((hotel: any) => hotel.hotelId === participant.hotelId)?.availableRooms} available`
-                            : " - Not available for these dates"}
-                        </SelectItem>
-                      )}
-                      
-                      {/* Available hotels */}
-                      {availableHotels
-                        .filter((hotel: any) => hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId)
-                        .map((hotel: any) => (
-                          <SelectItem key={`${hotel.hotelId}-${hotel.instanceCode}`} value={hotel.hotelId}>
-                            {hotel.hotelName} - {hotel.location} ({hotel.availableRooms} rooms available)
+                      {/* Current hotel - show current instance with dates */}
+                      {participant.hotelId && (() => {
+                        // Find current hotel instance that matches participant's booking dates
+                        const currentHotelInstance = availableHotels.find((hotel: any) => 
+                          hotel.hotelId === participant.hotelId &&
+                          new Date(hotel.startDate) <= new Date(participant.bookingStartDate) &&
+                          new Date(hotel.endDate) >= new Date(participant.bookingEndDate)
+                        );
+                        
+                        const formatDate = (dateStr: string) => {
+                          const date = new Date(dateStr);
+                          return date.toLocaleDateString('en-GB');
+                        };
+                        
+                        return currentHotelInstance ? (
+                          <SelectItem 
+                            key={`${currentHotelInstance.hotelId}-${currentHotelInstance.instanceCode}`} 
+                            value={participant.hotelId}
+                          >
+                            {currentHotelInstance.hotelName} ({formatDate(currentHotelInstance.startDate)} - {formatDate(currentHotelInstance.endDate)}) (Current)
                           </SelectItem>
-                        ))}
+                        ) : (
+                          <SelectItem key={`${participant.hotelId}-current-fallback`} value={participant.hotelId}>
+                            {participant.hotelName || "Current Hotel"} (Current - Not available for selected dates)
+                          </SelectItem>
+                        );
+                      })()}
+                      
+                      {/* Available hotels with date ranges */}
+                      {availableHotels
+                        .filter((hotel: any) => {
+                          // Filter hotels based on selected booking dates
+                          if (!watchedStartDate || !watchedEndDate) {
+                            // If no dates selected, show all available hotels except current
+                            return hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId;
+                          }
+                          
+                          // Convert DD/MM/YYYY to Date objects for comparison
+                          const startDate = new Date(watchedStartDate.split('/').reverse().join('-'));
+                          const endDate = new Date(watchedEndDate.split('/').reverse().join('-'));
+                          const hotelStartDate = new Date(hotel.startDate);
+                          const hotelEndDate = new Date(hotel.endDate);
+                          
+                          // Hotel must be available for entire booking period and have rooms
+                          return hotel.availableRooms > 0 && 
+                                 hotel.hotelId !== participant.hotelId &&
+                                 hotelStartDate <= startDate && 
+                                 hotelEndDate >= endDate;
+                        })
+                        .map((hotel: any) => {
+                          const formatDate = (dateStr: string) => {
+                            const date = new Date(dateStr);
+                            return date.toLocaleDateString('en-GB');
+                          };
+                          
+                          return (
+                            <SelectItem 
+                              key={`${hotel.hotelId}-${hotel.instanceCode}`} 
+                              value={hotel.hotelId}
+                            >
+                              {hotel.hotelName} ({formatDate(hotel.startDate)} - {formatDate(hotel.endDate)}) - {hotel.availableRooms} rooms
+                            </SelectItem>
+                          );
+                        })}
                     </SelectContent>
                   </Select>
                   <FormMessage />
