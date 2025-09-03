@@ -10,6 +10,38 @@ export interface UploadResult {
 }
 
 export class UploadService {
+  // Date parsing utility for DD/MM/YYYY format
+  static parseDDMMYYYY(dateString: string): Date {
+    if (!dateString) throw new Error('Date string is required');
+    
+    const parts = dateString.trim().split('/');
+    if (parts.length !== 3) {
+      throw new Error('Date must be in DD/MM/YYYY format');
+    }
+    
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      throw new Error('Invalid date components');
+    }
+    
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2020) {
+      throw new Error('Date values out of range');
+    }
+    
+    // Create date object (month is 0-indexed in JavaScript)
+    const date = new Date(year, month - 1, day);
+    
+    // Verify the date is valid (handles cases like Feb 30th)
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+      throw new Error('Invalid date');
+    }
+    
+    return date;
+  }
+
   // Parse PSV (Pipe Separated Values) content
   static parsePSV(content: string): string[][] {
     const lines = content.trim().split('\n');
@@ -91,9 +123,9 @@ export class UploadService {
             continue;
           }
 
-          // Validate dates
-          const startDate = new Date(hotelData.startDate);
-          const endDate = new Date(hotelData.endDate);
+          // Validate dates (DD/MM/YYYY format)
+          const startDate = this.parseDDMMYYYY(hotelData.startDate);
+          const endDate = this.parseDDMMYYYY(hotelData.endDate);
           
           if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
             result.errors.push(`Row ${i + 1}: Invalid date format`);
@@ -225,8 +257,8 @@ export class UploadService {
 
           // MANDATORY: Enforce 3-day minimum stay for coach/official bookings
           // This business rule applies to actual participant bookings, not hotel inventory
-          const startDate = new Date(data.BOOKING_START_DATE);
-          const endDate = new Date(data.BOOKING_END_DATE);
+          const startDate = this.parseDDMMYYYY(data.BOOKING_START_DATE);
+          const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
@@ -357,8 +389,8 @@ export class UploadService {
 
           // MANDATORY: Enforce 3-day minimum stay for player bookings
           // This business rule applies to actual participant bookings, not hotel inventory
-          const startDate = new Date(data.BOOKING_START_DATE);
-          const endDate = new Date(data.BOOKING_END_DATE);
+          const startDate = this.parseDDMMYYYY(data.BOOKING_START_DATE);
+          const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
           if (daysDiff < 3) {
