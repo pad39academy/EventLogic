@@ -254,9 +254,6 @@ export const updatePlayerSchema = createInsertSchema(participants).omit({
   discipline: true, // Inherited from coach
   district: true, // Inherited from coach
   location: true, // Inherited from coach
-  bookingStartDate: true, // Managed by admin separately
-  bookingEndDate: true, // Managed by admin separately
-  bookingReference: true, // Managed by admin separately
   bookingType: true, // Managed by admin separately
   checkinStatus: true, // Managed by check-in/out process
   checkinTime: true, // Managed by check-in/out process
@@ -272,6 +269,39 @@ export const updatePlayerSchema = createInsertSchema(participants).omit({
 }).extend({
   // Hotel change reason (optional - only required if hotel is changed)
   changeReason: z.string().optional(),
+  // Override date fields to accept strings and transform to Date objects
+  bookingStartDate: z.string().min(1, "Start date is required").transform((str) => {
+    const parts = str.split('-');
+    if (parts.length !== 3) throw new Error('Invalid date format');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  }),
+  bookingEndDate: z.string().min(1, "End date is required").transform((str) => {
+    const parts = str.split('-');
+    if (parts.length !== 3) throw new Error('Invalid date format');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  }),
+}).refine((data) => {
+  const startDate = typeof data.bookingStartDate === 'string' ? new Date(data.bookingStartDate) : data.bookingStartDate;
+  const endDate = typeof data.bookingEndDate === 'string' ? new Date(data.bookingEndDate) : data.bookingEndDate;
+  const diffTime = endDate.getTime() - startDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 3;
+}, {
+  message: "Booking must be at least 3 days",
+  path: ["bookingEndDate"],
+}).refine((data) => {
+  const startDate = typeof data.bookingStartDate === 'string' ? new Date(data.bookingStartDate) : data.bookingStartDate;
+  const endDate = typeof data.bookingEndDate === 'string' ? new Date(data.bookingEndDate) : data.bookingEndDate;
+  return endDate > startDate;
+}, {
+  message: "End date must be after start date",
+  path: ["bookingEndDate"],
 });
 
 export const updateCoachSchema = createInsertSchema(participants).omit({

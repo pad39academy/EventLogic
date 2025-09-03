@@ -30,6 +30,7 @@ export interface IStorage {
   getHotelsWithOverlappingDates(hotelId: string, startDate: Date, endDate: Date): Promise<Hotel[]>;
   checkHotelDateConflicts(hotelId: string, excludeInstanceCode: string, startDate: Date, endDate: Date): Promise<Hotel[]>;
   getAvailableHotels(): Promise<(Hotel & { availableRooms: number })[]>;
+  getAvailableHotelsForDates(startDate: Date, endDate: Date, excludeParticipantId?: string): Promise<(Hotel & { availableRooms: number; suggestedDates?: { start: Date; end: Date } })[]>;
 
   // Participant management
   getParticipants(filters?: ParticipantFilters): Promise<Participant[]>;
@@ -906,6 +907,92 @@ export class DatabaseStorage implements IStorage {
       const isActive = now >= hotel.startDate && now <= hotel.endDate;
       return isActive && hotel.availableRooms > 0;
     });
+  }
+
+  async getAvailableHotelsForDates(startDate: Date, endDate: Date, excludeParticipantId?: string): Promise<(Hotel & { availableRooms: number; suggestedDates?: { start: Date; end: Date } })[]> {
+    // Get hotels that overlap with the requested date range
+    const hotelsWithOccupancy = await db
+      .select({
+        id: hotels.id,
+        hotelId: hotels.hotelId,
+        instanceCode: hotels.instanceCode,
+        hotelName: hotels.hotelName,
+        location: hotels.location,
+        district: hotels.district,
+        address: hotels.address,
+        pincode: hotels.pincode,
+        pointOfContact: hotels.pointOfContact,
+        contactPhoneNumber: hotels.contactPhoneNumber,
+        startDate: hotels.startDate,
+        endDate: hotels.endDate,
+        totalRooms: hotels.totalRooms,
+        occupiedRooms: hotels.occupiedRooms,
+        availableRooms: hotels.availableRooms,
+        createdAt: hotels.createdAt,
+        participantCount: sql<number>`COALESCE(COUNT(CASE WHEN ${participants.id} IS NOT NULL ${excludeParticipantId ? sql`AND ${participants.id} != ${excludeParticipantId}` : sql``} THEN 1 END), 0)`.as('participantCount'),
+        playerCount: sql<number>`COALESCE(COUNT(CASE WHEN ${participants.role} = 'player' ${excludeParticipantId ? sql`AND ${participants.id} != ${excludeParticipantId}` : sql``} THEN 1 END), 0)`.as('playerCount'),
+        coachCount: sql<number>`COALESCE(COUNT(CASE WHEN ${participants.role} = 'coach' ${excludeParticipantId ? sql`AND ${participants.id} != ${excludeParticipantId}` : sql``} THEN 1 END), 0)`.as('coachCount'),
+        officialCount: sql<number>`COALESCE(COUNT(CASE WHEN ${participants.role} = 'official' ${excludeParticipantId ? sql`AND ${participants.id} != ${excludeParticipantId}` : sql``} THEN 1 END), 0)`.as('officialCount'),
+      })
+      .from(hotels)
+      .leftJoin(participants, and(
+        eq(participants.hotelId, hotels.id),
+        // Only count participants whose booking dates overlap with the requested dates
+        lte(participants.bookingStartDate, endDate),
+        gte(participants.bookingEndDate, startDate)
+      ))
+      .where(and(
+        // Hotel must be available for the entire requested period
+        lte(hotels.startDate, startDate),
+        gte(hotels.endDate, endDate)
+      ))
+      .groupBy(hotels.id)
+      .orderBy(hotels.hotelName);
+
+    const availableHotels = hotelsWithOccupancy.map(hotel => {
+      const players = Number(hotel.playerCount);
+      const coaches = Number(hotel.coachCount);
+      const officials = Number(hotel.officialCount);
+      
+      // Calculate rooms needed based on specific role rules
+      const roomsForPlayers = Math.ceil(players / 3);
+      const roomsForCoaches = Math.ceil(coaches / 2);
+      const roomsForOfficials = officials; // 1 official per room
+      
+      const totalRoomsNeeded = roomsForPlayers + roomsForCoaches + roomsForOfficials;
+      const actualAvailableRooms = Math.max(0, hotel.totalRooms - totalRoomsNeeded);
+
+      return {
+        ...hotel,
+        availableRooms: actualAvailableRooms,
+      };
+    });
+
+    // For hotels with no availability, suggest alternative dates
+    const hotelsWithSuggestions = await Promise.all(availableHotels.map(async hotel => {
+      if (hotel.availableRooms > 0) {
+        return hotel;
+      }
+
+      // Find the earliest available period for this hotel (simplified suggestion)
+      const suggestedStart = new Date(Math.max(hotel.startDate.getTime(), Date.now()));
+      const suggestedEnd = new Date(suggestedStart.getTime() + (endDate.getTime() - startDate.getTime()));
+      
+      // Ensure suggested end date is within hotel's availability period
+      if (suggestedEnd <= hotel.endDate) {
+        return {
+          ...hotel,
+          suggestedDates: {
+            start: suggestedStart,
+            end: suggestedEnd
+          }
+        };
+      }
+
+      return hotel;
+    }));
+
+    return hotelsWithSuggestions;
   }
 }
 

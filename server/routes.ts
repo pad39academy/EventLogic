@@ -600,8 +600,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get available hotels for participant assignment
   app.get("/api/admin/available-hotels", requireAdmin, async (req, res) => {
     try {
-      const availableHotels = await storage.getAvailableHotels();
-      res.json(availableHotels);
+      const { startDate, endDate, excludeParticipantId } = req.query;
+      
+      if (startDate && endDate) {
+        // Date-based hotel availability
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        const availableHotels = await storage.getAvailableHotelsForDates(start, end, excludeParticipantId as string);
+        res.json(availableHotels);
+      } else {
+        // General available hotels (current implementation)
+        const availableHotels = await storage.getAvailableHotels();
+        res.json(availableHotels);
+      }
     } catch (error) {
       console.error('Get available hotels error:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get available hotels" });

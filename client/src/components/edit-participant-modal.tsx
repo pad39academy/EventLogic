@@ -38,7 +38,26 @@ const playerUpdateSchema = z.object({
   coachId: z.string().optional(),
   hotelId: z.string().min(1, "Hotel assignment is required"),
   stadium: z.string().optional(),
+  bookingStartDate: z.string().min(1, "Start date is required"),
+  bookingEndDate: z.string().min(1, "End date is required"),
+  bookingReference: z.string().min(1, "Booking reference is required"),
   changeReason: z.string().optional(),
+}).refine((data) => {
+  const startDate = new Date(data.bookingStartDate);
+  const endDate = new Date(data.bookingEndDate);
+  const diffTime = endDate.getTime() - startDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 3;
+}, {
+  message: "Booking must be at least 3 days",
+  path: ["bookingEndDate"],
+}).refine((data) => {
+  const startDate = new Date(data.bookingStartDate);
+  const endDate = new Date(data.bookingEndDate);
+  return endDate > startDate;
+}, {
+  message: "End date must be after start date",
+  path: ["bookingEndDate"],
 });
 
 const coachUpdateSchema = z.object({
@@ -85,6 +104,9 @@ interface Participant {
   hotelId: string;
   hotelName: string | null;
   stadium: string | null;
+  bookingStartDate: string;
+  bookingEndDate: string;
+  bookingReference: string;
   travelPocName: string | null;
   travelPocMobile: string | null;
   venuePocName: string | null;
@@ -98,6 +120,10 @@ interface Hotel {
   location: string;
   district: string;
   availableRooms: number;
+  suggestedDates?: {
+    start: Date;
+    end: Date;
+  };
 }
 
 interface Coach {
@@ -116,6 +142,8 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showReasonField, setShowReasonField] = useState(false);
+  const [hotelSuggestion, setHotelSuggestion] = useState<string | null>(null);
+  const [dateSuggestion, setDateSuggestion] = useState<{ start: Date; end: Date } | null>(null);
 
   // Get schema based on role
   const getSchema = () => {
@@ -146,6 +174,9 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
         defaultValues.teamName = participant.teamName || "";
         defaultValues.coachId = participant.coachId || "";
         defaultValues.stadium = participant.stadium || "";
+        defaultValues.bookingStartDate = participant.bookingStartDate ? new Date(participant.bookingStartDate).toISOString().split('T')[0] : "";
+        defaultValues.bookingEndDate = participant.bookingEndDate ? new Date(participant.bookingEndDate).toISOString().split('T')[0] : "";
+        defaultValues.bookingReference = participant.bookingReference || "";
       } else if (participant.role === "coach") {
         defaultValues.discipline = participant.discipline || "";
         defaultValues.district = participant.district || "";
@@ -167,8 +198,12 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
     }
   }, [participant, form]);
 
-  // Watch hotel ID changes to show reason field
+  // Watch form values for smart hotel/date logic
+  const watchedStartDate = form.watch("bookingStartDate");
+  const watchedEndDate = form.watch("bookingEndDate");
   const watchedHotelId = form.watch("hotelId");
+
+  // Show reason field when hotel changes
   useEffect(() => {
     if (participant && watchedHotelId && watchedHotelId !== participant.hotelId) {
       setShowReasonField(true);
@@ -178,9 +213,70 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
     }
   }, [watchedHotelId, participant, form]);
 
-  // Get available hotels
-  const { data: availableHotels = [] } = useQuery({
-    queryKey: ["/api/admin/available-hotels"],
+  // Smart logic: Check for date/hotel conflicts and suggestions
+  useEffect(() => {
+    if (!participant || participant.role !== "player" || !watchedStartDate || !watchedEndDate) {
+      setHotelSuggestion(null);
+      setDateSuggestion(null);
+      return;
+    }
+
+    // Check if current hotel is available for selected dates
+    const currentHotel = availableHotels.find((hotel: any) => hotel.id === watchedHotelId);
+    
+    if (currentHotel && currentHotel.availableRooms === 0 && currentHotel.suggestedDates) {
+      // Hotel not available for selected dates, suggest alternative dates
+      setDateSuggestion(currentHotel.suggestedDates);
+      setHotelSuggestion(null);
+    } else if (watchedHotelId && !availableHotels.find((hotel: any) => hotel.id === watchedHotelId)) {
+      // Selected hotel not available at all for these dates
+      const alternativeHotel = availableHotels.find((hotel: any) => hotel.availableRooms > 0);
+      if (alternativeHotel) {
+        setHotelSuggestion(`Consider ${alternativeHotel.hotelName} - ${alternativeHotel.location} (${alternativeHotel.availableRooms} rooms available)`);
+      }
+      setDateSuggestion(null);
+    } else {
+      setHotelSuggestion(null);
+      setDateSuggestion(null);
+    }
+  }, [availableHotels, watchedHotelId, watchedStartDate, watchedEndDate, participant]);
+
+  // Auto-suggest when dates are changed and hotel becomes unavailable
+  useEffect(() => {
+    if (!participant || participant.role !== "player" || !watchedStartDate || !watchedEndDate) return;
+    
+    // If current hotel is not available for new dates, clear hotel selection
+    if (watchedHotelId && !availableHotels.find((hotel: any) => hotel.id === watchedHotelId && hotel.availableRooms > 0)) {
+      form.setValue("hotelId", "");
+    }
+  }, [watchedStartDate, watchedEndDate, availableHotels, watchedHotelId, form, participant]);
+
+  // Get available hotels based on selected dates
+  const { data: availableHotels = [], refetch: refetchHotels } = useQuery({
+    queryKey: ["/api/admin/available-hotels", watchedStartDate, watchedEndDate, participant?.id],
+    queryFn: async () => {
+      if (!watchedStartDate || !watchedEndDate) {
+        // No dates selected, get general available hotels
+        const response = await fetch("/api/admin/available-hotels", {
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error('Failed to fetch hotels');
+        return response.json();
+      }
+      
+      // Get hotels available for specific dates
+      const params = new URLSearchParams({
+        startDate: watchedStartDate,
+        endDate: watchedEndDate,
+        ...(participant?.id && { excludeParticipantId: participant.id })
+      });
+      
+      const response = await fetch(`/api/admin/available-hotels?${params}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch hotels');
+      return response.json();
+    },
     enabled: isOpen,
   });
 
@@ -342,6 +438,58 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="bookingStartDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Booking Start Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="date" 
+                            data-testid="input-booking-start-date" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bookingEndDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Booking End Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="date" 
+                            data-testid="input-booking-end-date" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="bookingReference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Booking Reference</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-booking-reference" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </>
             )}
 
@@ -479,12 +627,12 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-hotel">
-                        <SelectValue placeholder="Select hotel" />
+                        <SelectValue placeholder={participant.role === "player" && (!watchedStartDate || !watchedEndDate) ? "Select dates first" : "Select hotel"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Current hotel option */}
-                      {participant.hotelId && (
+                      {/* Current hotel option (only if available for dates) */}
+                      {participant.hotelId && availableHotels.find((hotel: any) => hotel.id === participant.hotelId && hotel.availableRooms > 0) && (
                         <SelectItem key={participant.hotelId} value={participant.hotelId}>
                           {participant.hotelName} (Current)
                         </SelectItem>
@@ -492,7 +640,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       
                       {/* Available hotels */}
                       {availableHotels
-                        .filter((hotel: any) => hotel.id !== participant.hotelId)
+                        .filter((hotel: any) => hotel.availableRooms > 0 && hotel.id !== participant.hotelId)
                         .map((hotel: any) => (
                           <SelectItem key={hotel.id} value={hotel.id}>
                             {hotel.hotelName} - {hotel.location} ({hotel.availableRooms} rooms available)
@@ -501,6 +649,31 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                  
+                  {/* Show suggestions */}
+                  {hotelSuggestion && (
+                    <div className="text-sm text-blue-600 mt-1">
+                      💡 {hotelSuggestion}
+                    </div>
+                  )}
+                  
+                  {dateSuggestion && (
+                    <div className="text-sm text-orange-600 mt-1">
+                      💡 Hotel available from {new Date(dateSuggestion.start).toLocaleDateString()} to {new Date(dateSuggestion.end).toLocaleDateString()}
+                      <Button 
+                        type="button" 
+                        variant="link" 
+                        size="sm"
+                        className="p-0 h-auto ml-2 text-orange-600"
+                        onClick={() => {
+                          form.setValue("bookingStartDate", new Date(dateSuggestion.start).toISOString().split('T')[0]);
+                          form.setValue("bookingEndDate", new Date(dateSuggestion.end).toISOString().split('T')[0]);
+                        }}
+                      >
+                        Use these dates
+                      </Button>
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
