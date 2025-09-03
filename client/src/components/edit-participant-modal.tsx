@@ -406,25 +406,27 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Coach</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger data-testid="select-coach">
-                            <SelectValue placeholder="Select coach" />
+                            <SelectValue placeholder={field.value ? 
+                              (coaches.find((coach: any) => coach.participantId === field.value)?.name || "Current coach") 
+                              : "Select coach"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {/* Current coach (if exists) */}
                           {participant.coachId && (
                             <SelectItem key={participant.coachId} value={participant.coachId}>
-                              {coaches.find((coach: Coach) => coach.coachId === participant.coachId)?.name || "Current Coach"} (Current)
+                              {coaches.find((coach: any) => coach.participantId === participant.coachId)?.name || "Current Coach"} (Current)
                             </SelectItem>
                           )}
                           
                           {/* Available coaches */}
                           {coaches
-                            .filter((coach: Coach) => coach.coachId !== participant.coachId)
-                            .map((coach: Coach) => (
-                              <SelectItem key={coach.coachId} value={coach.coachId}>
+                            .filter((coach: any) => coach.participantId !== participant.coachId)
+                            .map((coach: any) => (
+                              <SelectItem key={coach.participantId} value={coach.participantId}>
                                 {coach.name} ({coach.discipline})
                               </SelectItem>
                             ))}
@@ -635,10 +637,14 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hotel Assignment</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-hotel">
-                        <SelectValue placeholder={participant.role === "player" && (!watchedStartDate || !watchedEndDate) ? "Select dates first" : "Select hotel"} />
+                        <SelectValue placeholder={
+                          field.value ? 
+                            (participant.hotelName || "Current hotel") :
+                            (participant.role === "player" && (!watchedStartDate || !watchedEndDate) ? "Select dates first" : "Select hotel")
+                        } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
