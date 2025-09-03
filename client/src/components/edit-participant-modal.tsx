@@ -203,6 +203,35 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
   const watchedEndDate = form.watch("bookingEndDate");
   const watchedHotelId = form.watch("hotelId");
 
+  // Get available hotels based on selected dates
+  const { data: availableHotels = [], refetch: refetchHotels } = useQuery({
+    queryKey: ["/api/admin/available-hotels", watchedStartDate, watchedEndDate, participant?.id],
+    queryFn: async () => {
+      if (!watchedStartDate || !watchedEndDate) {
+        // No dates selected, get general available hotels
+        const response = await fetch("/api/admin/available-hotels", {
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error('Failed to fetch hotels');
+        return response.json();
+      }
+      
+      // Get hotels available for specific dates
+      const params = new URLSearchParams({
+        startDate: watchedStartDate,
+        endDate: watchedEndDate,
+        ...(participant?.id && { excludeParticipantId: participant.id })
+      });
+      
+      const response = await fetch(`/api/admin/available-hotels?${params}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch hotels');
+      return response.json();
+    },
+    enabled: isOpen,
+  });
+
   // Show reason field when hotel changes
   useEffect(() => {
     if (participant && watchedHotelId && watchedHotelId !== participant.hotelId) {
@@ -250,35 +279,6 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
       form.setValue("hotelId", "");
     }
   }, [watchedStartDate, watchedEndDate, availableHotels, watchedHotelId, form, participant]);
-
-  // Get available hotels based on selected dates
-  const { data: availableHotels = [], refetch: refetchHotels } = useQuery({
-    queryKey: ["/api/admin/available-hotels", watchedStartDate, watchedEndDate, participant?.id],
-    queryFn: async () => {
-      if (!watchedStartDate || !watchedEndDate) {
-        // No dates selected, get general available hotels
-        const response = await fetch("/api/admin/available-hotels", {
-          credentials: 'include',
-        });
-        if (!response.ok) throw new Error('Failed to fetch hotels');
-        return response.json();
-      }
-      
-      // Get hotels available for specific dates
-      const params = new URLSearchParams({
-        startDate: watchedStartDate,
-        endDate: watchedEndDate,
-        ...(participant?.id && { excludeParticipantId: participant.id })
-      });
-      
-      const response = await fetch(`/api/admin/available-hotels?${params}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch hotels');
-      return response.json();
-    },
-    enabled: isOpen,
-  });
 
   // Get coaches for player role
   const { data: coaches = [] } = useQuery({
