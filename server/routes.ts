@@ -1582,6 +1582,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new participant (Admin only)
+  app.post("/api/admin/participants", requireAdmin, async (req, res) => {
+    try {
+      const participantData = req.body;
+
+      // Validate required fields based on role
+      if (!participantData.role || !participantData.participantId || !participantData.name) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate hotel exists
+      const hotel = await storage.getHotelByHotelId(participantData.hotelId);
+      if (!hotel) {
+        return res.status(400).json({ message: `Hotel ${participantData.hotelId} not found` });
+      }
+
+      // For players, validate coach exists
+      if (participantData.role === 'player') {
+        if (!participantData.coachId) {
+          return res.status(400).json({ message: "Coach assignment is required for players" });
+        }
+        const coach = await storage.getParticipantByParticipantId(participantData.coachId);
+        if (!coach || coach.role !== 'coach') {
+          return res.status(400).json({ message: `Coach ${participantData.coachId} not found` });
+        }
+      }
+
+      // Validate 3-day minimum booking
+      const startDate = new Date(participantData.bookingStartDate);
+      const endDate = new Date(participantData.bookingEndDate);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      
+      if (daysDiff < 3) {
+        return res.status(400).json({ 
+          message: `Booking duration must be at least 3 days. Current: ${daysDiff} days` 
+        });
+      }
+
+      // Check if participant ID already exists
+      const existing = await storage.getParticipantByParticipantId(participantData.participantId);
+      if (existing) {
+        return res.status(400).json({ 
+          message: `Participant ID ${participantData.participantId} already exists` 
+        });
+      }
+
+      // Normalize mobile number
+      if (participantData.mobileNumber) {
+        participantData.mobileNumber = participantData.mobileNumber.startsWith('+91') 
+          ? participantData.mobileNumber 
+          : `+91${participantData.mobileNumber}`;
+      }
+
+      // Prepare participant data for insertion
+      const insertData = {
+        participantId: participantData.participantId,
+        name: participantData.name,
+        mobileNumber: participantData.mobileNumber || null,
+        role: participantData.role,
+        hotelId: participantData.hotelId,
+        bookingStartDate: startDate,
+        bookingEndDate: endDate,
+        bookingReference: participantData.bookingReference,
+        // Role-specific fields
+        ...(participantData.role !== 'player' && {
+          discipline: participantData.discipline,
+          location: participantData.location,
+          district: participantData.district,
+          stadium: participantData.stadium,
+          notifyTransport: participantData.notifyTransport,
+        }),
+        ...(participantData.role === 'coach' && {
+          travelPocName: participantData.travelPocName,
+          travelPocMobile: participantData.travelPocMobile,
+          venuePocName: participantData.venuePocName,
+          venuePocMobile: participantData.venuePocMobile,
+        }),
+        ...(participantData.role === 'player' && {
+          coachId: participantData.coachId,
+          teamName: participantData.teamName,
+        }),
+      };
+
+      const newParticipant = await storage.createParticipant(insertData);
+
+      // For coaches, create user account for login
+      if (participantData.role === 'coach' && participantData.mobileNumber) {
+        try {
+          await storage.createUser({
+            email: `${participantData.participantId}@ievolve.com`,
+            username: participantData.participantId,
+            role: 'coach',
+            participantId: participantData.participantId,
+            mobileNumber: participantData.mobileNumber,
+            isVerified: true
+          });
+        } catch (error) {
+          console.warn(`Failed to create user account for coach ${participantData.participantId}:`, error);
+        }
+      }
+
+      // Update hotel occupancy
+      await storage.updateHotelOccupancy(participantData.hotelId, '1');
+
+      // Create audit log
+      await storage.createAuditLog({
+        userId: req.session.user!.id,
+        actionType: "create",
+        targetEntity: "participant",
+        targetId: newParticipant.id,
+        details: { participantData }
+      });
+
+      res.status(201).json(newParticipant);
+    } catch (error) {
+      console.error("Error creating participant:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create participant" 
+      });
+    }
+  });
+
+  // Get all coaches (Admin only)
+  app.get("/api/admin/coaches", requireAdmin, async (req, res) => {
+    try {
+      const participants = await storage.getParticipants();
+      const coaches = participants
+        .filter(p => p.role === 'coach')
+        .map(coach => ({
+          participantId: coach.participantId,
+          name: coach.name,
+          discipline: coach.discipline,
+          district: coach.district,
+          location: coach.location,
+          teamName: coach.teamName,
+          mobileNumber: coach.mobileNumber,
+          hotelId: coach.hotelId
+        }));
+      
+      res.json(coaches);
+    } catch (error) {
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to get coaches" 
+      });
+    }
+  });
+
   // Export data (Admin only)
   app.get("/api/admin/export/participants", requireAdmin, async (req, res) => {
     try {

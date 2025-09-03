@@ -23,6 +23,7 @@ import RecalculateOccupancy from "@/components/recalculate-occupancy";
 import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
 import { AdminNotificationsList } from "@/components/admin-notifications-list";
 import TimeWindowSettings from "@/components/time-window-settings";
+import { AddParticipantModal } from "@/components/add-participant-modal";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -30,6 +31,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [addHotelModalOpen, setAddHotelModalOpen] = useState(false);
+  const [addParticipantModalOpen, setAddParticipantModalOpen] = useState(false);
   const [hotelAddMode, setHotelAddMode] = useState<"new" | "instance">("new");
   const [uploadType, setUploadType] = useState<"hotel_inventory" | "coaches_officials" | "players" | "">("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -480,6 +482,26 @@ export default function AdminDashboard() {
 
             {/* Participants Management */}
             <div className="mb-8">
+              <div className="md:flex md:items-center md:justify-between mb-6">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
+                    Participant Management
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
+                    Manage coaches, officials, and players
+                  </p>
+                </div>
+                <div className="mt-4 flex md:mt-0 md:ml-4">
+                  <Button
+                    onClick={() => setAddParticipantModalOpen(true)}
+                    className="flex items-center space-x-2"
+                    data-testid="button-add-participant"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Participant</span>
+                  </Button>
+                </div>
+              </div>
               <ParticipantTable isAdmin={true} />
             </div>
           </>
@@ -809,6 +831,12 @@ export default function AdminDashboard() {
         onOpenChange={setAddHotelModalOpen}
         mode={hotelAddMode}
         onModeChange={setHotelAddMode}
+      />
+
+      {/* Add Participant Modal */}
+      <AddParticipantModal
+        isOpen={addParticipantModalOpen}
+        onClose={() => setAddParticipantModalOpen(false)}
       />
     </div>
   );
