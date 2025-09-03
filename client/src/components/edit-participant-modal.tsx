@@ -728,23 +728,8 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       {/* Available hotels with date ranges */}
                       {availableHotels
                         .filter((hotel: any) => {
-                          // Filter hotels based on selected booking dates
-                          if (!watchedStartDate || !watchedEndDate) {
-                            // If no dates selected, show all available hotels except current
-                            return hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId;
-                          }
-                          
-                          // Convert DD/MM/YYYY to Date objects for comparison
-                          const startDate = new Date(watchedStartDate.split('/').reverse().join('-'));
-                          const endDate = new Date(watchedEndDate.split('/').reverse().join('-'));
-                          const hotelStartDate = new Date(hotel.startDate);
-                          const hotelEndDate = new Date(hotel.endDate);
-                          
-                          // Hotel must be available for entire booking period and have rooms
-                          return hotel.availableRooms > 0 && 
-                                 hotel.hotelId !== participant.hotelId &&
-                                 hotelStartDate <= startDate && 
-                                 hotelEndDate >= endDate;
+                          // Always show available hotels (we'll let the backend handle date filtering)
+                          return hotel.availableRooms > 0 && hotel.hotelId !== participant.hotelId;
                         })
                         .map((hotel: any) => {
                           const formatDate = (dateStr: string) => {
