@@ -67,7 +67,7 @@ export const participants = pgTable("participants", {
   teamName: text("team_name"),
   coachId: text("coach_id"), // For players, references coach
   hotelId: text("hotel_id").notNull(),
-  // hotelName removed - players get this from their coach's hotel assignment
+  hotelName: text("hotel_name").notNull(), // Auto-populated from hotel lookup
   stadium: text("stadium"),
   bookingStartDate: timestamp("booking_start_date").notNull(),
   bookingEndDate: timestamp("booking_end_date").notNull(),

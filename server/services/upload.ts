@@ -317,6 +317,7 @@ export class UploadService {
             district: data.DISTRICT,
             location: data.LOCATION,
             hotelId: data.HOTEL_ID,
+            hotelName: hotel.hotelName, // Auto-populate from hotel lookup
             stadium: data.STADIUM,
             bookingStartDate: startDate,
             bookingEndDate: endDate,
@@ -414,6 +415,7 @@ export class UploadService {
             teamName: data.TEAM_NAME,
             coachId: data.COACH_ID,
             hotelId: data.HOTEL_ID,
+            hotelName: hotel.hotelName, // Auto-populate from hotel lookup
             bookingStartDate: startDate,
             bookingEndDate: endDate,
             bookingReference: data.BOOKING_REFERENCE,
