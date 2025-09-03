@@ -884,7 +884,7 @@ export class DatabaseStorage implements IStorage {
         currentParticipants: sql<number>`COALESCE(COUNT(${participants.id}), 0)`.as('currentParticipants'),
       })
       .from(hotels)
-      .leftJoin(participants, eq(participants.hotelId, hotels.id))
+      .leftJoin(participants, eq(participants.hotelId, hotels.hotelId))
       .groupBy(hotels.id)
       .orderBy(hotels.hotelName);
 
@@ -936,7 +936,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(hotels)
       .leftJoin(participants, and(
-        eq(participants.hotelId, hotels.id),
+        eq(participants.hotelId, hotels.hotelId),
         // Only count participants whose booking dates overlap with the requested dates
         lte(participants.bookingStartDate, endDate),
         gte(participants.bookingEndDate, startDate)
