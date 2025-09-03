@@ -902,10 +902,8 @@ export class DatabaseStorage implements IStorage {
         availableRooms: actualAvailableRooms,
       };
     }).filter(hotel => {
-      // Only return hotels that are currently active and have available rooms
-      const now = new Date();
-      const isActive = now >= hotel.startDate && now <= hotel.endDate;
-      return isActive && hotel.availableRooms > 0;
+      // Only return hotels that have available rooms (remove strict date filtering for general availability)
+      return hotel.availableRooms > 0;
     });
   }
 
@@ -942,9 +940,9 @@ export class DatabaseStorage implements IStorage {
         gte(participants.bookingEndDate, startDate)
       ))
       .where(and(
-        // Hotel must be available for the entire requested period
-        lte(hotels.startDate, startDate),
-        gte(hotels.endDate, endDate)
+        // Hotel availability period must overlap with requested dates
+        lte(hotels.startDate, endDate),
+        gte(hotels.endDate, startDate)
       ))
       .groupBy(hotels.id)
       .orderBy(hotels.hotelName);
