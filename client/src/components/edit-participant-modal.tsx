@@ -173,7 +173,6 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
       if (participant.role === "player") {
         defaultValues.teamName = participant.teamName || "";
         defaultValues.coachId = participant.coachId || "";
-        defaultValues.stadium = participant.stadium || "";
         defaultValues.bookingStartDate = participant.bookingStartDate ? new Date(participant.bookingStartDate).toISOString().split('T')[0] : "";
         defaultValues.bookingEndDate = participant.bookingEndDate ? new Date(participant.bookingEndDate).toISOString().split('T')[0] : "";
         defaultValues.bookingReference = participant.bookingReference || "";
@@ -409,9 +408,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger data-testid="select-coach">
-                            <SelectValue placeholder={field.value ? 
-                              (coaches.find((coach: any) => coach.participantId === field.value)?.name || "Current coach") 
-                              : "Select coach"} />
+                            <SelectValue placeholder="Select coach" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -640,11 +637,7 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-hotel">
-                        <SelectValue placeholder={
-                          field.value ? 
-                            (participant.hotelName || "Current hotel") :
-                            (participant.role === "player" && (!watchedStartDate || !watchedEndDate) ? "Select dates first" : "Select hotel")
-                        } />
+                        <SelectValue placeholder={participant.role === "player" && (!watchedStartDate || !watchedEndDate) ? "Select dates first" : "Select hotel"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
