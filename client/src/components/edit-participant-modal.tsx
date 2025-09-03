@@ -413,11 +413,21 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {coaches.map((coach: Coach) => (
-                            <SelectItem key={coach.coachId} value={coach.coachId}>
-                              {coach.name} ({coach.discipline})
+                          {/* Current coach (if exists) */}
+                          {participant.coachId && (
+                            <SelectItem key={participant.coachId} value={participant.coachId}>
+                              {coaches.find((coach: Coach) => coach.coachId === participant.coachId)?.name || "Current Coach"} (Current)
                             </SelectItem>
-                          ))}
+                          )}
+                          
+                          {/* Available coaches */}
+                          {coaches
+                            .filter((coach: Coach) => coach.coachId !== participant.coachId)
+                            .map((coach: Coach) => (
+                              <SelectItem key={coach.coachId} value={coach.coachId}>
+                                {coach.name} ({coach.discipline})
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -425,19 +435,6 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="stadium"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stadium/Venue</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-stadium" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -550,6 +547,20 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="stadium"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stadium/Venue</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-stadium" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </>
             )}
 
@@ -631,10 +642,13 @@ export function EditParticipantModal({ participant, isOpen, onClose }: EditParti
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Current hotel option (only if available for dates) */}
-                      {participant.hotelId && availableHotels.find((hotel: any) => hotel.id === participant.hotelId && hotel.availableRooms > 0) && (
+                      {/* Current hotel - always show if assigned */}
+                      {participant.hotelId && (
                         <SelectItem key={participant.hotelId} value={participant.hotelId}>
-                          {participant.hotelName} (Current)
+                          {participant.hotelName || "Current Hotel"} (Current)
+                          {availableHotels.find((hotel: any) => hotel.id === participant.hotelId) 
+                            ? ` - ${availableHotels.find((hotel: any) => hotel.id === participant.hotelId)?.availableRooms} available`
+                            : " - Not available for these dates"}
                         </SelectItem>
                       )}
                       
