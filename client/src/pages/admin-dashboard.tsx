@@ -19,7 +19,6 @@ import HotelTable from "@/components/hotel-table";
 import CheckoutBoard from "@/components/checkout-board";
 import CheckinBoard from "@/components/checkin-board";
 import AddHotelModal from "@/components/add-hotel-modal";
-import RecalculateOccupancy from "@/components/recalculate-occupancy";
 import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
 import { AdminNotificationsList } from "@/components/admin-notifications-list";
 import TimeWindowSettings from "@/components/time-window-settings";
@@ -539,11 +538,6 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Dynamic Occupancy Control */}
-            <div className="mb-8">
-              <RecalculateOccupancy />
-            </div>
 
             {/* Hotel Management Overview */}
             <HotelTable />
