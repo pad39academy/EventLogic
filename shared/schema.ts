@@ -14,6 +14,25 @@ export const notificationStatusEnum = pgEnum("notification_status", ["unread", "
 export const notificationTypeEnum = pgEnum("notification_type", ["match_lost", "early_checkout", "custom", "general"]);
 export const audienceTypeEnum = pgEnum("audience_type", ["coaches_only", "all_participants", "discipline_specific"]);
 
+// Event-driven architecture enums
+export const eventTypeEnum = pgEnum("event_type", [
+  // Booking events
+  "booking_created", "booking_updated", "booking_cancelled",
+  // Hotel occupancy events
+  "hotel_occupancy_changed", "hotel_capacity_updated",
+  // Participant events
+  "participant_registered", "participant_updated", "participant_deleted",
+  "participant_checked_in", "participant_checked_out",
+  // Admin events
+  "bulk_upload_completed", "hotel_verification_completed",
+  // Notification events
+  "notification_sent", "otp_generated",
+  // System events
+  "audit_logged", "background_job_executed"
+]);
+
+export const eventStatusEnum = pgEnum("event_status", ["pending", "processed", "failed", "retrying"]);
+
 // Users table (Admins and Coaches)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -140,6 +159,65 @@ export const settings = pgTable("settings", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Event Store table for event-driven architecture
+export const eventStore = pgTable("event_store", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: eventTypeEnum("event_type").notNull(),
+  aggregateId: text("aggregate_id").notNull(), // The ID of the entity this event affects
+  aggregateType: text("aggregate_type").notNull(), // participant, hotel, user, etc.
+  eventData: jsonb("event_data").notNull(), // The full event payload
+  metadata: jsonb("metadata").default({}), // Additional context (user_id, correlation_id, etc.)
+  eventVersion: integer("event_version").notNull().default(1), // For event schema evolution
+  status: eventStatusEnum("status").default("pending"),
+  processedAt: timestamp("processed_at"),
+  failedAt: timestamp("failed_at"),
+  retryCount: integer("retry_count").default(0),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  eventTypeIdx: index("event_store_event_type_idx").on(table.eventType),
+  aggregateIdx: index("event_store_aggregate_idx").on(table.aggregateId, table.aggregateType),
+  statusIdx: index("event_store_status_idx").on(table.status),
+  createdAtIdx: index("event_store_created_at_idx").on(table.createdAt),
+}));
+
+// Event Handlers Tracking table
+export const eventHandlers = pgTable("event_handlers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => eventStore.id),
+  handlerName: text("handler_name").notNull(), // occupancy_calculator, notification_sender, etc.
+  status: eventStatusEnum("status").default("pending"),
+  processedAt: timestamp("processed_at"),
+  failedAt: timestamp("failed_at"),
+  retryCount: integer("retry_count").default(0),
+  errorMessage: text("error_message"),
+  result: jsonb("result"), // Handler execution result
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  eventHandlerIdx: index("event_handlers_event_idx").on(table.eventId),
+  handlerStatusIdx: index("event_handlers_status_idx").on(table.handlerName, table.status),
+}));
+
+// Hotel Occupancy Balance table for event-driven occupancy tracking
+export const hotelOccupancyBalance = pgTable("hotel_occupancy_balance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hotelId: text("hotel_id").notNull(),
+  instanceCode: text("instance_code").notNull(),
+  date: timestamp("date").notNull(), // Date for which this occupancy applies
+  totalRooms: integer("total_rooms").notNull(),
+  playersCount: integer("players_count").default(0),
+  coachesCount: integer("coaches_count").default(0),
+  officialsCount: integer("officials_count").default(0),
+  calculatedOccupiedRooms: integer("calculated_occupied_rooms").default(0), // Calculated from business rules
+  availableRooms: integer("available_rooms").default(0),
+  lastEventId: varchar("last_event_id"), // Reference to the last event that updated this balance
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  hotelDateIdx: index("hotel_occupancy_hotel_date_idx").on(table.hotelId, table.instanceCode, table.date),
+  uniqueHotelDateIdx: index("unique_hotel_date_idx").on(table.hotelId, table.instanceCode, table.date),
+}));
 
 // Audit log table
 export const auditLog = pgTable("audit_log", {
@@ -408,6 +486,31 @@ export type UpdateNotification = z.infer<typeof updateNotificationSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type HotelVerificationRequest = z.infer<typeof hotelVerificationSchema>;
+
+// Event Store schemas
+export const insertEventStoreSchema = createInsertSchema(eventStore).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEventHandlerSchema = createInsertSchema(eventHandlers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHotelOccupancyBalanceSchema = createInsertSchema(hotelOccupancyBalance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Event Store types
+export type EventStore = typeof eventStore.$inferSelect;
+export type InsertEventStore = z.infer<typeof insertEventStoreSchema>;
+export type EventHandler = typeof eventHandlers.$inferSelect;
+export type InsertEventHandler = z.infer<typeof insertEventHandlerSchema>;
+export type HotelOccupancyBalance = typeof hotelOccupancyBalance.$inferSelect;
+export type InsertHotelOccupancyBalance = z.infer<typeof insertHotelOccupancyBalanceSchema>;
 
 // Additional schemas for API validation
 export const loginSchema = z.object({

@@ -1,9 +1,11 @@
 import { 
   users, hotels, participants, reassignments, auditLog, notifications,
+  eventStore, eventHandlers, hotelOccupancyBalance,
   type User, type InsertUser, type Hotel, type InsertHotel, type UpdateHotel,
   type Participant, type InsertParticipant, type Reassignment, 
   type InsertReassignment, type AuditLog, type InsertAuditLog,
   type Notification, type InsertNotification, type UpdateNotification,
+  type EventStore, type InsertEventStore, type HotelOccupancyBalance,
   calculateHotelStatus, type HotelWithStatus
 } from "@shared/schema";
 import { db } from "./db";
@@ -63,6 +65,12 @@ export interface IStorage {
 
   // Dashboard statistics
   getDashboardStats(): Promise<DashboardStats>;
+
+  // Event-driven architecture methods
+  getParticipantsByHotelAndDate(hotelId: string, date: Date): Promise<Participant[]>;
+  createEvent(event: InsertEventStore): Promise<EventStore>;
+  getEventsByAggregateId(aggregateId: string): Promise<EventStore[]>;
+  getHotelOccupancyBalanceByDate(hotelId: string, instanceCode: string, startDate: Date, endDate: Date): Promise<HotelOccupancyBalance[]>;
 }
 
 export interface ParticipantFilters {
@@ -991,6 +999,46 @@ export class DatabaseStorage implements IStorage {
     }));
 
     return hotelsWithSuggestions;
+  }
+
+  // Event-driven architecture methods
+  async getParticipantsByHotelAndDate(hotelId: string, date: Date): Promise<Participant[]> {
+    return await db.select()
+      .from(participants)
+      .where(and(
+        eq(participants.hotelId, hotelId),
+        lte(participants.bookingStartDate, date),
+        gte(participants.bookingEndDate, date)
+      ));
+  }
+
+  async createEvent(event: InsertEventStore): Promise<EventStore> {
+    const [createdEvent] = await db.insert(eventStore).values(event).returning();
+    return createdEvent;
+  }
+
+  async getEventsByAggregateId(aggregateId: string): Promise<EventStore[]> {
+    return await db.select()
+      .from(eventStore)
+      .where(eq(eventStore.aggregateId, aggregateId))
+      .orderBy(desc(eventStore.createdAt));
+  }
+
+  async getHotelOccupancyBalanceByDate(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate: Date, 
+    endDate: Date
+  ): Promise<HotelOccupancyBalance[]> {
+    return await db.select()
+      .from(hotelOccupancyBalance)
+      .where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode),
+        gte(hotelOccupancyBalance.date, startDate),
+        lte(hotelOccupancyBalance.date, endDate)
+      ))
+      .orderBy(desc(hotelOccupancyBalance.date));
   }
 }
 

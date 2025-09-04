@@ -1,23 +1,23 @@
 /**
  * Background Jobs Service
  * Handles periodic tasks like hotel occupancy updates to improve dashboard performance
+ * Enhanced with event-driven processing capabilities
  */
 
-import type { DatabaseStorage } from "./storage.js";
+import { storage } from "../storage";
+import { EventService } from "./event";
 
 export class BackgroundJobsService {
-  private storage: DatabaseStorage;
   private intervalId: NodeJS.Timeout | null = null;
+  private eventProcessorInterval: NodeJS.Timeout | null = null;
   private readonly UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutes
+  private readonly EVENT_PROCESSING_INTERVAL = 30 * 1000; // 30 seconds for event processing
   private isRunning = false;
 
-  constructor(storage: DatabaseStorage) {
-    this.storage = storage;
-  }
-
   /**
-   * Start background job for periodic hotel occupancy updates
+   * Start background jobs for periodic hotel occupancy updates and event processing
    * This reduces the load on dashboard requests by pre-calculating occupancy
+   * and ensures all events are processed reliably
    */
   start(): void {
     if (this.isRunning) {
@@ -34,9 +34,16 @@ export class BackgroundJobsService {
     this.intervalId = setInterval(() => {
       this.updateHotelOccupancyJob();
     }, this.UPDATE_INTERVAL);
+
+    // Schedule event processing
+    this.eventProcessorInterval = setInterval(() => {
+      this.processEventsJob();
+    }, this.EVENT_PROCESSING_INTERVAL);
     
     this.isRunning = true;
-    console.log(`✅ Background jobs started (updating every ${this.UPDATE_INTERVAL / 60000} minutes)`)
+    console.log(`✅ Background jobs started:`);
+    console.log(`   - Hotel occupancy updates every ${this.UPDATE_INTERVAL / 60000} minutes`);
+    console.log(`   - Event processing every ${this.EVENT_PROCESSING_INTERVAL / 1000} seconds`);
   }
 
   /**
@@ -46,6 +53,10 @@ export class BackgroundJobsService {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.eventProcessorInterval) {
+      clearInterval(this.eventProcessorInterval);
+      this.eventProcessorInterval = null;
     }
     this.isRunning = false;
     console.log("🛑 Background jobs stopped");
@@ -70,6 +81,14 @@ export class BackgroundJobsService {
   }
 
   /**
+   * Manual trigger for event processing
+   */
+  async triggerEventProcessing(): Promise<void> {
+    console.log("🔄 Manual trigger: Processing events...");
+    await this.processEventsJob();
+  }
+
+  /**
    * Background job to update dashboard statistics views
    */
   private async updateHotelOccupancyJob(): Promise<void> {
@@ -78,10 +97,19 @@ export class BackgroundJobsService {
       const startTime = Date.now();
       
       // Update hotel occupancy data first
-      await this.storage.updateAllHotelOccupancy();
+      await storage.updateAllHotelOccupancy();
       
-      // Update job execution tracking
-      await this.storage.updateJobExecution('dashboard_stats_aggregation', Date.now() - startTime, 'success');
+      // Publish background job completed event
+      await EventService.publishEvent(
+        'background_job_executed',
+        'dashboard_stats_aggregation',
+        'system',
+        {
+          jobName: 'dashboard_stats_aggregation',
+          duration: Date.now() - startTime,
+          status: 'success'
+        }
+      );
       
       const duration = Date.now() - startTime;
       console.log(`✅ [Background] Dashboard stats updated in ${duration}ms`);
@@ -89,8 +117,40 @@ export class BackgroundJobsService {
     } catch (error) {
       console.error("❌ [Background] Dashboard stats update failed:", error);
       
-      // Record failure in tracking table
-      await this.storage.updateJobExecution('dashboard_stats_aggregation', 0, 'error', (error as Error).message || 'Unknown error');
+      // Publish failure event
+      await EventService.publishEvent(
+        'background_job_executed',
+        'dashboard_stats_aggregation',
+        'system',
+        {
+          jobName: 'dashboard_stats_aggregation',
+          duration: 0,
+          status: 'error',
+          error: (error as Error).message || 'Unknown error'
+        }
+      );
+    }
+  }
+
+  /**
+   * Background job to process pending events
+   */
+  private async processEventsJob(): Promise<void> {
+    try {
+      console.log("📧 [Background] Processing pending events...");
+      const startTime = Date.now();
+      
+      // Process up to 50 pending events per cycle
+      await EventService.processPendingEvents(50);
+      
+      // Retry failed events (up to 3 retries, max 5 events per cycle)
+      await EventService.retryFailedEvents(3, 5);
+      
+      const duration = Date.now() - startTime;
+      console.log(`✅ [Background] Event processing completed in ${duration}ms`);
+      
+    } catch (error) {
+      console.error("❌ [Background] Event processing failed:", error);
     }
   }
 }
@@ -98,9 +158,9 @@ export class BackgroundJobsService {
 // Singleton instance
 let backgroundJobsService: BackgroundJobsService | null = null;
 
-export function createBackgroundJobsService(storage: DatabaseStorage): BackgroundJobsService {
+export function createBackgroundJobsService(): BackgroundJobsService {
   if (!backgroundJobsService) {
-    backgroundJobsService = new BackgroundJobsService(storage);
+    backgroundJobsService = new BackgroundJobsService();
   }
   return backgroundJobsService;
 }

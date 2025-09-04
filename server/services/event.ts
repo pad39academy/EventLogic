@@ -1,0 +1,483 @@
+import { db } from "../db";
+import { storage } from "../storage";
+import { 
+  eventStore, eventHandlers, hotelOccupancyBalance,
+  type InsertEventStore, type InsertEventHandler, type EventStore,
+  type InsertHotelOccupancyBalance, type HotelOccupancyBalance
+} from "@shared/schema";
+import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+
+// Event data type definitions
+export interface BookingCreatedEvent {
+  participantId: string;
+  role: 'coach' | 'official' | 'player';
+  hotelId: string;
+  instanceCode: string;
+  bookingStartDate: string;
+  bookingEndDate: string;
+  teamName?: string;
+  coachId?: string;
+}
+
+export interface HotelOccupancyChangedEvent {
+  hotelId: string;
+  instanceCode: string;
+  date: string;
+  previousOccupancy: {
+    playersCount: number;
+    coachesCount: number;
+    officialsCount: number;
+    calculatedOccupiedRooms: number;
+  };
+  newOccupancy: {
+    playersCount: number;
+    coachesCount: number;
+    officialsCount: number;
+    calculatedOccupiedRooms: number;
+  };
+  totalRooms: number;
+}
+
+export interface ParticipantRegisteredEvent {
+  participantId: string;
+  name: string;
+  role: 'coach' | 'official' | 'player';
+  hotelId: string;
+  instanceCode: string;
+  bookingStartDate: string;
+  bookingEndDate: string;
+  discipline?: string;
+  district?: string;
+  teamName?: string;
+  coachId?: string;
+}
+
+export class EventService {
+  
+  /**
+   * Publish an event to the event store
+   */
+  static async publishEvent(
+    eventType: string,
+    aggregateId: string,
+    aggregateType: string,
+    eventData: any,
+    metadata: any = {}
+  ): Promise<EventStore> {
+    const insertEvent: InsertEventStore = {
+      eventType: eventType as any,
+      aggregateId,
+      aggregateType,
+      eventData,
+      metadata: {
+        ...metadata,
+        timestamp: new Date().toISOString(),
+        correlationId: metadata.correlationId || this.generateCorrelationId(),
+      },
+      status: "pending",
+    };
+
+    const [event] = await db.insert(eventStore).values(insertEvent).returning();
+    console.log(`📧 Event published: ${eventType} for ${aggregateType}:${aggregateId}`);
+
+    // Process event immediately (you could also queue this for background processing)
+    await this.processEvent(event.id);
+
+    return event;
+  }
+
+  /**
+   * Process a single event by running all registered handlers
+   */
+  static async processEvent(eventId: string): Promise<void> {
+    const [event] = await db.select().from(eventStore).where(eq(eventStore.id, eventId));
+    
+    if (!event || event.status !== 'pending') {
+      return;
+    }
+
+    console.log(`🔄 Processing event: ${event.eventType} (${eventId})`);
+
+    try {
+      // Get registered handlers for this event type
+      const handlers = this.getEventHandlers(event.eventType);
+
+      // Execute each handler
+      for (const handlerName of handlers) {
+        await this.executeHandler(event, handlerName);
+      }
+
+      // Mark event as processed
+      await db.update(eventStore)
+        .set({ 
+          status: 'processed', 
+          processedAt: new Date() 
+        })
+        .where(eq(eventStore.id, eventId));
+
+      console.log(`✅ Event processed successfully: ${event.eventType} (${eventId})`);
+
+    } catch (error) {
+      console.error(`❌ Event processing failed: ${event.eventType} (${eventId})`, error);
+      
+      // Mark event as failed
+      await db.update(eventStore)
+        .set({ 
+          status: 'failed', 
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+        .where(eq(eventStore.id, eventId));
+    }
+  }
+
+  /**
+   * Execute a specific event handler
+   */
+  static async executeHandler(event: EventStore, handlerName: string): Promise<void> {
+    // Track handler execution
+    const insertHandler: InsertEventHandler = {
+      eventId: event.id,
+      handlerName,
+      status: 'pending',
+    };
+
+    const [handlerRecord] = await db.insert(eventHandlers).values(insertHandler).returning();
+
+    try {
+      let result: any = null;
+
+      // Execute the appropriate handler based on event type and handler name
+      switch (handlerName) {
+        case 'occupancy_calculator':
+          result = await this.handleOccupancyCalculation(event);
+          break;
+        case 'notification_sender':
+          result = await this.handleNotificationSending(event);
+          break;
+        case 'audit_logger':
+          result = await this.handleAuditLogging(event);
+          break;
+        default:
+          throw new Error(`Unknown handler: ${handlerName}`);
+      }
+
+      // Mark handler as processed
+      await db.update(eventHandlers)
+        .set({ 
+          status: 'processed', 
+          processedAt: new Date(),
+          result: result || {}
+        })
+        .where(eq(eventHandlers.id, handlerRecord.id));
+
+    } catch (error) {
+      console.error(`Handler ${handlerName} failed for event ${event.id}:`, error);
+      
+      // Mark handler as failed
+      await db.update(eventHandlers)
+        .set({ 
+          status: 'failed', 
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+        .where(eq(eventHandlers.id, handlerRecord.id));
+
+      throw error; // Re-throw to fail the entire event processing
+    }
+  }
+
+  /**
+   * Handle hotel occupancy calculation events
+   */
+  static async handleOccupancyCalculation(event: EventStore): Promise<any> {
+    console.log(`🏨 Processing occupancy calculation for event: ${event.eventType}`);
+
+    if (event.eventType === 'booking_created' || event.eventType === 'participant_registered') {
+      const eventData = event.eventData as BookingCreatedEvent | ParticipantRegisteredEvent;
+      await this.updateHotelOccupancyBalance(
+        eventData.hotelId, 
+        eventData.instanceCode, 
+        new Date(eventData.bookingStartDate),
+        new Date(eventData.bookingEndDate),
+        event.id
+      );
+      
+      return { message: 'Occupancy balance updated successfully' };
+    }
+
+    if (event.eventType === 'participant_deleted') {
+      const eventData = event.eventData as any;
+      await this.recalculateHotelOccupancy(eventData.hotelId, eventData.instanceCode, event.id);
+      
+      return { message: 'Occupancy recalculated after participant deletion' };
+    }
+
+    return { message: 'No occupancy calculation needed for this event type' };
+  }
+
+  /**
+   * Update hotel occupancy balance for date ranges
+   */
+  static async updateHotelOccupancyBalance(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate: Date, 
+    endDate: Date,
+    eventId: string
+  ): Promise<void> {
+    const hotel = await storage.getHotelByHotelIdAndInstance(hotelId, instanceCode);
+    if (!hotel) {
+      throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
+    }
+
+    // Create date range for occupancy updates
+    const dates = this.generateDateRange(startDate, endDate);
+    
+    for (const date of dates) {
+      await this.updateSingleDateOccupancy(hotelId, instanceCode, date, hotel.totalRooms, eventId);
+    }
+  }
+
+  /**
+   * Update occupancy for a single date
+   */
+  static async updateSingleDateOccupancy(
+    hotelId: string, 
+    instanceCode: string, 
+    date: Date, 
+    totalRooms: number,
+    eventId: string
+  ): Promise<void> {
+    // Get current participants for this hotel and date
+    const participants = await storage.getParticipantsByHotelAndDate(hotelId, date);
+    
+    // Calculate occupancy by role
+    const playersCount = participants.filter(p => p.role === 'player').length;
+    const coachesCount = participants.filter(p => p.role === 'coach').length;
+    const officialsCount = participants.filter(p => p.role === 'official').length;
+
+    // Apply business rules: 3 players per room, 2 coaches per room, 1 official per room
+    const roomsForPlayers = Math.ceil(playersCount / 3);
+    const roomsForCoaches = Math.ceil(coachesCount / 2);
+    const roomsForOfficials = officialsCount;
+    
+    const calculatedOccupiedRooms = roomsForPlayers + roomsForCoaches + roomsForOfficials;
+    const availableRooms = Math.max(0, totalRooms - calculatedOccupiedRooms);
+
+    // Check if balance record exists for this date
+    const [existingBalance] = await db.select()
+      .from(hotelOccupancyBalance)
+      .where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode),
+        eq(hotelOccupancyBalance.date, date)
+      ));
+
+    const balanceData = {
+      hotelId,
+      instanceCode,
+      date,
+      totalRooms,
+      playersCount,
+      coachesCount,
+      officialsCount,
+      calculatedOccupiedRooms,
+      availableRooms,
+      lastEventId: eventId,
+      updatedAt: new Date(),
+    };
+
+    if (existingBalance) {
+      // Update existing balance
+      await db.update(hotelOccupancyBalance)
+        .set(balanceData)
+        .where(eq(hotelOccupancyBalance.id, existingBalance.id));
+    } else {
+      // Create new balance record
+      await db.insert(hotelOccupancyBalance).values({
+        ...balanceData,
+        createdAt: new Date(),
+      } as InsertHotelOccupancyBalance);
+    }
+
+    console.log(`📊 Updated occupancy for ${hotelId}-${instanceCode} on ${date.toDateString()}: ${calculatedOccupiedRooms}/${totalRooms} rooms occupied`);
+  }
+
+  /**
+   * Handle notification sending events
+   */
+  static async handleNotificationSending(event: EventStore): Promise<any> {
+    // Implement notification logic based on event type
+    console.log(`📱 Processing notification for event: ${event.eventType}`);
+    
+    // This would integrate with your existing notification service
+    return { message: 'Notification sent successfully' };
+  }
+
+  /**
+   * Handle audit logging events
+   */
+  static async handleAuditLogging(event: EventStore): Promise<any> {
+    console.log(`📝 Processing audit log for event: ${event.eventType}`);
+    
+    // Create audit log entry
+    await storage.createAuditLog({
+      userId: event.metadata.userId || 'system',
+      actionType: event.eventType,
+      targetEntity: event.aggregateType,
+      targetId: event.aggregateId,
+      details: {
+        eventId: event.id,
+        eventData: event.eventData,
+        metadata: event.metadata
+      }
+    });
+
+    return { message: 'Audit log created successfully' };
+  }
+
+  /**
+   * Get registered handlers for an event type
+   */
+  static getEventHandlers(eventType: string): string[] {
+    const handlerMap: Record<string, string[]> = {
+      'booking_created': ['occupancy_calculator', 'audit_logger'],
+      'booking_updated': ['occupancy_calculator', 'audit_logger'],
+      'booking_cancelled': ['occupancy_calculator', 'notification_sender', 'audit_logger'],
+      'participant_registered': ['occupancy_calculator', 'audit_logger'],
+      'participant_updated': ['occupancy_calculator', 'audit_logger'],
+      'participant_deleted': ['occupancy_calculator', 'audit_logger'],
+      'participant_checked_in': ['notification_sender', 'audit_logger'],
+      'participant_checked_out': ['notification_sender', 'audit_logger'],
+      'hotel_occupancy_changed': ['notification_sender', 'audit_logger'],
+      'bulk_upload_completed': ['audit_logger'],
+    };
+
+    return handlerMap[eventType] || [];
+  }
+
+  /**
+   * Generate date range between two dates
+   */
+  static generateDateRange(startDate: Date, endDate: Date): Date[] {
+    const dates: Date[] = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      dates.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return dates;
+  }
+
+  /**
+   * Recalculate occupancy for entire hotel
+   */
+  static async recalculateHotelOccupancy(hotelId: string, instanceCode: string, eventId: string): Promise<void> {
+    const hotel = await storage.getHotelByHotelIdAndInstance(hotelId, instanceCode);
+    if (!hotel) return;
+
+    // Get all occupancy balance records for this hotel
+    const balanceRecords = await db.select()
+      .from(hotelOccupancyBalance)
+      .where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode)
+      ));
+
+    // Recalculate each date
+    for (const balance of balanceRecords) {
+      await this.updateSingleDateOccupancy(hotelId, instanceCode, balance.date, hotel.totalRooms, eventId);
+    }
+  }
+
+  /**
+   * Generate correlation ID for event tracking
+   */
+  static generateCorrelationId(): string {
+    return `corr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Get occupancy balance for a specific hotel and date range
+   */
+  static async getOccupancyBalance(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate?: Date, 
+    endDate?: Date
+  ): Promise<HotelOccupancyBalance[]> {
+    let query = db.select()
+      .from(hotelOccupancyBalance)
+      .where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode)
+      ));
+
+    if (startDate && endDate) {
+      query = query.where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode),
+        gte(hotelOccupancyBalance.date, startDate),
+        lte(hotelOccupancyBalance.date, endDate)
+      )) as any;
+    }
+
+    return await query.orderBy(desc(hotelOccupancyBalance.date));
+  }
+
+  /**
+   * Process pending events (for background job)
+   */
+  static async processPendingEvents(limit: number = 50): Promise<void> {
+    const pendingEvents = await db.select()
+      .from(eventStore)
+      .where(eq(eventStore.status, 'pending'))
+      .orderBy(eventStore.createdAt)
+      .limit(limit);
+
+    console.log(`🔄 Processing ${pendingEvents.length} pending events`);
+
+    for (const event of pendingEvents) {
+      try {
+        await this.processEvent(event.id);
+      } catch (error) {
+        console.error(`Failed to process event ${event.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Retry failed events
+   */
+  static async retryFailedEvents(maxRetries: number = 3, limit: number = 10): Promise<void> {
+    const failedEvents = await db.select()
+      .from(eventStore)
+      .where(and(
+        eq(eventStore.status, 'failed'),
+        sql`${eventStore.retryCount} < ${maxRetries}`
+      ))
+      .orderBy(eventStore.failedAt)
+      .limit(limit);
+
+    console.log(`🔄 Retrying ${failedEvents.length} failed events`);
+
+    for (const event of failedEvents) {
+      try {
+        // Increment retry count
+        await db.update(eventStore)
+          .set({ 
+            status: 'retrying',
+            retryCount: event.retryCount + 1
+          })
+          .where(eq(eventStore.id, event.id));
+
+        await this.processEvent(event.id);
+      } catch (error) {
+        console.error(`Retry failed for event ${event.id}:`, error);
+      }
+    }
+  }
+}
