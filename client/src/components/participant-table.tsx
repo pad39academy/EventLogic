@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Edit, Plus, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { EditParticipantModal } from "./edit-participant-modal";
+import { AddParticipantModal } from "./add-participant-modal";
 import type { Participant, ParticipantFilters } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -605,50 +606,11 @@ export default function ParticipantTable({ isAdmin = false, coachId }: Participa
         )}
       </CardContent>
 
-      {/* Add Participant Dialog */}
-      <Dialog open={showAddParticipantDialog} onOpenChange={setShowAddParticipantDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New Participant</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600">
-              <p className="mb-3">You can add a single participant manually or upload bulk data using the PSV upload options above.</p>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
-                  <span>Use "Coach & Official Data" upload for coaches and officials</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
-                  <span>Use "Player Data Sheet" upload for players</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAddParticipantDialog(false)}
-                data-testid="button-cancel-add-participant"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => {
-                  setShowAddParticipantDialog(false);
-                  toast({
-                    title: "Info",
-                    description: "Please use the PSV upload options above to add participants efficiently",
-                  });
-                }}
-                data-testid="button-confirm-add-participant"
-              >
-                Got it
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Add Participant Modal */}
+      <AddParticipantModal
+        isOpen={showAddParticipantDialog}
+        onClose={() => setShowAddParticipantDialog(false)}
+      />
 
       {/* Edit Participant Modal */}
       <EditParticipantModal
