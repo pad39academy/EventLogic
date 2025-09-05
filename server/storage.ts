@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, lt, gt, or, like, ilike, desc, asc, sql, isNotNull } from "drizzle-orm";
+import { BalanceWindowManager } from './services/balance-window-manager';
 
 export interface IStorage {
   // User management
@@ -271,6 +272,10 @@ export class DatabaseStorage implements IStorage {
 
   async createHotel(insertHotel: InsertHotel): Promise<Hotel> {
     const [hotel] = await db.insert(hotels).values(insertHotel).returning();
+    
+    // Ensure balance window is created for the new hotel
+    await BalanceWindowManager.ensureBalanceWindow(hotel.hotelId, hotel.instanceCode);
+    
     return hotel;
   }
 
