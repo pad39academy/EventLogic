@@ -14,83 +14,68 @@ import { eq, and, sql, lte, gte, lt } from 'drizzle-orm';
 export class BalanceWindowManager {
 
   /**
-   * SAFER APPROACH: Chunked balance window creation for multiple hotels
-   * Processes hotels in chunks to avoid blocking and provide better error recovery
+   * TWO-PHASE BULK APPROACH: Create balance windows for all hotels at once
+   * Phase 1: Hotels already created
+   * Phase 2: Bulk create ALL balance windows with recovery mechanisms
    */
-  static async createBalanceWindowsChunked(
-    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>,
-    chunkSize: number = 50,
-    onProgress?: (processed: number, total: number, errors: string[]) => void
-  ): Promise<{success: boolean, processed: number, errors: string[]}> {
+  static async createBalanceWindowsBulk(
+    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): Promise<{success: boolean, processed: number, errors: string[], balanceRecordsCreated: number}> {
     const result = {
       success: true,
       processed: 0,
-      errors: [] as string[]
+      errors: [] as string[],
+      balanceRecordsCreated: 0
     };
 
-    console.log(`🚀 Starting chunked balance window creation for ${hotels.length} hotels (chunks of ${chunkSize})`);
+    console.log(`🚀 TWO-PHASE BULK: Creating balance windows for ${hotels.length} hotels...`);
     
-    // Process hotels in chunks
-    for (let i = 0; i < hotels.length; i += chunkSize) {
-      const chunk = hotels.slice(i, i + chunkSize);
-      const chunkNumber = Math.floor(i / chunkSize) + 1;
-      const totalChunks = Math.ceil(hotels.length / chunkSize);
+    try {
+      // Calculate ALL balance records for ALL hotels
+      const allBalanceRecords = this.calculateAllBalanceRecords(hotels);
+      console.log(`📊 Calculated ${allBalanceRecords.length} balance records for ${hotels.length} hotels`);
       
-      console.log(`📦 Processing chunk ${chunkNumber}/${totalChunks} (${chunk.length} hotels)...`);
+      // BULK INSERT ALL RECORDS AT ONCE (10-50x faster)
+      console.log(`⚡ Performing bulk insert of ${allBalanceRecords.length} balance records...`);
+      await db.insert(hotelDailyBalance).values(allBalanceRecords);
       
-      try {
-        // Process this chunk of hotels
-        await this.processHotelChunk(chunk);
-        result.processed += chunk.length;
-        
-        console.log(`✅ Chunk ${chunkNumber} completed successfully: ${chunk.length} hotels processed`);
-        
-        // Report progress
-        if (onProgress) {
-          onProgress(result.processed, hotels.length, result.errors);
-        }
-        
-        // Small delay between chunks to allow other operations
-        if (i + chunkSize < hotels.length) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms pause
-        }
-        
-      } catch (error) {
-        const errorMsg = `Chunk ${chunkNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        result.errors.push(errorMsg);
-        console.error(`❌ ${errorMsg}`);
-        
-        // Try to process individual hotels in this chunk for partial recovery
-        const partialResults = await this.recoverFailedChunk(chunk);
-        result.processed += partialResults.processed;
-        result.errors.push(...partialResults.errors);
-        
-        if (onProgress) {
-          onProgress(result.processed, hotels.length, result.errors);
-        }
+      result.processed = hotels.length;
+      result.balanceRecordsCreated = allBalanceRecords.length;
+      console.log(`🎉 BULK SUCCESS: Created ${allBalanceRecords.length} balance records for ${hotels.length} hotels!`);
+      
+    } catch (error) {
+      console.error(`❌ BULK INSERT FAILED: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.errors.push(`Bulk insert failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // RECOVERY MECHANISM: Try cleanup and retry
+      console.log(`🔧 Starting recovery process...`);
+      const recoveryResult = await this.recoverFromBulkFailure(hotels);
+      
+      result.processed = recoveryResult.processed;
+      result.balanceRecordsCreated = recoveryResult.balanceRecordsCreated;
+      result.errors.push(...recoveryResult.errors);
+      
+      if (recoveryResult.processed === hotels.length) {
+        result.success = true;
+        console.log(`✅ RECOVERY SUCCESS: All ${hotels.length} hotels processed via recovery`);
+      } else {
+        result.success = false;
+        console.log(`⚠️  PARTIAL RECOVERY: ${recoveryResult.processed}/${hotels.length} hotels processed`);
       }
-    }
-    
-    if (result.errors.length > 0) {
-      result.success = false;
-      console.log(`⚠️  Chunked processing completed with errors: ${result.processed}/${hotels.length} processed`);
-    } else {
-      console.log(`🎉 Chunked processing completed successfully: ${result.processed}/${hotels.length} processed`);
     }
     
     return result;
   }
 
   /**
-   * Process a single chunk of hotels with bulk balance window creation
+   * Calculate all balance records for all hotels (no database calls)
    */
-  private static async processHotelChunk(
-    chunk: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
-  ): Promise<void> {
-    // Calculate all balance records for this chunk
+  private static calculateAllBalanceRecords(
+    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): InsertHotelDailyBalance[] {
     const allBalanceRecords: InsertHotelDailyBalance[] = [];
     
-    for (const hotel of chunk) {
+    for (const hotel of hotels) {
       const dates = this.generateDateRange(hotel.startDate, hotel.endDate);
       
       for (const date of dates) {
@@ -114,28 +99,80 @@ export class BalanceWindowManager {
       }
     }
     
-    // Bulk insert all balance records for this chunk
-    if (allBalanceRecords.length > 0) {
+    return allBalanceRecords;
+  }
+
+  /**
+   * Recovery mechanism when bulk insert fails
+   * Option 1: Clean slate retry (delete partial data + retry bulk)
+   * Option 2: Individual hotel processing (if clean slate fails)
+   */
+  private static async recoverFromBulkFailure(
+    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): Promise<{processed: number, errors: string[], balanceRecordsCreated: number}> {
+    console.log(`🔄 Recovery Option 1: Clean slate retry...`);
+    
+    try {
+      // Delete any partial balance data that might exist
+      await this.cleanupPartialBalanceData(hotels);
+      
+      // Retry the bulk insert
+      const allBalanceRecords = this.calculateAllBalanceRecords(hotels);
       await db.insert(hotelDailyBalance).values(allBalanceRecords);
-      console.log(`📊 Created ${allBalanceRecords.length} balance records for ${chunk.length} hotels`);
+      
+      console.log(`✅ Clean slate retry SUCCESS: ${allBalanceRecords.length} balance records created`);
+      return {
+        processed: hotels.length,
+        balanceRecordsCreated: allBalanceRecords.length,
+        errors: []
+      };
+      
+    } catch (cleanSlateError) {
+      console.error(`❌ Clean slate retry failed: ${cleanSlateError instanceof Error ? cleanSlateError.message : 'Unknown error'}`);
+      
+      // Recovery Option 2: Individual hotel processing
+      console.log(`🔄 Recovery Option 2: Individual hotel processing...`);
+      return await this.processHotelsIndividually(hotels);
     }
   }
 
   /**
-   * Recover from failed chunk by processing hotels individually
+   * Clean up any partial balance data for the hotels
    */
-  private static async recoverFailedChunk(
-    chunk: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
-  ): Promise<{processed: number, errors: string[]}> {
-    console.log(`🔄 Attempting individual recovery for ${chunk.length} hotels...`);
+  private static async cleanupPartialBalanceData(
+    hotels: Array<{hotelId: string, instanceCode: string}>
+  ): Promise<void> {
+    console.log(`🧹 Cleaning up partial balance data for ${hotels.length} hotels...`);
+    
+    for (const hotel of hotels) {
+      await db.delete(hotelDailyBalance)
+        .where(and(
+          eq(hotelDailyBalance.hotelId, hotel.hotelId),
+          eq(hotelDailyBalance.instanceCode, hotel.instanceCode)
+        ));
+    }
+    
+    console.log(`✅ Cleanup completed for ${hotels.length} hotels`);
+  }
+
+  /**
+   * Last resort: Process each hotel individually
+   */
+  private static async processHotelsIndividually(
+    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): Promise<{processed: number, errors: string[], balanceRecordsCreated: number}> {
+    console.log(`🔄 Processing ${hotels.length} hotels individually...`);
     
     let processed = 0;
+    let balanceRecordsCreated = 0;
     const errors: string[] = [];
     
-    for (const hotel of chunk) {
+    for (const hotel of hotels) {
       try {
+        const dates = this.generateDateRange(hotel.startDate, hotel.endDate);
         await this.ensureBalanceWindow(hotel.hotelId, hotel.instanceCode);
         processed++;
+        balanceRecordsCreated += dates.length;
       } catch (error) {
         const errorMsg = `Failed to create balance window for ${hotel.hotelId}-${hotel.instanceCode}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         errors.push(errorMsg);
@@ -143,8 +180,8 @@ export class BalanceWindowManager {
       }
     }
     
-    console.log(`🔧 Recovery completed: ${processed}/${chunk.length} hotels processed`);
-    return { processed, errors };
+    console.log(`🔧 Individual processing completed: ${processed}/${hotels.length} hotels processed`);
+    return { processed, errors, balanceRecordsCreated };
   }
   
   /**
