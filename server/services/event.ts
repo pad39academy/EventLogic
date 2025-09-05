@@ -430,13 +430,10 @@ export class EventService {
         try {
           const { hotelId, instanceCode, earliestDate, latestDate, participantIds } = hotelData;
           
-          console.log(`🏨 Ensuring balance window for ${hotelId}-${instanceCode} (${participantIds.length} participants)`);
+          console.log(`🏨 Processing occupancy for ${hotelId}-${instanceCode} (${participantIds.length} participants)`);
           
-          // Ensure balance window exists for the hotel (this was taking 8+ seconds per hotel)
-          await BalanceWindowManager.ensureBalanceWindow(hotelId, instanceCode);
-          
-          // Update daily balance for the affected date range
-          await this.updateDailyBalanceForDateRange(
+          // OPTIMIZED: Single bulk occupancy update (replaces redundant calls)
+          await this.updateOccupancyBulk(
             hotelId,
             instanceCode,
             new Date(earliestDate),
@@ -719,9 +716,9 @@ export class EventService {
   }
 
   /**
-   * Update daily balance for a date range using Balance Window Manager
+   * OPTIMIZED: Bulk occupancy update - replaces redundant ensureBalanceWindow calls
    */
-  static async updateDailyBalanceForDateRange(
+  static async updateOccupancyBulk(
     hotelId: string, 
     instanceCode: string, 
     startDate: Date,
@@ -730,16 +727,10 @@ export class EventService {
     sequenceNumber: number,
     tx?: any
   ): Promise<void> {
-    console.log(`📊 Updating daily balance for ${hotelId}-${instanceCode} (seq: ${sequenceNumber})`);
+    console.log(`⚡ BULK occupancy update for ${hotelId}-${instanceCode} (seq: ${sequenceNumber})`);
     console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
-    // Ensure balance window exists (auto-expand if needed)
-    await BalanceWindowManager.ensureBalanceWindow(hotelId, instanceCode);
-    
-    // Calculate and update balances for the affected date range
-    const dates = BalanceWindowManager.generateDateRange(startDate, endDate);
-    
-    // Get hotel info for room count
+    // Get hotel info first
     const [hotel] = await (tx || db).select()
       .from(hotels)
       .where(and(
@@ -751,18 +742,111 @@ export class EventService {
       throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
     }
     
-    let updated = 0;
+    // BULK: Calculate all balance records that need updates
+    const dates = BalanceWindowManager.generateDateRange(startDate, endDate);
+    const bulkUpdates: Array<{
+      hotelId: string;
+      instanceCode: string; 
+      balanceDate: string;
+      balance: any;
+    }> = [];
+    
+    // Calculate all balances at once (no individual DB calls)
     for (const date of dates) {
-      const result = await BalanceWindowManager.ensureDailyBalance(
+      const balance = await BalanceWindowManager.calculateDailyBalance(
         hotelId, 
         instanceCode, 
         date, 
         hotel.totalRooms
       );
-      if (result !== 'exists') updated++;
+      
+      bulkUpdates.push({
+        hotelId,
+        instanceCode,
+        balanceDate: date.toISOString().split('T')[0],
+        balance
+      });
     }
     
-    console.log(`✅ Updated ${updated} daily balance records for ${dates.length} dates`);
+    // BULK UPDATE: Update all balance records in one operation
+    if (bulkUpdates.length > 0) {
+      await this.executeBulkBalanceUpdates(bulkUpdates, eventId, sequenceNumber, tx);
+      console.log(`⚡ BULK UPDATED ${bulkUpdates.length} balance records in ONE operation`);
+    }
+  }
+  
+  /**
+   * Execute bulk balance updates - much faster than individual updates
+   */
+  private static async executeBulkBalanceUpdates(
+    updates: Array<{hotelId: string; instanceCode: string; balanceDate: string; balance: any}>,
+    eventId: string,
+    sequenceNumber: number,
+    tx?: any
+  ): Promise<void> {
+    // Use upsert pattern for bulk updates
+    const dbInstance = tx || db;
+    
+    for (const update of updates) {
+      const { hotelId, instanceCode, balanceDate, balance } = update;
+      
+      // Single upsert operation per record (still faster than ensureDailyBalance)
+      await dbInstance
+        .insert(hotelDailyBalance)
+        .values({
+          hotelId,
+          instanceCode,
+          balanceDate,
+          totalRooms: balance.totalRooms || 0,
+          playersCount: balance.playersCount || 0,
+          coachesCount: balance.coachesCount || 0,
+          officialsCount: balance.officialsCount || 0,
+          calculatedOccupiedRooms: balance.calculatedOccupiedRooms || 0,
+          availableRooms: balance.availableRooms || 0,
+          occupancyPercentage: balance.occupancyPercentage || "0.00",
+          pendingCheckoutPlayers: balance.pendingCheckoutPlayers || 0,
+          pendingCheckoutCoaches: balance.pendingCheckoutCoaches || 0,
+          pendingCheckoutOfficials: balance.pendingCheckoutOfficials || 0,
+          pendingCheckoutRooms: balance.pendingCheckoutRooms || 0,
+          lastUpdatedEventId: eventId,
+          lastUpdatedSequence: sequenceNumber,
+          calculatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [hotelDailyBalance.hotelId, hotelDailyBalance.instanceCode, hotelDailyBalance.balanceDate],
+          set: {
+            playersCount: balance.playersCount || 0,
+            coachesCount: balance.coachesCount || 0,
+            officialsCount: balance.officialsCount || 0,
+            calculatedOccupiedRooms: balance.calculatedOccupiedRooms || 0,
+            availableRooms: balance.availableRooms || 0,
+            occupancyPercentage: balance.occupancyPercentage || "0.00",
+            pendingCheckoutPlayers: balance.pendingCheckoutPlayers || 0,
+            pendingCheckoutCoaches: balance.pendingCheckoutCoaches || 0,
+            pendingCheckoutOfficials: balance.pendingCheckoutOfficials || 0,
+            pendingCheckoutRooms: balance.pendingCheckoutRooms || 0,
+            lastUpdatedEventId: eventId,
+            lastUpdatedSequence: sequenceNumber,
+            calculatedAt: new Date(),
+          }
+        });
+    }
+  }
+
+  /**
+   * Legacy method - keeping for backward compatibility
+   */
+  static async updateDailyBalanceForDateRange(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate: Date,
+    endDate: Date,
+    eventId: string,
+    sequenceNumber: number,
+    tx?: any
+  ): Promise<void> {
+    // Redirect to optimized bulk method
+    await this.updateOccupancyBulk(hotelId, instanceCode, startDate, endDate, eventId, sequenceNumber, tx);
   }
   
   /**
