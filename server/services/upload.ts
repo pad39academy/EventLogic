@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { type InsertHotel, type InsertParticipant, type InsertUser } from "@shared/schema";
 import { AuthService } from "./auth";
+import { EventService } from "./event";
 
 export interface UploadResult {
   success: boolean;
@@ -199,7 +200,26 @@ export class UploadService {
             availableRooms,
           };
 
-          await storage.createHotel(insertHotel);
+          const createdHotel = await storage.createHotel(insertHotel);
+          
+          // Publish hotel creation event
+          await EventService.publishEvent(
+            "hotel_capacity_updated",
+            createdHotel.hotelId,
+            "hotel",
+            {
+              hotelId: createdHotel.hotelId,
+              instanceCode: createdHotel.instanceCode,
+              hotelName: createdHotel.hotelName,
+              totalRooms: createdHotel.totalRooms,
+              startDate: createdHotel.startDate.toISOString(),
+              endDate: createdHotel.endDate.toISOString(),
+              location: createdHotel.location,
+              district: createdHotel.district,
+            },
+            { source: "hotel_upload" }
+          );
+          
           result.created++;
         } catch (error) {
           result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -329,7 +349,28 @@ export class UploadService {
             checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
-          await storage.createParticipant(insertParticipant);
+          const createdParticipant = await storage.createParticipant(insertParticipant);
+          
+          // Publish participant registration event
+          await EventService.publishEvent(
+            "participant_registered",
+            createdParticipant.participantId,
+            "participant",
+            {
+              participantId: createdParticipant.participantId,
+              name: createdParticipant.name,
+              role: createdParticipant.role,
+              hotelId: createdParticipant.hotelId,
+              instanceCode: '1', // Default instance for now
+              bookingStartDate: createdParticipant.bookingStartDate.toISOString(),
+              bookingEndDate: createdParticipant.bookingEndDate.toISOString(),
+              discipline: createdParticipant.discipline,
+              district: createdParticipant.district,
+              teamName: createdParticipant.teamName,
+              coachId: createdParticipant.coachId,
+            },
+            { source: "coaches_officials_upload" }
+          );
           
           // Update hotel occupancy after adding participant
           await storage.updateHotelOccupancy(data.HOTEL_ID, '1');
@@ -423,7 +464,28 @@ export class UploadService {
             checkinStatus: "pending",
           };
 
-          await storage.createParticipant(insertParticipant);
+          const createdParticipant = await storage.createParticipant(insertParticipant);
+          
+          // Publish participant registration event
+          await EventService.publishEvent(
+            "participant_registered",
+            createdParticipant.participantId,
+            "participant",
+            {
+              participantId: createdParticipant.participantId,
+              name: createdParticipant.name,
+              role: createdParticipant.role,
+              hotelId: createdParticipant.hotelId,
+              instanceCode: '1', // Default instance for now
+              bookingStartDate: createdParticipant.bookingStartDate.toISOString(),
+              bookingEndDate: createdParticipant.bookingEndDate.toISOString(),
+              discipline: createdParticipant.discipline,
+              district: createdParticipant.district,
+              teamName: createdParticipant.teamName,
+              coachId: createdParticipant.coachId,
+            },
+            { source: "players_upload" }
+          );
           
           // Update hotel occupancy after adding participant
           await storage.updateHotelOccupancy(data.HOTEL_ID, '1');
