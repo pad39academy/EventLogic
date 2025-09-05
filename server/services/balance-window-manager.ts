@@ -8,28 +8,17 @@ import {
 import { eq, and, sql, lte, gte, lt } from 'drizzle-orm';
 
 /**
- * Balance Window Manager - Maintains 30+100 day rolling window for hotel occupancy
- * Phase 1: 30 days past + 100 days future = 130 days total
- * Phase 2: 100 days past + 100 days future = 200 days total
+ * Balance Window Manager - Maintains balance data only for actual hotel operation dates
+ * Uses hotel's actual start_date to end_date for efficient, targeted balance tracking
  */
 export class BalanceWindowManager {
   
   /**
-   * Ensures exactly 130 days of balance data per hotel (Phase 1)
-   * Past 30 days + Today + Future 99 days = 130 days total
+   * Ensures balance data only for hotel's actual operating date range
+   * Uses hotel.start_date to hotel.end_date for efficient database utilization
    */
   static async ensureBalanceWindow(hotelId: string, instanceCode: string): Promise<void> {
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 30); // 30 days back
-    
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + 99);   // 99 days forward
-    
-    console.log(`🏨 Ensuring 130-day balance window for ${hotelId}-${instanceCode}`);
-    console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
-    
-    // Get hotel info
+    // Get hotel info with actual operating dates
     const [hotel] = await db.select()
       .from(hotels)
       .where(and(
@@ -41,7 +30,13 @@ export class BalanceWindowManager {
       throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
     }
     
-    // Generate 130-day window
+    const startDate = new Date(hotel.startDate);
+    const endDate = new Date(hotel.endDate);
+    
+    console.log(`🏨 Ensuring balance window for ${hotelId}-${instanceCode}`);
+    console.log(`📅 Hotel operating range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    
+    // Generate only dates hotel is actually operating
     const dates = this.generateDateRange(startDate, endDate);
     
     let created = 0;
@@ -53,7 +48,7 @@ export class BalanceWindowManager {
       if (result === 'updated') updated++;
     }
     
-    console.log(`✅ Balance window ensured: ${created} created, ${updated} updated`);
+    console.log(`✅ Balance window ensured: ${created} created, ${updated} updated for ${dates.length} operating days`);
   }
   
   /**
@@ -115,6 +110,7 @@ export class BalanceWindowManager {
   
   /**
    * Calculate daily balance for a specific hotel and date
+   * Uses precise room consumption: 1 room (official), 0.5 room (coach), 1/3 room (player)
    */
   static async calculateDailyBalance(
     hotelId: string, 
@@ -154,19 +150,21 @@ export class BalanceWindowManager {
     const pendingCheckoutCoaches = pendingCheckoutParticipants.filter(p => p.role === 'coach').length;
     const pendingCheckoutOfficials = pendingCheckoutParticipants.filter(p => p.role === 'official').length;
     
-    // Apply business rules: 3 players per room, 2 coaches per room, 1 official per room
-    const roomsForPlayers = Math.ceil(playersCount / 3);
-    const roomsForCoaches = Math.ceil(coachesCount / 2);
-    const roomsForOfficials = officialsCount;
+    // NEW LOGIC: Precise room consumption based on participant roles
+    // Official: 1 full room, Coach: 0.5 room, Player: 1/3 room
+    const roomsConsumedByPlayers = playersCount * (1/3);     // 1/3 room per player
+    const roomsConsumedByCoaches = coachesCount * 0.5;       // 0.5 room per coach
+    const roomsConsumedByOfficials = officialsCount * 1;     // 1 full room per official
     
-    const calculatedOccupiedRooms = roomsForPlayers + roomsForCoaches + roomsForOfficials;
+    const totalRoomsConsumed = roomsConsumedByPlayers + roomsConsumedByCoaches + roomsConsumedByOfficials;
+    const calculatedOccupiedRooms = Math.ceil(totalRoomsConsumed); // Round up for room allocation
     const availableRooms = Math.max(0, totalRooms - calculatedOccupiedRooms);
     
-    // Calculate pending checkout rooms
-    const pendingCheckoutPlayersRooms = Math.ceil(pendingCheckoutPlayers / 3);
-    const pendingCheckoutCoachesRooms = Math.ceil(pendingCheckoutCoaches / 2);
-    const pendingCheckoutOfficialsRooms = pendingCheckoutOfficials;
-    const pendingCheckoutRooms = pendingCheckoutPlayersRooms + pendingCheckoutCoachesRooms + pendingCheckoutOfficialsRooms;
+    // Calculate pending checkout rooms using same logic
+    const pendingPlayersRooms = pendingCheckoutPlayers * (1/3);
+    const pendingCoachesRooms = pendingCheckoutCoaches * 0.5;
+    const pendingOfficialsRooms = pendingCheckoutOfficials * 1;
+    const pendingCheckoutRooms = Math.ceil(pendingPlayersRooms + pendingCoachesRooms + pendingOfficialsRooms);
     
     const occupancyPercentage = totalRooms > 0 
       ? ((calculatedOccupiedRooms / totalRooms) * 100).toFixed(2)
@@ -187,16 +185,21 @@ export class BalanceWindowManager {
   }
   
   /**
-   * Auto-cleanup: Remove balances older than the window (Phase 1: 30 days)
+   * Auto-cleanup: Remove balances outside hotel operating ranges
    */
-  static async cleanupExpiredBalances(): Promise<void> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 30); // Phase 1: Keep 30 days back
-    
+  static async cleanupExpiredBalances(): Promise<any> {
+    // Remove balance records that are outside any hotel's operating range
     const result = await db.delete(hotelDailyBalance)
-      .where(lt(hotelDailyBalance.balanceDate, cutoffDate.toISOString().split('T')[0]));
+      .where(sql`
+        NOT EXISTS (
+          SELECT 1 FROM hotels h 
+          WHERE h.hotel_id = ${hotelDailyBalance.hotelId} 
+          AND h.instance_code = ${hotelDailyBalance.instanceCode}
+          AND ${hotelDailyBalance.balanceDate} BETWEEN h.start_date AND h.end_date
+        )
+      `);
     
-    console.log(`🧹 Cleaned up balance records older than ${cutoffDate.toISOString().split('T')[0]}`);
+    console.log(`🧹 Cleaned up balance records outside hotel operating ranges`);
     return result;
   }
   
@@ -248,6 +251,71 @@ export class BalanceWindowManager {
       .orderBy(hotelDailyBalance.balanceDate);
   }
   
+  /**
+   * Validate if sufficient room capacity exists for participant booking
+   * Returns validation result with detailed information
+   */
+  static async validateBalanceAvailability(
+    hotelId: string,
+    instanceCode: string,
+    participantRole: 'player' | 'coach' | 'official',
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
+    isValid: boolean;
+    availableRooms: number;
+    requiredRooms: number;
+    conflictDates: string[];
+    message: string;
+  }> {
+    
+    // Calculate room consumption for this participant type
+    const roomConsumption = participantRole === 'official' ? 1 : 
+                           participantRole === 'coach' ? 0.5 : 1/3; // player
+    
+    const dates = this.generateDateRange(startDate, endDate);
+    const conflictDates: string[] = [];
+    let minAvailableRooms = Infinity;
+    
+    // Check balance availability for each date in the range
+    for (const date of dates) {
+      const [balance] = await db.select()
+        .from(hotelDailyBalance)
+        .where(and(
+          eq(hotelDailyBalance.hotelId, hotelId),
+          eq(hotelDailyBalance.instanceCode, instanceCode),
+          eq(hotelDailyBalance.balanceDate, date.toISOString().split('T')[0])
+        ));
+      
+      if (!balance) {
+        // No balance record means hotel doesn't operate on this date
+        conflictDates.push(date.toISOString().split('T')[0]);
+        continue;
+      }
+      
+      // Check if sufficient rooms available
+      const availableCapacity = balance.availableRooms || 0;
+      minAvailableRooms = Math.min(minAvailableRooms, availableCapacity);
+      
+      if (availableCapacity < Math.ceil(roomConsumption)) {
+        conflictDates.push(date.toISOString().split('T')[0]);
+      }
+    }
+    
+    const isValid = conflictDates.length === 0;
+    const message = isValid 
+      ? `✅ Sufficient capacity available for ${participantRole}`
+      : `❌ Insufficient capacity on dates: ${conflictDates.join(', ')}`;
+    
+    return {
+      isValid,
+      availableRooms: minAvailableRooms === Infinity ? 0 : minAvailableRooms,
+      requiredRooms: Math.ceil(roomConsumption),
+      conflictDates,
+      message,
+    };
+  }
+
   /**
    * Generate array of dates between start and end (inclusive)
    */
