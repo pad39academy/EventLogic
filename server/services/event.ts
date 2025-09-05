@@ -300,6 +300,9 @@ export class EventService {
         case 'occupancy_calculator':
           result = await this.handleOccupancyCalculation(event);
           break;
+        case 'batch_occupancy_processor':
+          result = await this.handleBatchOccupancyProcessingInTransaction(event, db);
+          break;
         case 'notification_sender':
           result = await this.handleNotificationSending(event);
           break;

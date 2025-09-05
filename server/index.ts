@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
+import { BackgroundJobsService } from "./services/background-jobs";
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const app = express();
@@ -117,6 +118,10 @@ app.use((req, res, next) => {
       ? await import("../viteDev")
       : await import("../viteProd");
     log(`serving on port ${port}`);
+    
+    // Start background jobs service for event processing
+    const backgroundJobs = new BackgroundJobsService();
+    backgroundJobs.start();
   });
 
   // Handle graceful shutdown
