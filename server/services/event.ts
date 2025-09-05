@@ -1,10 +1,12 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import { 
-  eventStore, eventHandlers, hotelOccupancyBalance, hotels, participants, auditLog,
+  eventStore, eventHandlers, hotelOccupancyBalance, hotelDailyBalance, hotels, participants, auditLog,
   type InsertEventStore, type InsertEventHandler, type EventStore,
-  type InsertHotelOccupancyBalance, type HotelOccupancyBalance
+  type InsertHotelOccupancyBalance, type HotelOccupancyBalance, type InsertHotelDailyBalance
 } from "@shared/schema";
+import { SequenceGenerator } from './sequence-generator';
+import { BalanceWindowManager } from './balance-window-manager';
 import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 
 // Event data type definitions
@@ -55,7 +57,7 @@ export interface ParticipantRegisteredEvent {
 export class EventService {
   
   /**
-   * Publish an event to the event store with ACID transaction
+   * Publish an event to the event store with ACID transaction + daily partitioning
    */
   static async publishEvent(
     eventType: string,
@@ -64,23 +66,34 @@ export class EventService {
     eventData: any,
     metadata: any = {}
   ): Promise<EventStore> {
-    // ACID FIX: Wrap event creation + processing in single transaction
+    const eventDate = new Date();
+    
+    // ACID + PARTITIONING: Wrap event creation + processing in single transaction
     return await db.transaction(async (tx) => {
+      // Generate sequence number for daily partition
+      const sequenceNumber = await SequenceGenerator.getNextSequenceNumber(eventDate);
+      const partitionKey = SequenceGenerator.generatePartitionKey(eventDate);
+      
       const insertEvent: InsertEventStore = {
         eventType: eventType as any,
         aggregateId,
         aggregateType,
         eventData,
+        // Daily partitioning fields
+        eventDate: eventDate.toISOString().split('T')[0],
+        sequenceNumber,
+        partitionKey,
+        // Standard fields
         metadata: {
           ...metadata,
-          timestamp: new Date().toISOString(),
-          correlationId: metadata.correlationId || this.generateCorrelationId(),
+          timestamp: eventDate.toISOString(),
+          correlationId: metadata.correlationId || SequenceGenerator.generateCorrelationId(),
         },
         status: "pending",
       };
 
       const [event] = await tx.insert(eventStore).values(insertEvent).returning();
-      console.log(`📧 Event published: ${eventType} for ${aggregateType}:${aggregateId}`);
+      console.log(`📧 Event published: ${eventType} #${sequenceNumber} for ${aggregateType}:${aggregateId} on ${partitionKey}`);
 
       // Process event immediately within same transaction
       await this.processEventInTransaction(event.id, tx);
@@ -297,28 +310,42 @@ export class EventService {
    * Handle hotel occupancy calculation events within transaction (ACID compliant)
    */
   static async handleOccupancyCalculationInTransaction(event: EventStore, tx: any): Promise<any> {
-    console.log(`🏨 Processing occupancy calculation for event: ${event.eventType}`);
+    console.log(`🏨 Processing occupancy calculation for event: ${event.eventType} #${event.sequenceNumber}`);
 
     if (event.eventType === 'booking_created' || event.eventType === 'participant_registered') {
       const eventData = event.eventData as BookingCreatedEvent | ParticipantRegisteredEvent;
-      await this.updateHotelOccupancyBalanceInTransaction(
+      
+      // Update daily balance using new balance window manager
+      await this.updateDailyBalanceForDateRange(
         eventData.hotelId, 
         eventData.instanceCode, 
         new Date(eventData.bookingStartDate),
         new Date(eventData.bookingEndDate),
         event.id,
-        new Date(event.createdAt),
+        Number(event.sequenceNumber),
         tx
       );
       
-      return { message: 'Occupancy balance updated successfully' };
+      return { 
+        message: 'Daily balance updated successfully',
+        hotelId: eventData.hotelId,
+        instanceCode: eventData.instanceCode,
+        eventSequence: event.sequenceNumber,
+      };
     }
 
     if (event.eventType === 'participant_deleted') {
       const eventData = event.eventData as any;
-      await this.recalculateHotelOccupancy(eventData.hotelId, eventData.instanceCode, event.id);
       
-      return { message: 'Occupancy recalculated after participant deletion' };
+      // Recalculate balance window for affected hotel
+      await this.recalculateHotelBalanceWindow(
+        eventData.hotelId, 
+        eventData.instanceCode, 
+        event.id, 
+        Number(event.sequenceNumber)
+      );
+      
+      return { message: 'Hotel balance window recalculated after participant deletion' };
     }
 
     return { message: 'No occupancy calculation needed for this event type' };
@@ -553,6 +580,70 @@ export class EventService {
     }
 
     console.log(`📊 Updated occupancy for ${hotelId}-${instanceCode} on ${date.toDateString()}: ${calculatedOccupiedRooms}/${totalRooms} rooms occupied`);
+  }
+
+  /**
+   * Update daily balance for a date range using Balance Window Manager
+   */
+  static async updateDailyBalanceForDateRange(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate: Date,
+    endDate: Date,
+    eventId: string,
+    sequenceNumber: number,
+    tx?: any
+  ): Promise<void> {
+    console.log(`📊 Updating daily balance for ${hotelId}-${instanceCode} (seq: ${sequenceNumber})`);
+    console.log(`📅 Date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    
+    // Ensure balance window exists (auto-expand if needed)
+    await BalanceWindowManager.ensureBalanceWindow(hotelId, instanceCode);
+    
+    // Calculate and update balances for the affected date range
+    const dates = BalanceWindowManager.generateDateRange(startDate, endDate);
+    
+    // Get hotel info for room count
+    const [hotel] = await (tx || db).select()
+      .from(hotels)
+      .where(and(
+        eq(hotels.hotelId, hotelId),
+        eq(hotels.instanceCode, instanceCode)
+      ));
+    
+    if (!hotel) {
+      throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
+    }
+    
+    let updated = 0;
+    for (const date of dates) {
+      const result = await BalanceWindowManager.ensureDailyBalance(
+        hotelId, 
+        instanceCode, 
+        date, 
+        hotel.totalRooms
+      );
+      if (result !== 'exists') updated++;
+    }
+    
+    console.log(`✅ Updated ${updated} daily balance records for ${dates.length} dates`);
+  }
+  
+  /**
+   * Recalculate entire balance window for a hotel
+   */
+  static async recalculateHotelBalanceWindow(
+    hotelId: string, 
+    instanceCode: string, 
+    eventId: string,
+    sequenceNumber: number
+  ): Promise<void> {
+    console.log(`🔄 Recalculating balance window for ${hotelId}-${instanceCode} (seq: ${sequenceNumber})`);
+    
+    // Force regenerate the entire balance window
+    await BalanceWindowManager.ensureBalanceWindow(hotelId, instanceCode);
+    
+    console.log(`✅ Balance window recalculation complete for ${hotelId}-${instanceCode}`);
   }
 
   /**

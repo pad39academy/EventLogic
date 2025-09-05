@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, pgEnum, jsonb, index, uniqueIndex, date, bigint, decimal } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -160,9 +160,16 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Event Store table for event-driven architecture
+// Event Store table for event-driven architecture with daily partitioning
 export const eventStore = pgTable("event_store", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Daily partitioning fields for scalability
+  eventDate: date("event_date").notNull(), // YYYY-MM-DD for partitioning
+  sequenceNumber: bigint("sequence_number", { mode: "number" }).notNull(), // Daily sequence: 1, 2, 3...
+  partitionKey: varchar("partition_key").notNull(), // "2025-09-05" format for daily partitions
+  
+  // Existing fields
   eventType: eventTypeEnum("event_type").notNull(),
   aggregateId: text("aggregate_id").notNull(), // The ID of the entity this event affects
   aggregateType: text("aggregate_type").notNull(), // participant, hotel, user, etc.
@@ -176,6 +183,12 @@ export const eventStore = pgTable("event_store", {
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
+  // Partition-optimized indexes for daily partitions
+  partitionSeqIdx: index("event_partition_seq_idx").on(table.partitionKey, table.sequenceNumber),
+  eventTypePartitionIdx: index("event_type_partition_idx").on(table.eventType, table.partitionKey),
+  aggregatePartitionIdx: index("event_aggregate_partition_idx").on(table.aggregateId, table.partitionKey),
+  
+  // Legacy indexes for existing queries
   eventTypeIdx: index("event_store_event_type_idx").on(table.eventType),
   aggregateIdx: index("event_store_aggregate_idx").on(table.aggregateId, table.aggregateType),
   statusIdx: index("event_store_status_idx").on(table.status),
@@ -199,19 +212,60 @@ export const eventHandlers = pgTable("event_handlers", {
   handlerStatusIdx: index("event_handlers_status_idx").on(table.handlerName, table.status),
 }));
 
-// Hotel Occupancy Balance table for event-driven occupancy tracking
-export const hotelOccupancyBalance = pgTable("hotel_occupancy_balance", {
+// Hotel Daily Balance Ledger - Pre-calculated for lightning-fast reads (30+100 day window)
+export const hotelDailyBalance = pgTable("hotel_daily_balance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Core identifiers
   hotelId: text("hotel_id").notNull(),
   instanceCode: text("instance_code").notNull(),
-  date: timestamp("date").notNull(), // Date for which this occupancy applies
+  balanceDate: date("balance_date").notNull(), // YYYY-MM-DD for date-based partitioning
+  
+  // Pre-calculated occupancy data
   totalRooms: integer("total_rooms").notNull(),
   playersCount: integer("players_count").default(0),
   coachesCount: integer("coaches_count").default(0),
   officialsCount: integer("officials_count").default(0),
-  calculatedOccupiedRooms: integer("calculated_occupied_rooms").default(0), // Calculated from business rules
+  calculatedOccupiedRooms: integer("calculated_occupied_rooms").default(0),
   availableRooms: integer("available_rooms").default(0),
-  lastEventId: varchar("last_event_id"), // Reference to the last event that updated this balance
+  occupancyPercentage: decimal("occupancy_percentage", { precision: 5, scale: 2 }).default("0.00"),
+  
+  // Pending checkout tracking (checked in but not checked out)
+  pendingCheckoutPlayers: integer("pending_checkout_players").default(0),
+  pendingCheckoutCoaches: integer("pending_checkout_coaches").default(0),
+  pendingCheckoutOfficials: integer("pending_checkout_officials").default(0),
+  pendingCheckoutRooms: integer("pending_checkout_rooms").default(0),
+  
+  // Event tracking for idempotency
+  lastUpdatedEventId: varchar("last_updated_event_id"),
+  lastUpdatedSequence: bigint("last_updated_sequence", { mode: "number" }),
+  
+  // Audit fields
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  // PRIMARY: Fast hotel-date queries for dashboard
+  hotelDateIdx: uniqueIndex("hotel_date_unique_idx").on(table.hotelId, table.instanceCode, table.balanceDate),
+  
+  // Secondary indexes for analytics
+  dateRangeIdx: index("balance_date_range_idx").on(table.balanceDate),
+  occupancyIdx: index("occupancy_percentage_idx").on(table.occupancyPercentage),
+  pendingCheckoutIdx: index("pending_checkout_idx").on(table.hotelId, table.pendingCheckoutRooms),
+}));
+
+// Legacy table (keep for migration compatibility)
+export const hotelOccupancyBalance = pgTable("hotel_occupancy_balance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hotelId: text("hotel_id").notNull(),
+  instanceCode: text("instance_code").notNull(),
+  date: timestamp("date").notNull(),
+  totalRooms: integer("total_rooms").notNull(),
+  playersCount: integer("players_count").default(0),
+  coachesCount: integer("coaches_count").default(0),
+  officialsCount: integer("officials_count").default(0),
+  calculatedOccupiedRooms: integer("calculated_occupied_rooms").default(0),
+  availableRooms: integer("available_rooms").default(0),
+  lastEventId: varchar("last_event_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
@@ -511,6 +565,14 @@ export type EventHandler = typeof eventHandlers.$inferSelect;
 export type InsertEventHandler = z.infer<typeof insertEventHandlerSchema>;
 export type HotelOccupancyBalance = typeof hotelOccupancyBalance.$inferSelect;
 export type InsertHotelOccupancyBalance = z.infer<typeof insertHotelOccupancyBalanceSchema>;
+
+// New Daily Balance types
+export const insertHotelDailyBalanceSchema = createInsertSchema(hotelDailyBalance).omit({
+  id: true,
+  createdAt: true,
+});
+export type HotelDailyBalance = typeof hotelDailyBalance.$inferSelect;
+export type InsertHotelDailyBalance = z.infer<typeof insertHotelDailyBalanceSchema>;
 
 // Additional schemas for API validation
 export const loginSchema = z.object({
