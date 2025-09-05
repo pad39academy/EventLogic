@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import { 
-  eventStore, eventHandlers, hotelOccupancyBalance,
+  eventStore, eventHandlers, hotelOccupancyBalance, hotels, participants, auditLog,
   type InsertEventStore, type InsertEventHandler, type EventStore,
   type InsertHotelOccupancyBalance, type HotelOccupancyBalance
 } from "@shared/schema";
@@ -55,7 +55,7 @@ export interface ParticipantRegisteredEvent {
 export class EventService {
   
   /**
-   * Publish an event to the event store
+   * Publish an event to the event store with ACID transaction
    */
   static async publishEvent(
     eventType: string,
@@ -64,30 +64,80 @@ export class EventService {
     eventData: any,
     metadata: any = {}
   ): Promise<EventStore> {
-    const insertEvent: InsertEventStore = {
-      eventType: eventType as any,
-      aggregateId,
-      aggregateType,
-      eventData,
-      metadata: {
-        ...metadata,
-        timestamp: new Date().toISOString(),
-        correlationId: metadata.correlationId || this.generateCorrelationId(),
-      },
-      status: "pending",
-    };
+    // ACID FIX: Wrap event creation + processing in single transaction
+    return await db.transaction(async (tx) => {
+      const insertEvent: InsertEventStore = {
+        eventType: eventType as any,
+        aggregateId,
+        aggregateType,
+        eventData,
+        metadata: {
+          ...metadata,
+          timestamp: new Date().toISOString(),
+          correlationId: metadata.correlationId || this.generateCorrelationId(),
+        },
+        status: "pending",
+      };
 
-    const [event] = await db.insert(eventStore).values(insertEvent).returning();
-    console.log(`📧 Event published: ${eventType} for ${aggregateType}:${aggregateId}`);
+      const [event] = await tx.insert(eventStore).values(insertEvent).returning();
+      console.log(`📧 Event published: ${eventType} for ${aggregateType}:${aggregateId}`);
 
-    // Process event immediately (you could also queue this for background processing)
-    await this.processEvent(event.id);
+      // Process event immediately within same transaction
+      await this.processEventInTransaction(event.id, tx);
 
-    return event;
+      return event;
+    });
   }
 
   /**
-   * Process a single event by running all registered handlers
+   * Process a single event by running all registered handlers (within transaction)
+   */
+  static async processEventInTransaction(eventId: string, tx: any): Promise<void> {
+    const [event] = await tx.select().from(eventStore).where(eq(eventStore.id, eventId));
+    
+    if (!event || event.status !== 'pending') {
+      return;
+    }
+
+    console.log(`🔄 Processing event: ${event.eventType} (${eventId})`);
+
+    try {
+      // Get registered handlers for this event type
+      const handlers = this.getEventHandlers(event.eventType);
+
+      // Execute each handler within the same transaction
+      for (const handlerName of handlers) {
+        await this.executeHandlerInTransaction(event, handlerName, tx);
+      }
+
+      // Mark event as processed
+      await tx.update(eventStore)
+        .set({ 
+          status: 'processed', 
+          processedAt: new Date() 
+        })
+        .where(eq(eventStore.id, eventId));
+
+      console.log(`✅ Event processed successfully: ${event.eventType} (${eventId})`);
+
+    } catch (error) {
+      console.error(`❌ Event processing failed: ${event.eventType} (${eventId})`, error);
+      
+      // Mark event as failed
+      await tx.update(eventStore)
+        .set({ 
+          status: 'failed', 
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+        .where(eq(eventStore.id, eventId));
+      
+      throw error; // Re-throw to rollback the entire transaction
+    }
+  }
+
+  /**
+   * Process a single event by running all registered handlers (legacy method)
    */
   static async processEvent(eventId: string): Promise<void> {
     const [event] = await db.select().from(eventStore).where(eq(eventStore.id, eventId));
@@ -132,7 +182,63 @@ export class EventService {
   }
 
   /**
-   * Execute a specific event handler
+   * Execute a specific event handler within transaction (ACID compliant)
+   */
+  static async executeHandlerInTransaction(event: EventStore, handlerName: string, tx: any): Promise<void> {
+    // Track handler execution
+    const insertHandler: InsertEventHandler = {
+      eventId: event.id,
+      handlerName,
+      status: 'pending',
+    };
+
+    const [handlerRecord] = await tx.insert(eventHandlers).values(insertHandler).returning();
+
+    try {
+      let result: any = null;
+
+      // Execute the appropriate handler based on event type and handler name
+      switch (handlerName) {
+        case 'occupancy_calculator':
+          result = await this.handleOccupancyCalculationInTransaction(event, tx);
+          break;
+        case 'notification_sender':
+          result = await this.handleNotificationSending(event);
+          break;
+        case 'audit_logger':
+          result = await this.handleAuditLoggingInTransaction(event, tx);
+          break;
+        default:
+          throw new Error(`Unknown handler: ${handlerName}`);
+      }
+
+      // Mark handler as processed
+      await tx.update(eventHandlers)
+        .set({ 
+          status: 'processed', 
+          processedAt: new Date(),
+          result: result || {}
+        })
+        .where(eq(eventHandlers.id, handlerRecord.id));
+
+    } catch (error) {
+      console.error(`Handler ${handlerName} failed for event ${event.id}:`, error);
+      
+      // Mark handler as failed
+      await tx.update(eventHandlers)
+        .set({ 
+          status: 'failed', 
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        })
+        .where(eq(eventHandlers.id, handlerRecord.id));
+
+      throw error; // Re-throw to fail the entire transaction
+    }
+  }
+
+  /**
+   * Execute a specific event handler (legacy method)
    */
   static async executeHandler(event: EventStore, handlerName: string): Promise<void> {
     // Track handler execution
@@ -188,7 +294,38 @@ export class EventService {
   }
 
   /**
-   * Handle hotel occupancy calculation events
+   * Handle hotel occupancy calculation events within transaction (ACID compliant)
+   */
+  static async handleOccupancyCalculationInTransaction(event: EventStore, tx: any): Promise<any> {
+    console.log(`🏨 Processing occupancy calculation for event: ${event.eventType}`);
+
+    if (event.eventType === 'booking_created' || event.eventType === 'participant_registered') {
+      const eventData = event.eventData as BookingCreatedEvent | ParticipantRegisteredEvent;
+      await this.updateHotelOccupancyBalanceInTransaction(
+        eventData.hotelId, 
+        eventData.instanceCode, 
+        new Date(eventData.bookingStartDate),
+        new Date(eventData.bookingEndDate),
+        event.id,
+        new Date(event.createdAt),
+        tx
+      );
+      
+      return { message: 'Occupancy balance updated successfully' };
+    }
+
+    if (event.eventType === 'participant_deleted') {
+      const eventData = event.eventData as any;
+      await this.recalculateHotelOccupancy(eventData.hotelId, eventData.instanceCode, event.id);
+      
+      return { message: 'Occupancy recalculated after participant deletion' };
+    }
+
+    return { message: 'No occupancy calculation needed for this event type' };
+  }
+
+  /**
+   * Handle hotel occupancy calculation events (legacy method)
    */
   static async handleOccupancyCalculation(event: EventStore): Promise<any> {
     console.log(`🏨 Processing occupancy calculation for event: ${event.eventType}`);
@@ -217,7 +354,47 @@ export class EventService {
   }
 
   /**
-   * Update hotel occupancy balance for date ranges
+   * Update hotel occupancy balance for date ranges within transaction (ACID compliant)
+   */
+  static async updateHotelOccupancyBalanceInTransaction(
+    hotelId: string, 
+    instanceCode: string, 
+    startDate: Date, 
+    endDate: Date,
+    eventId: string,
+    eventTimestamp: Date,
+    tx: any
+  ): Promise<void> {
+    // Get hotel info within transaction
+    const [hotel] = await tx.select()
+      .from(hotels)
+      .where(and(
+        eq(hotels.hotelId, hotelId),
+        eq(hotels.instanceCode, instanceCode)
+      ));
+
+    if (!hotel) {
+      throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
+    }
+
+    // Create date range for occupancy updates
+    const dates = this.generateDateRange(startDate, endDate);
+    
+    for (const date of dates) {
+      await this.updateSingleDateOccupancyInTransaction(
+        hotelId, 
+        instanceCode, 
+        date, 
+        hotel.totalRooms, 
+        eventId,
+        eventTimestamp,
+        tx
+      );
+    }
+  }
+
+  /**
+   * Update hotel occupancy balance for date ranges (legacy method)
    */
   static async updateHotelOccupancyBalance(
     hotelId: string, 
@@ -240,7 +417,81 @@ export class EventService {
   }
 
   /**
-   * Update occupancy for a single date
+   * Update occupancy for a single date within transaction with row-level locking (ACID compliant)
+   */
+  static async updateSingleDateOccupancyInTransaction(
+    hotelId: string, 
+    instanceCode: string, 
+    date: Date, 
+    totalRooms: number,
+    eventId: string,
+    eventTimestamp: Date,
+    tx: any
+  ): Promise<void> {
+    // RACE CONDITION FIX: Use row-level locking to prevent concurrent updates
+    const [existingBalance] = await tx.select()
+      .from(hotelOccupancyBalance)
+      .where(and(
+        eq(hotelOccupancyBalance.hotelId, hotelId),
+        eq(hotelOccupancyBalance.instanceCode, instanceCode),
+        eq(hotelOccupancyBalance.date, date)
+      ))
+      .for('update'); // ROW-LEVEL LOCK - prevents concurrent modifications
+
+    // Get current participants for this hotel and date within transaction
+    const participants = await tx.select()
+      .from(participants)
+      .where(and(
+        eq(participants.hotelId, hotelId),
+        lte(participants.bookingStartDate, date),
+        gte(participants.bookingEndDate, date)
+      ));
+    
+    // Calculate occupancy by role
+    const playersCount = participants.filter(p => p.role === 'player').length;
+    const coachesCount = participants.filter(p => p.role === 'coach').length;
+    const officialsCount = participants.filter(p => p.role === 'official').length;
+
+    // Apply business rules: 3 players per room, 2 coaches per room, 1 official per room
+    const roomsForPlayers = Math.ceil(playersCount / 3);
+    const roomsForCoaches = Math.ceil(coachesCount / 2);
+    const roomsForOfficials = officialsCount;
+    
+    const calculatedOccupiedRooms = roomsForPlayers + roomsForCoaches + roomsForOfficials;
+    const availableRooms = Math.max(0, totalRooms - calculatedOccupiedRooms);
+
+    const balanceData = {
+      hotelId,
+      instanceCode,
+      date,
+      totalRooms,
+      playersCount,
+      coachesCount,
+      officialsCount,
+      calculatedOccupiedRooms,
+      availableRooms,
+      lastEventId: eventId, // Keep for now, but will be replaced with better design
+      updatedAt: new Date(),
+    };
+
+    if (existingBalance) {
+      // Update existing balance (already locked)
+      await tx.update(hotelOccupancyBalance)
+        .set(balanceData)
+        .where(eq(hotelOccupancyBalance.id, existingBalance.id));
+    } else {
+      // Create new balance record
+      await tx.insert(hotelOccupancyBalance).values({
+        ...balanceData,
+        createdAt: new Date(),
+      } as InsertHotelOccupancyBalance);
+    }
+
+    console.log(`📊 Updated occupancy for ${hotelId}-${instanceCode} on ${date.toDateString()}: ${calculatedOccupiedRooms}/${totalRooms} rooms occupied`);
+  }
+
+  /**
+   * Update occupancy for a single date (legacy method)
    */
   static async updateSingleDateOccupancy(
     hotelId: string, 
@@ -316,7 +567,29 @@ export class EventService {
   }
 
   /**
-   * Handle audit logging events
+   * Handle audit logging events within transaction (ACID compliant)
+   */
+  static async handleAuditLoggingInTransaction(event: EventStore, tx: any): Promise<any> {
+    console.log(`📝 Processing audit log for event: ${event.eventType}`);
+    
+    // Create audit log entry within transaction
+    await tx.insert(auditLog).values({
+      userId: event.metadata.userId || 'system',
+      actionType: event.eventType,
+      targetEntity: event.aggregateType,
+      targetId: event.aggregateId,
+      details: {
+        eventId: event.id,
+        eventData: event.eventData,
+        metadata: event.metadata
+      }
+    });
+
+    return { message: 'Audit log created successfully' };
+  }
+
+  /**
+   * Handle audit logging events (legacy method)
    */
   static async handleAuditLogging(event: EventStore): Promise<any> {
     console.log(`📝 Processing audit log for event: ${event.eventType}`);
