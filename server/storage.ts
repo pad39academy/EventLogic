@@ -333,7 +333,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipants(filters: ParticipantFilters = {}): Promise<Participant[]> {
-    let query = db.select({
+    let query = db.selectDistinct({
       id: participants.id,
       participantId: participants.participantId,
       name: participants.name,
@@ -421,7 +421,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipantById(id: string): Promise<Participant | undefined> {
-    const result = await db.select({
+    const result = await db.selectDistinct({
       id: participants.id,
       participantId: participants.participantId,
       name: participants.name,
@@ -457,7 +457,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParticipantByParticipantId(participantId: string): Promise<Participant | undefined> {
-    const result = await db.select({
+    const result = await db.selectDistinct({
       id: participants.id,
       participantId: participants.participantId,
       name: participants.name,
@@ -494,7 +494,7 @@ export class DatabaseStorage implements IStorage {
 
   async getParticipantsByCoachId(coachId: string): Promise<Participant[]> {
     return await db
-      .select({
+      .selectDistinct({
         id: participants.id,
         participantId: participants.participantId,
         name: participants.name,
