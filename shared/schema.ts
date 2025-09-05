@@ -19,7 +19,7 @@ export const eventTypeEnum = pgEnum("event_type", [
   // Booking events
   "booking_created", "booking_updated", "booking_cancelled",
   // Hotel occupancy events
-  "hotel_occupancy_changed", "hotel_capacity_updated",
+  "hotel_occupancy_changed", "hotel_capacity_updated", "batch_hotel_occupancy_update",
   // Participant events
   "participant_registered", "participant_updated", "participant_deleted",
   "participant_checked_in", "participant_checked_out",
