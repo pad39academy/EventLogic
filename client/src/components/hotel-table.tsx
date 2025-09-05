@@ -12,7 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Building2, MapPin, Users, Bed, Edit3, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Building2, MapPin, Users, Bed, Edit3, Calendar, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { formatToIndianDate, formatForDateInput, formatDateRange } from "@/../../shared/dateUtils";
 
@@ -75,27 +75,33 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function HotelTable() {
-  const [searchTerm, setSearchTerm] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [districtFilter, setDistrictFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortField, setSortField] = useState<string>("hotelId");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    search: "",
+    district: "all",
+    status: "all",
+    page: 1,
+    limit: 10,
+    sortBy: "hotelId",
+    sortOrder: "asc" as "asc" | "desc"
+  });
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: hotels = [], isLoading, error } = useQuery<Hotel[]>({
-    queryKey: ["/api/admin/dashboard/hotels", searchTerm, districtFilter, statusFilter, sortField, sortOrder],
+  const { data: hotelResponse = {}, isLoading, error } = useQuery({
+    queryKey: ["/api/admin/dashboard/hotels", filters],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (districtFilter !== "all") params.append('district', districtFilter);
-      if (statusFilter !== "all") params.append('status', statusFilter);
-      if (sortField) params.append('sortBy', sortField);
-      if (sortOrder) params.append('sortOrder', sortOrder);
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key === 'district' || key === 'status') {
+          if (value !== "all") params.append(key, value.toString());
+        } else if (value) {
+          params.append(key, value.toString());
+        }
+      });
       
       const response = await fetch(`/api/admin/dashboard/hotels?${params.toString()}`, {
         credentials: 'include'
@@ -108,6 +114,9 @@ export default function HotelTable() {
       return response.json();
     }
   });
+
+  const hotels = hotelResponse.data || [];
+  const pagination = hotelResponse.pagination;
 
   // Form for hotel editing
   const form = useForm<z.infer<typeof hotelEditSchema>>({
@@ -202,17 +211,16 @@ export default function HotelTable() {
 
   // Handle column sorting
   const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    if (filters.sortBy === field) {
+      setFilters({ ...filters, sortOrder: filters.sortOrder === "asc" ? "desc" : "asc", page: 1 });
     } else {
-      setSortField(field);
-      setSortOrder("asc");
+      setFilters({ ...filters, sortBy: field, sortOrder: "asc", page: 1 });
     }
   };
 
   // Handle search button click
   const handleSearch = () => {
-    setSearchTerm(searchInput);
+    setFilters({ ...filters, search: searchInput, page: 1 });
   };
 
   // Handle Enter key press
@@ -222,12 +230,17 @@ export default function HotelTable() {
     }
   };
 
+  // Handle refresh button click
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard/hotels"] });
+  };
+
   // Get sort icon for column header
   const getSortIcon = (field: string) => {
-    if (sortField !== field) {
+    if (filters.sortBy !== field) {
       return <ArrowUpDown className="h-4 w-4 opacity-50" />;
     }
-    return sortOrder === "asc" 
+    return filters.sortOrder === "asc" 
       ? <ArrowUp className="h-4 w-4" />
       : <ArrowDown className="h-4 w-4" />;
   };
@@ -300,7 +313,15 @@ export default function HotelTable() {
             </Button>
           </div>
           
-          <Select value={districtFilter} onValueChange={setDistrictFilter}>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          
+          <Select value={filters.district} onValueChange={(value) => setFilters({ ...filters, district: value, page: 1 })}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Filter by district" />
             </SelectTrigger>
@@ -312,7 +333,7 @@ export default function HotelTable() {
             </SelectContent>
           </Select>
           
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value, page: 1 })}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -323,6 +344,74 @@ export default function HotelTable() {
               <SelectItem value="expired">Expired</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        
+        {/* Page Size Selector and Top Pagination */}
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center gap-4">
+            <label htmlFor="pageSize" className="text-sm font-medium text-gray-700">
+              Rows per page:
+            </label>
+            <Select
+              value={filters.limit?.toString() || "10"}
+              onValueChange={(value) => setFilters({ ...filters, limit: parseInt(value), page: 1 })}
+            >
+              <SelectTrigger className="w-20" data-testid="select-page-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Pagination Controls - Top */}
+          {pagination && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
+              <nav className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: 1 })}
+                  data-testid="button-first-top"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
+                  data-testid="button-prev-top"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
+                  data-testid="button-next-top"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.totalPages })}
+                  data-testid="button-last-top"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </nav>
+            </div>
+          )}
         </div>
       </CardHeader>
       
@@ -561,14 +650,56 @@ export default function HotelTable() {
           </Table>
         </div>
         
-        {displayHotels.length > 0 && (
-          <div className="mt-4 text-sm text-gray-500 border-t pt-4">
-            Showing {displayHotels.length} hotel instances
-            {sortField && (
-              <span className="ml-2 text-xs">
-                • Sorted by {sortField} ({sortOrder === "asc" ? "ascending" : "descending"})
-              </span>
-            )}
+        {/* Pagination Controls - Bottom */}
+        {pagination && (
+          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{((pagination.page - 1) * filters.limit) + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(pagination.page * filters.limit, pagination.total)}</span> of{' '}
+              <span className="font-medium">{pagination.total}</span> hotels
+              {filters.search && ` matching "${filters.search}"`}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Page {pagination.page} of {pagination.totalPages}</span>
+              <nav className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: 1 })}
+                  data-testid="button-first-bottom"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPrev}
+                  onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
+                  data-testid="button-prev-bottom"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
+                  data-testid="button-next-bottom"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNext}
+                  onClick={() => setFilters({ ...filters, page: pagination.totalPages })}
+                  data-testid="button-last-bottom"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </nav>
+            </div>
           </div>
         )}
       </CardContent>

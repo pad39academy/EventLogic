@@ -35,6 +35,7 @@ export interface IStorage {
   checkHotelDateConflicts(hotelId: string, excludeInstanceCode: string, startDate: Date, endDate: Date): Promise<Hotel[]>;
   getAvailableHotels(): Promise<(Hotel & { availableRooms: number })[]>;
   getAvailableHotelsForDates(startDate: Date, endDate: Date, excludeParticipantId?: string): Promise<(Hotel & { availableRooms: number; suggestedDates?: { start: Date; end: Date } })[]>;
+  getHotelsWithTodayOccupancyPaginated(filters: HotelFilters & { page: number; limit: number }): Promise<{ data: any[]; pagination: { page: number; totalPages: number; total: number; hasNext: boolean; hasPrev: boolean } }>;
 
   // Participant management
   getParticipants(filters?: ParticipantFilters): Promise<Participant[]>;
@@ -394,6 +395,138 @@ export class DatabaseStorage implements IStorage {
     }
 
     return hotelResults;
+  }
+
+  async getHotelsWithTodayOccupancyPaginated(filters: HotelFilters & { page: number; limit: number }): Promise<{ data: any[]; pagination: { page: number; totalPages: number; total: number; hasNext: boolean; hasPrev: boolean } }> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    let query = db
+      .select({
+        // All hotel fields
+        id: hotels.id,
+        hotelId: hotels.hotelId,
+        instanceCode: hotels.instanceCode,
+        hotelName: hotels.hotelName,
+        address: hotels.address,
+        location: hotels.location,
+        pincode: hotels.pincode,
+        district: hotels.district,
+        totalRooms: hotels.totalRooms,
+        pointOfContact: hotels.pointOfContact,
+        contactPhoneNumber: hotels.contactPhoneNumber,
+        startDate: hotels.startDate,
+        endDate: hotels.endDate,
+        createdAt: hotels.createdAt,
+        
+        // ⚡ FAST: Pre-calculated occupancy from balance table
+        occupiedRooms: hotelDailyBalance.calculatedOccupiedRooms,
+        availableRooms: hotelDailyBalance.availableRooms,
+        occupancyPercentage: hotelDailyBalance.occupancyPercentage,
+      })
+      .from(hotels)
+      .leftJoin(
+        hotelDailyBalance,
+        and(
+          eq(hotels.hotelId, hotelDailyBalance.hotelId),
+          eq(hotels.instanceCode, hotelDailyBalance.instanceCode),
+          eq(hotelDailyBalance.balanceDate, today)
+        )
+      );
+
+    const conditions = [];
+
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(hotels.hotelName, `%${filters.search}%`),
+          ilike(hotels.hotelId, `%${filters.search}%`),
+          ilike(hotels.address, `%${filters.search}%`)
+        )
+      );
+    }
+
+    if (filters?.district) {
+      conditions.push(eq(hotels.district, filters.district));
+    }
+
+    if (filters?.location) {
+      conditions.push(eq(hotels.location, filters.location));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    let hotelResults = await query;
+
+    // Convert occupancyPercentage to string and ensure defaults  
+    hotelResults = hotelResults.map(hotel => ({
+      ...hotel,
+      occupiedRooms: hotel.occupiedRooms ?? 0,
+      availableRooms: hotel.availableRooms ?? (hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
+      occupancyPercentage: hotel.occupancyPercentage ? hotel.occupancyPercentage.toString() : "0.00",
+    }));
+
+    // Apply sorting in JavaScript
+    const sortBy = filters?.sortBy || 'hotelId';
+    const sortOrder = filters?.sortOrder || 'asc';
+
+    hotelResults.sort((a, b) => {
+      let aVal = a[sortBy as keyof typeof a];
+      let bVal = b[sortBy as keyof typeof b];
+
+      // Handle date fields specially
+      if (sortBy === 'startDate' || sortBy === 'endDate') {
+        aVal = new Date(aVal as string).getTime();
+        bVal = new Date(bVal as string).getTime();
+      }
+
+      // Handle numeric fields
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      // Handle string fields
+      const aStr = String(aVal || '').toLowerCase();
+      const bStr = String(bVal || '').toLowerCase();
+      
+      if (sortOrder === 'asc') {
+        return aStr.localeCompare(bStr);
+      } else {
+        return bStr.localeCompare(aStr);
+      }
+    });
+
+    // Apply status filter after getting data (since status is computed)
+    if (filters?.status) {
+      hotelResults = hotelResults.filter(hotel => {
+        const status = calculateHotelStatus(hotel.startDate, hotel.endDate);
+        return status === filters.status;
+      });
+    }
+
+    // Calculate total after status filtering
+    const total = hotelResults.length;
+
+    // Apply pagination
+    const offset = (filters.page - 1) * filters.limit;
+    const paginatedResults = hotelResults.slice(offset, offset + filters.limit);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / filters.limit);
+    const hasNext = filters.page < totalPages;
+    const hasPrev = filters.page > 1;
+
+    return {
+      data: paginatedResults,
+      pagination: {
+        page: filters.page,
+        totalPages,
+        total,
+        hasNext,
+        hasPrev
+      }
+    };
   }
 
   async getHotelById(id: string): Promise<Hotel | undefined> {

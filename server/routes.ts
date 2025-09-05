@@ -636,33 +636,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/dashboard/hotels", requireAdmin, async (req, res) => {
     try {
-      const { search, district, status, sortBy, sortOrder } = req.query;
+      const { search, district, status, sortBy, sortOrder, page = "1", limit = "10" } = req.query;
       
       const filters = {
         search: search as string,
         district: district as string,
         status: status as "upcoming" | "active" | "expired",
         sortBy: sortBy as string,
-        sortOrder: sortOrder as "asc" | "desc"
+        sortOrder: sortOrder as "asc" | "desc",
+        page: parseInt(page as string, 10),
+        limit: parseInt(limit as string, 10)
       };
       
-      // Remove undefined values
+      // Remove undefined/empty values but keep pagination params
       Object.keys(filters).forEach(key => {
-        if (filters[key as keyof typeof filters] === undefined || filters[key as keyof typeof filters] === "") {
+        if (key !== 'page' && key !== 'limit' && 
+            (filters[key as keyof typeof filters] === undefined || filters[key as keyof typeof filters] === "")) {
           delete filters[key as keyof typeof filters];
         }
       });
       
-      // ⚡ OPTIMIZED: Use pre-calculated balance data for today's occupancy
-      const hotels = await storage.getHotelsWithTodayOccupancy(filters);
+      // ⚡ OPTIMIZED: Use pre-calculated balance data for today's occupancy with pagination
+      const result = await storage.getHotelsWithTodayOccupancyPaginated(filters);
       
       // Add computed status to each hotel
-      const hotelsWithStatus = hotels.map(hotel => ({
+      const hotelsWithStatus = result.data.map(hotel => ({
         ...hotel,
         status: calculateHotelStatus(hotel.startDate, hotel.endDate)
       }));
       
-      res.json(hotelsWithStatus);
+      res.json({
+        data: hotelsWithStatus,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get hotels" });
     }
