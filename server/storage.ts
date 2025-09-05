@@ -1,6 +1,6 @@
 import { 
   users, hotels, participants, reassignments, notifications,
-  eventStore, eventHandlers, hotelOccupancyBalance,
+  eventStore, eventHandlers, hotelOccupancyBalance, hotelDailyBalance,
   type User, type InsertUser, type Hotel, type InsertHotel, type UpdateHotel,
   type Participant, type InsertParticipant, type Reassignment, 
   type InsertReassignment,
@@ -181,6 +181,146 @@ export class DatabaseStorage implements IStorage {
     }
 
     let hotelResults = await query;
+
+    // Apply sorting in JavaScript for now (to avoid TypeScript complexity)
+    const sortBy = filters?.sortBy || 'hotelId';
+    const sortOrder = filters?.sortOrder || 'asc';
+    
+    hotelResults.sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortBy) {
+        case 'hotelName':
+          aVal = a.hotelName;
+          bVal = b.hotelName;
+          break;
+        case 'location':
+          aVal = a.location;
+          bVal = b.location;
+          break;
+        case 'startDate':
+          aVal = new Date(a.startDate);
+          bVal = new Date(b.startDate);
+          break;
+        case 'endDate':
+          aVal = new Date(a.endDate);
+          bVal = b.endDate;
+          break;
+        case 'totalRooms':
+          aVal = a.totalRooms;
+          bVal = b.totalRooms;
+          break;
+        case 'occupiedRooms':
+          aVal = a.occupiedRooms;
+          bVal = b.occupiedRooms;
+          break;
+        case 'instanceCode':
+          aVal = parseInt(a.instanceCode);
+          bVal = parseInt(b.instanceCode);
+          break;
+        case 'pointOfContact':
+          aVal = a.pointOfContact || '';
+          bVal = b.pointOfContact || '';
+          break;
+        case 'contactPhoneNumber':
+          aVal = a.contactPhoneNumber || '';
+          bVal = b.contactPhoneNumber || '';
+          break;
+        default:
+          aVal = a.hotelId;
+          bVal = b.hotelId;
+      }
+      
+      if (typeof aVal === 'string') {
+        const result = aVal.localeCompare(bVal);
+        return sortOrder === 'desc' ? -result : result;
+      } else {
+        const result = aVal - bVal;
+        return sortOrder === 'desc' ? -result : result;
+      }
+    });
+
+    // Apply status filtering in JavaScript since it's computed
+    if (filters?.status) {
+      hotelResults = hotelResults.filter(hotel => {
+        const status = calculateHotelStatus(hotel.startDate, hotel.endDate);
+        return status === filters.status;
+      });
+    }
+
+    return hotelResults;
+  }
+
+  // ⚡ OPTIMIZED: Get hotels with today's occupancy from pre-calculated balance
+  async getHotelsWithTodayOccupancy(filters?: HotelFilters): Promise<Hotel[]> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    let query = db
+      .select({
+        // All hotel fields
+        id: hotels.id,
+        hotelId: hotels.hotelId,
+        instanceCode: hotels.instanceCode,
+        hotelName: hotels.hotelName,
+        address: hotels.address,
+        location: hotels.location,
+        pincode: hotels.pincode,
+        district: hotels.district,
+        totalRooms: hotels.totalRooms,
+        pointOfContact: hotels.pointOfContact,
+        contactPhoneNumber: hotels.contactPhoneNumber,
+        startDate: hotels.startDate,
+        endDate: hotels.endDate,
+        createdAt: hotels.createdAt,
+        
+        // ⚡ FAST: Pre-calculated occupancy from balance table
+        occupiedRooms: hotelDailyBalance.calculatedOccupiedRooms,
+        availableRooms: hotelDailyBalance.availableRooms,
+        occupancyPercentage: hotelDailyBalance.occupancyPercentage,
+      })
+      .from(hotels)
+      .leftJoin(
+        hotelDailyBalance,
+        and(
+          eq(hotels.hotelId, hotelDailyBalance.hotelId),
+          eq(hotels.instanceCode, hotelDailyBalance.instanceCode),
+          eq(hotelDailyBalance.balanceDate, today)
+        )
+      );
+
+    const conditions = [];
+
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(hotels.hotelName, `%${filters.search}%`),
+          ilike(hotels.hotelId, `%${filters.search}%`),
+          ilike(hotels.address, `%${filters.search}%`)
+        )
+      );
+    }
+
+    if (filters?.district) {
+      conditions.push(eq(hotels.district, filters.district));
+    }
+
+    if (filters?.location) {
+      conditions.push(eq(hotels.location, filters.location));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    let hotelResults = await query;
+
+    // Convert occupancyPercentage to string and ensure defaults  
+    hotelResults = hotelResults.map(hotel => ({
+      ...hotel,
+      occupiedRooms: hotel.occupiedRooms ?? 0,
+      availableRooms: hotel.availableRooms ?? (hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
+      occupancyPercentage: hotel.occupancyPercentage ? hotel.occupancyPercentage.toString() : "0.00",
+    }));
 
     // Apply sorting in JavaScript for now (to avoid TypeScript complexity)
     const sortBy = filters?.sortBy || 'hotelId';

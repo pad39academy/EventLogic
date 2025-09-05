@@ -662,7 +662,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      const hotels = await storage.getHotels(filters);
+      // ⚡ OPTIMIZED: Use pre-calculated balance data for today's occupancy
+      const hotels = await storage.getHotelsWithTodayOccupancy(filters);
       
       // Add computed status to each hotel
       const hotelsWithStatus = hotels.map(hotel => ({
