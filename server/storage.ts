@@ -49,9 +49,7 @@ export interface IStorage {
   createReassignment(reassignment: InsertReassignment): Promise<Reassignment>;
   getReassignmentsByParticipant(participantId: string): Promise<Reassignment[]>;
 
-  // Audit logging
-  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
-  getAuditLogs(filters?: AuditFilters): Promise<AuditLog[]>;
+  // Audit logging - REMOVED: functionality consolidated into event_store table
 
   // Notification management
   createNotification(notification: InsertNotification): Promise<Notification>;

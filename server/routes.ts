@@ -431,12 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const content = req.file.buffer.toString('utf-8');
       const result = await UploadService.uploadHotelInventory(content);
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "upload",
-        targetEntity: "hotel",
-        details: { type: "hotel_inventory", result },
-      });
+      // Audit logging now handled automatically via event_store.user_id
 
       res.json(result);
     } catch (error) {
@@ -458,12 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateAllHotelOccupancy();
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "upload",
-        targetEntity: "participant",
-        details: { type: "coaches_officials", result },
-      });
+      // Audit logging now handled automatically via event_store.user_id
 
       res.json(result);
     } catch (error) {
@@ -485,12 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateAllHotelOccupancy();
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "upload",
-        targetEntity: "participant",
-        details: { type: "players", result },
-      });
+      // Audit logging now handled automatically via event_store.user_id
 
       res.json(result);
     } catch (error) {
