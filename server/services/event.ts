@@ -104,6 +104,7 @@ export class EventService {
 
   /**
    * Process a single event by running all registered handlers (within transaction)
+   * NOW WITH COMPLETE HANDLER TRACKING FOR FULL AUDIT TRAIL!
    */
   static async processEventInTransaction(eventId: string, tx: any): Promise<void> {
     const [event] = await tx.select().from(eventStore).where(eq(eventStore.id, eventId));
@@ -118,8 +119,13 @@ export class EventService {
       // Get registered handlers for this event type
       const handlers = this.getEventHandlers(event.eventType);
 
-      // Execute each handler within the same transaction
+      if (handlers.length === 0) {
+        console.log(`ℹ️  No handlers registered for event type: ${event.eventType}`);
+      }
+
+      // Execute each handler within the same transaction WITH FULL TRACKING
       for (const handlerName of handlers) {
+        console.log(`🔧 Executing handler: ${handlerName} for event ${event.eventType}`);
         await this.executeHandlerInTransaction(event, handlerName, tx);
       }
 
@@ -131,7 +137,7 @@ export class EventService {
         })
         .where(eq(eventStore.id, eventId));
 
-      console.log(`✅ Event processed successfully: ${event.eventType} (${eventId})`);
+      console.log(`✅ Event processed successfully: ${event.eventType} (${eventId}) - ${handlers.length} handlers executed`);
 
     } catch (error) {
       console.error(`❌ Event processing failed: ${event.eventType} (${eventId})`, error);
@@ -196,9 +202,12 @@ export class EventService {
 
   /**
    * Execute a specific event handler within transaction (ACID compliant)
+   * WITH COMPLETE TRACKING: Status, timing, results, and error details
    */
   static async executeHandlerInTransaction(event: EventStore, handlerName: string, tx: any): Promise<void> {
-    // Track handler execution
+    const startTime = Date.now();
+    
+    // Track handler execution with detailed metadata
     const insertHandler: InsertEventHandler = {
       eventId: event.id,
       handlerName,
@@ -206,6 +215,7 @@ export class EventService {
     };
 
     const [handlerRecord] = await tx.insert(eventHandlers).values(insertHandler).returning();
+    console.log(`🔧 Started handler: ${handlerName} for event ${event.eventType} (${event.id})`);
 
     try {
       let result: any = null;
@@ -225,24 +235,40 @@ export class EventService {
           throw new Error(`Unknown handler: ${handlerName}`);
       }
 
-      // Mark handler as processed
+      const executionTime = Date.now() - startTime;
+
+      // Mark handler as processed with performance metrics
       await tx.update(eventHandlers)
         .set({ 
           status: 'processed', 
           processedAt: new Date(),
-          result: result || {}
+          result: {
+            ...result,
+            executionTimeMs: executionTime,
+            timestamp: new Date().toISOString()
+          }
         })
         .where(eq(eventHandlers.id, handlerRecord.id));
 
+      console.log(`✅ Handler completed: ${handlerName} in ${executionTime}ms`);
+
     } catch (error) {
-      console.error(`Handler ${handlerName} failed for event ${event.id}:`, error);
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      // Mark handler as failed
+      console.error(`❌ Handler ${handlerName} failed for event ${event.id} after ${executionTime}ms:`, error);
+      
+      // Mark handler as failed with error details and timing
       await tx.update(eventHandlers)
         .set({ 
           status: 'failed', 
           failedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          errorMessage,
+          result: {
+            executionTimeMs: executionTime,
+            errorDetails: error instanceof Error ? error.stack : 'Unknown error',
+            timestamp: new Date().toISOString()
+          }
         })
         .where(eq(eventHandlers.id, handlerRecord.id));
 
