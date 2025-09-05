@@ -2,6 +2,8 @@ import { storage } from "../storage";
 import { type InsertHotel, type InsertParticipant, type InsertUser } from "@shared/schema";
 import { AuthService } from "./auth";
 import { EventService } from "./event";
+import { db } from "../db";
+import { hotels, participants, users } from "@shared/schema";
 
 export interface UploadResult {
   success: boolean;
@@ -233,6 +235,249 @@ export class UploadService {
     return result;
   }
 
+  // 🚀 BATCH OPTIMIZED: Hotel inventory upload with transaction safety
+  static async uploadHotelInventoryBatch(content: string): Promise<UploadResult> {
+    const result: UploadResult = {
+      success: true,
+      created: 0,
+      errors: [],
+      warnings: [],
+    };
+
+    const BATCH_SIZE = 1000; // Process 1000 hotels at a time
+    
+    try {
+      console.log("🔍 Starting batch hotel upload validation...");
+      
+      // Step 1: Parse and validate structure
+      const rows = this.parsePSV(content);
+      const headers = rows[0];
+      
+      // Validate headers (same logic as original)
+      const requiredFields = [
+        { original: 'HotelID', camel: 'hotelId', key: 'hotelId' },
+        { original: 'InstanceCode', camel: 'instanceCode', key: 'instanceCode' },
+        { original: 'HotelName', camel: 'hotelName', key: 'hotelName' },
+        { original: 'Location', camel: 'location', key: 'location' },
+        { original: 'District', camel: 'district', key: 'district' },
+        { original: 'Address', camel: 'address', key: 'address' },
+        { original: 'Pincode', camel: 'pincode', key: 'pincode' },
+        { original: 'PointOfContact', camel: 'pointOfContact', key: 'pointOfContact' },
+        { original: 'ContactPhone', camel: 'contactPhoneNumber', key: 'contactPhoneNumber' },
+        { original: 'StartDate', camel: 'startDate', key: 'startDate' },
+        { original: 'EndDate', camel: 'endDate', key: 'endDate' },
+        { original: 'TotalRooms', camel: 'totalRooms', key: 'totalRooms' },
+        { original: 'OccupiedRooms', camel: 'occupiedRooms', key: 'occupiedRooms' },
+        { original: 'AvailableRooms', camel: 'availableRooms', key: 'availableRooms' }
+      ];
+
+      const headerMapping: { [key: string]: string } = {};
+      const missingFields: string[] = [];
+
+      requiredFields.forEach(field => {
+        const foundHeader = headers.find(h => 
+          h === field.original || h === field.camel || h.toLowerCase() === field.key.toLowerCase()
+        );
+        if (foundHeader) {
+          headerMapping[foundHeader] = field.key;
+        } else {
+          missingFields.push(field.original);
+        }
+      });
+
+      if (missingFields.length > 0) {
+        result.errors.push(`Missing headers: ${missingFields.join(', ')}`);
+        result.success = false;
+        return result;
+      }
+
+      // Step 2: Pre-validate ALL records before any database operations
+      console.log(`📋 Validating ${rows.length - 1} hotel records...`);
+      
+      const validHotels: InsertHotel[] = [];
+      const hotelKeys = new Set<string>(); // Track hotel+instance combinations
+      
+      // Load existing hotels into memory for fast duplicate checking
+      console.log("💾 Loading existing hotels for duplicate checking...");
+      const existingHotels = await storage.getHotels();
+      const existingKeys = new Set(existingHotels.map(h => `${h.hotelId}-${h.instanceCode}`));
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length !== headers.length) {
+          result.errors.push(`Row ${i + 1}: Invalid column count`);
+          continue;
+        }
+
+        const hotelData: any = {};
+        headers.forEach((header, index) => {
+          const mappedKey = headerMapping[header];
+          if (mappedKey) {
+            hotelData[mappedKey] = row[index];
+          }
+        });
+
+        try {
+          // Basic validation (same as original)
+          if (!hotelData.hotelId || !hotelData.instanceCode) {
+            result.errors.push(`Row ${i + 1}: Missing hotelId or instanceCode`);
+            continue;
+          }
+
+          const hotelKey = `${hotelData.hotelId}-${hotelData.instanceCode}`;
+          
+          // Check for duplicates in current batch
+          if (hotelKeys.has(hotelKey)) {
+            result.errors.push(`Row ${i + 1}: Duplicate hotel ${hotelKey} in upload file`);
+            continue;
+          }
+          
+          // Check for duplicates in existing database
+          if (existingKeys.has(hotelKey)) {
+            result.warnings.push(`Row ${i + 1}: Hotel ${hotelKey} already exists in database`);
+            continue;
+          }
+
+          // Date validation
+          const startDate = this.parseDDMMYYYY(hotelData.startDate);
+          const endDate = this.parseDDMMYYYY(hotelData.endDate);
+          
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            result.errors.push(`Row ${i + 1}: Invalid date format`);
+            continue;
+          }
+
+          if (endDate <= startDate) {
+            result.errors.push(`Row ${i + 1}: End date must be after start date`);
+            continue;
+          }
+
+          // Room validation
+          const totalRooms = parseInt(hotelData.totalRooms);
+          const occupiedRooms = parseInt(hotelData.occupiedRooms) || 0;
+          const availableRooms = parseInt(hotelData.availableRooms);
+
+          if (isNaN(totalRooms) || isNaN(availableRooms) || totalRooms <= 0 || availableRooms < 0) {
+            result.errors.push(`Row ${i + 1}: Invalid room numbers`);
+            continue;
+          }
+
+          if (occupiedRooms + availableRooms !== totalRooms) {
+            result.errors.push(`Row ${i + 1}: Room count mismatch. Occupied (${occupiedRooms}) + Available (${availableRooms}) ≠ Total (${totalRooms})`);
+            continue;
+          }
+
+          // Create validated hotel object
+          const insertHotel: InsertHotel = {
+            hotelId: hotelData.hotelId,
+            instanceCode: hotelData.instanceCode,
+            hotelName: hotelData.hotelName,
+            location: hotelData.location,
+            district: hotelData.district,
+            address: hotelData.address,
+            pincode: hotelData.pincode,
+            pointOfContact: hotelData.pointOfContact || '',
+            contactPhoneNumber: hotelData.contactPhoneNumber || '',
+            startDate,
+            endDate,
+            totalRooms,
+            occupiedRooms,
+            availableRooms,
+          };
+
+          validHotels.push(insertHotel);
+          hotelKeys.add(hotelKey);
+          
+        } catch (error) {
+          result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Step 3: Stop if validation errors found
+      if (result.errors.length > 0) {
+        result.success = false;
+        console.log(`❌ Validation failed with ${result.errors.length} errors. No hotels will be created.`);
+        return result;
+      }
+
+      if (validHotels.length === 0) {
+        console.log("⚠️ No valid hotels to process");
+        return result;
+      }
+
+      console.log(`✅ Pre-validation complete. ${validHotels.length} valid hotels ready for batch insertion.`);
+
+      // Step 4: Process in batches with transaction safety
+      const createdHotels: any[] = [];
+      
+      for (let i = 0; i < validHotels.length; i += BATCH_SIZE) {
+        const batch = validHotels.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(validHotels.length / BATCH_SIZE);
+        
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} hotels)...`);
+        
+        try {
+          // Execute batch in transaction - either all succeed or all rollback
+          const batchResults = await db.transaction(async (tx) => {
+            return await tx.insert(hotels).values(batch).returning();
+          });
+          
+          createdHotels.push(...batchResults);
+          result.created += batchResults.length;
+          console.log(`✅ Batch ${batchNumber} completed successfully: ${batchResults.length} hotels created`);
+          
+        } catch (error) {
+          result.errors.push(`Batch ${batchNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(`❌ Batch ${batchNumber} failed and was rolled back`);
+          result.success = false;
+          break; // Stop processing remaining batches
+        }
+      }
+
+      // Step 5: Publish events for created hotels (asynchronously for speed)
+      if (createdHotels.length > 0) {
+        console.log(`📧 Publishing ${createdHotels.length} hotel creation events...`);
+        
+        // Process events in background to avoid blocking upload response
+        setImmediate(async () => {
+          try {
+            for (const hotel of createdHotels) {
+              await EventService.publishEvent(
+                "hotel_capacity_updated",
+                hotel.hotelId,
+                "hotel",
+                {
+                  hotelId: hotel.hotelId,
+                  instanceCode: hotel.instanceCode,
+                  hotelName: hotel.hotelName,
+                  totalRooms: hotel.totalRooms,
+                  startDate: hotel.startDate.toISOString(),
+                  endDate: hotel.endDate.toISOString(),
+                  location: hotel.location,
+                  district: hotel.district,
+                },
+                { source: "batch_hotel_upload" }
+              );
+            }
+            console.log(`✅ All ${createdHotels.length} hotel events published successfully`);
+          } catch (error) {
+            console.error(`❌ Error publishing hotel events:`, error);
+          }
+        });
+      }
+
+      console.log(`🎉 Batch hotel upload complete! Created: ${result.created}, Errors: ${result.errors.length}, Warnings: ${result.warnings.length}`);
+      
+    } catch (error) {
+      result.errors.push(`Batch upload error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.success = false;
+      console.error("❌ Batch hotel upload failed:", error);
+    }
+
+    return result;
+  }
+
   // Upload Coach and Official Data Sheet
   static async uploadCoachesOfficials(content: string): Promise<UploadResult> {
     const result: UploadResult = {
@@ -383,6 +628,281 @@ export class UploadService {
     } catch (error) {
       result.errors.push(`Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       result.success = false;
+    }
+
+    return result;
+  }
+
+  // 🚀 BATCH OPTIMIZED: Participant upload with transaction safety
+  static async uploadCoachesOfficialsBatch(content: string): Promise<UploadResult> {
+    const result: UploadResult = {
+      success: true,
+      created: 0,
+      errors: [],
+      warnings: [],
+    };
+
+    const BATCH_SIZE = 500; // Process 500 participants at a time (smaller due to complexity)
+    
+    try {
+      console.log("🔍 Starting batch participant upload validation...");
+      
+      // Step 1: Parse and validate structure
+      const rows = this.parsePSV(content);
+      const headers = rows[0];
+      
+      const expectedHeaders = [
+        'ROLE', 'COACH_ID', 'NAME', 'MOBILE_NUMBER', 'DISCIPLINE', 'LOCATION', 'DISTRICT',
+        'HOTEL_ID', 'STADIUM', 'BOOKING_START_DATE', 'BOOKING_END_DATE', 
+        'BOOKING_REFERENCE_NUMBER', 'NOTIFY_TRANSPORT_CONTACT', 'TRAVEL_POC_NAME', 
+        'TRAVEL_POC_MOBILE', 'VENUE_POC_NAME', 'VENUE_POC_MOBILE'
+      ];
+
+      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        result.errors.push(`Missing headers: ${missingHeaders.join(', ')}`);
+        result.success = false;
+        return result;
+      }
+
+      // Step 2: Load reference data into memory for fast validation
+      console.log("💾 Loading reference data for validation...");
+      const existingHotels = await storage.getHotels();
+      const hotelMap = new Map();
+      existingHotels.forEach(hotel => {
+        hotelMap.set(`${hotel.hotelId}-${hotel.instanceCode}`, hotel);
+      });
+
+      const existingParticipants = await storage.getParticipants();
+      const participantKeys = new Set(existingParticipants.map(p => p.participantId));
+
+      const existingUsers = await storage.getUsers();
+      const usersByCoachId = new Map();
+      const usersByMobile = new Map();
+      existingUsers.forEach(user => {
+        if (user.coachId) usersByCoachId.set(user.coachId, user);
+        if (user.mobileNumber) usersByMobile.set(user.mobileNumber, user);
+      });
+
+      // Step 3: Pre-validate ALL records
+      console.log(`📋 Validating ${rows.length - 1} participant records...`);
+      
+      interface ValidatedParticipant {
+        participant: InsertParticipant;
+        needsUserCreation: boolean;
+        userData?: InsertUser;
+        rowNumber: number;
+      }
+
+      const validParticipants: ValidatedParticipant[] = [];
+      const participantIdSet = new Set<string>();
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const data: any = {};
+        headers.forEach((header, index) => {
+          data[header] = row[index];
+        });
+
+        try {
+          // Validate hotel exists
+          const hotel = hotelMap.get(`${data.HOTEL_ID}-1`);
+          if (!hotel) {
+            result.errors.push(`Row ${i + 1}: Hotel ${data.HOTEL_ID} not found in inventory`);
+            continue;
+          }
+
+          // Date validation with 3-day minimum
+          const startDate = this.parseDDMMYYYY(data.BOOKING_START_DATE);
+          const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
+          const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+          
+          if (daysDiff < 3) {
+            result.errors.push(`Row ${i + 1}: Coach/Official booking duration must be at least 3 days. Current: ${daysDiff} days`);
+            continue;
+          }
+
+          // Check for duplicates in batch
+          if (participantIdSet.has(data.COACH_ID)) {
+            result.errors.push(`Row ${i + 1}: Duplicate participant ${data.COACH_ID} in upload file`);
+            continue;
+          }
+
+          // Check for existing participants
+          if (participantKeys.has(data.COACH_ID)) {
+            result.warnings.push(`Row ${i + 1}: Participant ${data.COACH_ID} already exists`);
+            continue;
+          }
+
+          // Normalize mobile number
+          let normalizedMobile = data.MOBILE_NUMBER;
+          if (normalizedMobile && !normalizedMobile.startsWith('+')) {
+            if (normalizedMobile.startsWith('91')) {
+              normalizedMobile = '+' + normalizedMobile;
+            } else if (normalizedMobile.length === 10) {
+              normalizedMobile = '+91' + normalizedMobile;
+            }
+          }
+
+          // Prepare participant data
+          const insertParticipant: InsertParticipant = {
+            participantId: data.COACH_ID,
+            name: data.NAME,
+            mobileNumber: normalizedMobile,
+            role: data.ROLE.toLowerCase() as "coach" | "official" | "player",
+            discipline: data.DISCIPLINE,
+            district: data.DISTRICT,
+            location: data.LOCATION,
+            hotelId: data.HOTEL_ID,
+            stadium: data.STADIUM,
+            bookingStartDate: startDate,
+            bookingEndDate: endDate,
+            bookingReference: data.BOOKING_REFERENCE_NUMBER,
+            notifyTransport: data.NOTIFY_TRANSPORT_CONTACT,
+            travelPocName: data.TRAVEL_POC_NAME,
+            travelPocMobile: data.TRAVEL_POC_MOBILE,
+            venuePocName: data.VENUE_POC_NAME,
+            venuePocMobile: data.VENUE_POC_MOBILE,
+            checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
+          };
+
+          // Determine if user creation is needed for coaches
+          let needsUserCreation = false;
+          let userData: InsertUser | undefined;
+
+          if (data.ROLE === 'COACH') {
+            const existingUserByCoach = usersByCoachId.get(data.COACH_ID);
+            const existingUserByMobile = usersByMobile.get(normalizedMobile);
+            
+            if (!existingUserByCoach && !existingUserByMobile) {
+              needsUserCreation = true;
+              userData = {
+                mobileNumber: normalizedMobile,
+                name: data.NAME,
+                role: "coach",
+                coachId: data.COACH_ID,
+                isActive: true,
+              };
+            }
+          }
+
+          validParticipants.push({
+            participant: insertParticipant,
+            needsUserCreation,
+            userData,
+            rowNumber: i + 1
+          });
+
+          participantIdSet.add(data.COACH_ID);
+          
+        } catch (error) {
+          result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Step 4: Stop if validation errors found
+      if (result.errors.length > 0) {
+        result.success = false;
+        console.log(`❌ Validation failed with ${result.errors.length} errors. No participants will be created.`);
+        return result;
+      }
+
+      if (validParticipants.length === 0) {
+        console.log("⚠️ No valid participants to process");
+        return result;
+      }
+
+      console.log(`✅ Pre-validation complete. ${validParticipants.length} valid participants ready for batch insertion.`);
+
+      // Step 5: Process in batches with transaction safety
+      const createdParticipants: any[] = [];
+      
+      for (let i = 0; i < validParticipants.length; i += BATCH_SIZE) {
+        const batch = validParticipants.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(validParticipants.length / BATCH_SIZE);
+        
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} participants)...`);
+        
+        try {
+          // Execute batch in transaction - either all succeed or all rollback
+          const batchResults = await db.transaction(async (tx) => {
+            // First, create any needed user accounts
+            const usersToCreate = batch.filter(item => item.needsUserCreation && item.userData);
+            if (usersToCreate.length > 0) {
+              console.log(`  👤 Creating ${usersToCreate.length} user accounts...`);
+              await tx.insert(users).values(usersToCreate.map(item => item.userData!));
+            }
+            
+            // Then, create participants
+            console.log(`  🎯 Creating ${batch.length} participants...`);
+            const participantData = batch.map(item => item.participant);
+            const insertedParticipants = await tx.insert(participants).values(participantData).returning();
+            
+            return insertedParticipants;
+          });
+          
+          createdParticipants.push(...batchResults);
+          result.created += batchResults.length;
+          console.log(`✅ Batch ${batchNumber} completed successfully: ${batchResults.length} participants created`);
+          
+        } catch (error) {
+          result.errors.push(`Batch ${batchNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(`❌ Batch ${batchNumber} failed and was rolled back`);
+          result.success = false;
+          break; // Stop processing remaining batches
+        }
+      }
+
+      // Step 6: Publish events and update occupancy (asynchronously for speed)
+      if (createdParticipants.length > 0) {
+        console.log(`📧 Publishing ${createdParticipants.length} participant events and updating occupancy...`);
+        
+        // Process events in background to avoid blocking upload response
+        setImmediate(async () => {
+          try {
+            // Publish events
+            for (const participant of createdParticipants) {
+              await EventService.publishEvent(
+                "participant_registered",
+                participant.participantId,
+                "participant",
+                {
+                  participantId: participant.participantId,
+                  name: participant.name,
+                  role: participant.role,
+                  hotelId: participant.hotelId,
+                  instanceCode: '1',
+                  bookingStartDate: participant.bookingStartDate.toISOString(),
+                  bookingEndDate: participant.bookingEndDate.toISOString(),
+                  discipline: participant.discipline,
+                  district: participant.district,
+                  teamName: participant.teamName,
+                  coachId: participant.coachId,
+                },
+                { source: "batch_participants_upload" }
+              );
+            }
+            
+            // Update hotel occupancy for affected hotels
+            const affectedHotels = new Set(createdParticipants.map(p => p.hotelId));
+            for (const hotelId of affectedHotels) {
+              await storage.updateHotelOccupancy(hotelId, '1');
+            }
+            
+            console.log(`✅ All ${createdParticipants.length} participant events published and occupancy updated`);
+          } catch (error) {
+            console.error(`❌ Error publishing participant events:`, error);
+          }
+        });
+      }
+
+      console.log(`🎉 Batch participant upload complete! Created: ${result.created}, Errors: ${result.errors.length}, Warnings: ${result.warnings.length}`);
+      
+    } catch (error) {
+      result.errors.push(`Batch upload error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.success = false;
+      console.error("❌ Batch participant upload failed:", error);
     }
 
     return result;
