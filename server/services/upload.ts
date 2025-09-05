@@ -908,6 +908,227 @@ export class UploadService {
     return result;
   }
 
+  // 🚀 BATCH OPTIMIZED: Player upload with transaction safety
+  static async uploadPlayersBatch(content: string): Promise<UploadResult> {
+    const result: UploadResult = {
+      success: true,
+      created: 0,
+      errors: [],
+      warnings: [],
+    };
+
+    const BATCH_SIZE = 500; // Process 500 players at a time
+    
+    try {
+      console.log("🔍 Starting batch player upload validation...");
+      
+      // Step 1: Parse and validate structure
+      const rows = this.parsePSV(content);
+      const headers = rows[0];
+      
+      const expectedHeaders = [
+        'COACH_ID', 'PLAYER_ID', 'PLAYER_NAME', 'MOBILE_NUMBER', 'TEAM_NAME',
+        'HOTEL_ID', 'BOOKING_REFERENCE', 'BOOKING_START_DATE', 'BOOKING_END_DATE'
+      ];
+
+      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        result.errors.push(`Missing headers: ${missingHeaders.join(', ')}`);
+        result.success = false;
+        return result;
+      }
+
+      // Step 2: Load reference data into memory for fast validation
+      console.log("💾 Loading reference data for validation...");
+      const existingHotels = await storage.getHotels();
+      const hotelMap = new Map();
+      existingHotels.forEach(hotel => {
+        hotelMap.set(`${hotel.hotelId}-${hotel.instanceCode}`, hotel);
+      });
+
+      const existingParticipants = await storage.getParticipants();
+      const participantKeys = new Set(existingParticipants.map(p => p.participantId));
+      
+      // Create coach lookup map for performance
+      const coachMap = new Map();
+      existingParticipants.filter(p => p.role === 'coach').forEach(coach => {
+        coachMap.set(coach.participantId, coach);
+      });
+
+      // Step 3: Pre-validate ALL records
+      console.log(`📋 Validating ${rows.length - 1} player records...`);
+      
+      const validPlayers: InsertParticipant[] = [];
+      const playerIdSet = new Set<string>();
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const data: any = {};
+        headers.forEach((header, index) => {
+          data[header] = row[index];
+        });
+
+        try {
+          // Validate coach exists
+          const coach = coachMap.get(data.COACH_ID);
+          if (!coach) {
+            result.errors.push(`Row ${i + 1}: Coach ${data.COACH_ID} not found`);
+            continue;
+          }
+
+          // Validate hotel exists
+          const hotel = hotelMap.get(`${data.HOTEL_ID}-1`);
+          if (!hotel) {
+            result.errors.push(`Row ${i + 1}: Hotel ${data.HOTEL_ID} not found in inventory`);
+            continue;
+          }
+
+          // Date validation with 3-day minimum
+          const startDate = this.parseDDMMYYYY(data.BOOKING_START_DATE);
+          const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
+          const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+          
+          if (daysDiff < 3) {
+            result.errors.push(`Row ${i + 1}: Player booking duration must be at least 3 days. Current: ${daysDiff} days`);
+            continue;
+          }
+
+          // Check for duplicates in batch
+          if (playerIdSet.has(data.PLAYER_ID)) {
+            result.errors.push(`Row ${i + 1}: Duplicate player ${data.PLAYER_ID} in upload file`);
+            continue;
+          }
+
+          // Check for existing players
+          if (participantKeys.has(data.PLAYER_ID)) {
+            result.warnings.push(`Row ${i + 1}: Player ${data.PLAYER_ID} already exists`);
+            continue;
+          }
+
+          // Prepare player data
+          const insertParticipant: InsertParticipant = {
+            participantId: data.PLAYER_ID,
+            name: data.PLAYER_NAME,
+            mobileNumber: data.MOBILE_NUMBER || null,
+            role: "player",
+            // Players inherit discipline, district, location from their coach
+            discipline: coach.discipline,
+            district: coach.district,
+            location: coach.location,
+            hotelId: data.HOTEL_ID,
+            stadium: coach.stadium,
+            bookingStartDate: startDate,
+            bookingEndDate: endDate,
+            bookingReference: data.BOOKING_REFERENCE,
+            teamName: data.TEAM_NAME,
+            coachId: data.COACH_ID,
+            checkinStatus: 'pending',
+          };
+
+          validPlayers.push(insertParticipant);
+          playerIdSet.add(data.PLAYER_ID);
+          
+        } catch (error) {
+          result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Step 4: Stop if validation errors found
+      if (result.errors.length > 0) {
+        result.success = false;
+        console.log(`❌ Validation failed with ${result.errors.length} errors. No players will be created.`);
+        return result;
+      }
+
+      if (validPlayers.length === 0) {
+        console.log("⚠️ No valid players to process");
+        return result;
+      }
+
+      console.log(`✅ Pre-validation complete. ${validPlayers.length} valid players ready for batch insertion.`);
+
+      // Step 5: Process in batches with transaction safety
+      const createdPlayers: any[] = [];
+      
+      for (let i = 0; i < validPlayers.length; i += BATCH_SIZE) {
+        const batch = validPlayers.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(validPlayers.length / BATCH_SIZE);
+        
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} players)...`);
+        
+        try {
+          // Execute batch in transaction - either all succeed or all rollback
+          const batchResults = await db.transaction(async (tx) => {
+            return await tx.insert(participants).values(batch).returning();
+          });
+          
+          createdPlayers.push(...batchResults);
+          result.created += batchResults.length;
+          console.log(`✅ Batch ${batchNumber} completed successfully: ${batchResults.length} players created`);
+          
+        } catch (error) {
+          result.errors.push(`Batch ${batchNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(`❌ Batch ${batchNumber} failed and was rolled back`);
+          result.success = false;
+          break; // Stop processing remaining batches
+        }
+      }
+
+      // Step 6: Publish events and update occupancy (asynchronously for speed)
+      if (createdPlayers.length > 0) {
+        console.log(`📧 Publishing ${createdPlayers.length} player events and updating occupancy...`);
+        
+        // Process events in background to avoid blocking upload response
+        setImmediate(async () => {
+          try {
+            // Publish events
+            for (const player of createdPlayers) {
+              await EventService.publishEvent(
+                "participant_registered",
+                player.participantId,
+                "participant",
+                {
+                  participantId: player.participantId,
+                  name: player.name,
+                  role: player.role,
+                  hotelId: player.hotelId,
+                  instanceCode: '1',
+                  bookingStartDate: player.bookingStartDate.toISOString(),
+                  bookingEndDate: player.bookingEndDate.toISOString(),
+                  discipline: player.discipline,
+                  district: player.district,
+                  teamName: player.teamName,
+                  coachId: player.coachId,
+                },
+                { source: "batch_players_upload" }
+              );
+            }
+            
+            // Update hotel occupancy for affected hotels
+            const affectedHotels = new Set(createdPlayers.map(p => p.hotelId));
+            for (const hotelId of affectedHotels) {
+              await storage.updateHotelOccupancy(hotelId, '1');
+            }
+            
+            console.log(`✅ All ${createdPlayers.length} player events published and occupancy updated`);
+          } catch (error) {
+            console.error(`❌ Error publishing player events:`, error);
+          }
+        });
+      }
+
+      console.log(`🎉 Batch player upload complete! Created: ${result.created}, Errors: ${result.errors.length}, Warnings: ${result.warnings.length}`);
+      
+    } catch (error) {
+      result.errors.push(`Batch upload error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.success = false;
+      console.error("❌ Batch player upload failed:", error);
+    }
+
+    return result;
+  }
+
   // Upload Player Data Sheet
   static async uploadPlayers(content: string): Promise<UploadResult> {
     const result: UploadResult = {
