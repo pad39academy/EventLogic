@@ -312,6 +312,17 @@ export class EventService {
   static async handleOccupancyCalculationInTransaction(event: EventStore, tx: any): Promise<any> {
     console.log(`🏨 Processing occupancy calculation for event: ${event.eventType} #${event.sequenceNumber}`);
 
+    if (event.eventType === 'hotel_capacity_updated') {
+      const eventData = event.eventData as any;
+      
+      // Ensure balance window exists for the hotel
+      await BalanceWindowManager.ensureBalanceWindow(eventData.hotelId, eventData.instanceCode);
+      
+      console.log(`✅ Balance window ensured for hotel: ${eventData.hotelId}-${eventData.instanceCode}`);
+      
+      return { message: 'Balance window ensured for hotel' };
+    }
+
     if (event.eventType === 'booking_created' || event.eventType === 'participant_registered') {
       const eventData = event.eventData as BookingCreatedEvent | ParticipantRegisteredEvent;
       
@@ -715,6 +726,7 @@ export class EventService {
       'participant_checked_in': ['notification_sender', 'audit_logger'],
       'participant_checked_out': ['notification_sender', 'audit_logger'],
       'hotel_occupancy_changed': ['notification_sender', 'audit_logger'],
+      'hotel_capacity_updated': ['occupancy_calculator', 'audit_logger'],
       'bulk_upload_completed': ['audit_logger'],
     };
 
