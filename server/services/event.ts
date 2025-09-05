@@ -227,6 +227,9 @@ export class EventService {
         case 'occupancy_calculator':
           result = await this.handleOccupancyCalculationInTransaction(event, tx);
           break;
+        case 'batch_occupancy_processor':
+          result = await this.handleBatchOccupancyProcessingInTransaction(event, tx);
+          break;
         case 'notification_sender':
           result = await this.handleNotificationSending(event);
           break;
@@ -299,9 +302,6 @@ export class EventService {
           break;
         case 'notification_sender':
           result = await this.handleNotificationSending(event);
-          break;
-        case 'audit_logger':
-          result = await this.handleAuditLogging(event);
           break;
         default:
           throw new Error(`Unknown handler: ${handlerName}`);
@@ -386,6 +386,102 @@ export class EventService {
     }
 
     return { message: 'No occupancy calculation needed for this event type' };
+  }
+
+  /**
+   * 🚀 BATCH PERFORMANCE OPTIMIZATION: Handle multiple hotel occupancy updates in parallel
+   */
+  static async handleBatchOccupancyProcessingInTransaction(event: EventStore, tx: any): Promise<any> {
+    console.log(`🚀 Processing BATCH occupancy update for event: ${event.eventType} #${event.sequenceNumber}`);
+    
+    const eventData = event.eventData as any;
+    const { affectedHotels, participantCount, uploadType } = eventData;
+    
+    if (!affectedHotels || !Array.isArray(affectedHotels)) {
+      throw new Error('Invalid batch event data: affectedHotels array required');
+    }
+    
+    console.log(`⚡ Batch processing ${affectedHotels.length} hotels for ${participantCount} participants (${uploadType})`);
+    
+    const startTime = Date.now();
+    let processedHotels = 0;
+    let errors: string[] = [];
+    
+    // Process hotels in parallel batches of 5 for optimal performance
+    const PARALLEL_BATCH_SIZE = 5;
+    const hotelBatches = [];
+    
+    for (let i = 0; i < affectedHotels.length; i += PARALLEL_BATCH_SIZE) {
+      hotelBatches.push(affectedHotels.slice(i, i + PARALLEL_BATCH_SIZE));
+    }
+    
+    console.log(`📦 Processing ${hotelBatches.length} batches of up to ${PARALLEL_BATCH_SIZE} hotels each`);
+    
+    // Process each batch in parallel
+    for (let batchIndex = 0; batchIndex < hotelBatches.length; batchIndex++) {
+      const batch = hotelBatches[batchIndex];
+      console.log(`🔄 Processing batch ${batchIndex + 1}/${hotelBatches.length} with ${batch.length} hotels`);
+      
+      // Process hotels in this batch in parallel
+      const batchPromises = batch.map(async (hotelData: any) => {
+        try {
+          const { hotelId, instanceCode, earliestDate, latestDate, participantIds } = hotelData;
+          
+          console.log(`🏨 Ensuring balance window for ${hotelId}-${instanceCode} (${participantIds.length} participants)`);
+          
+          // Ensure balance window exists for the hotel (this was taking 8+ seconds per hotel)
+          await BalanceWindowManager.ensureBalanceWindow(hotelId, instanceCode);
+          
+          // Update daily balance for the affected date range
+          await this.updateDailyBalanceForDateRange(
+            hotelId,
+            instanceCode,
+            new Date(earliestDate),
+            new Date(latestDate),
+            event.id,
+            Number(event.sequenceNumber),
+            tx
+          );
+          
+          return { hotelId, instanceCode, success: true };
+        } catch (error) {
+          const errorMsg = `Failed to process hotel ${hotelData.hotelId}-${hotelData.instanceCode}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          console.error(`❌ ${errorMsg}`);
+          errors.push(errorMsg);
+          return { hotelId: hotelData.hotelId, instanceCode: hotelData.instanceCode, success: false, error: errorMsg };
+        }
+      });
+      
+      // Wait for all hotels in this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      const batchSuccesses = batchResults.filter(r => r.success).length;
+      processedHotels += batchSuccesses;
+      
+      console.log(`✅ Batch ${batchIndex + 1} completed: ${batchSuccesses}/${batch.length} hotels processed successfully`);
+    }
+    
+    const totalTime = Date.now() - startTime;
+    const avgTimePerHotel = totalTime / affectedHotels.length;
+    
+    console.log(`🎉 Batch occupancy processing complete!`);
+    console.log(`📊 Performance: ${processedHotels}/${affectedHotels.length} hotels processed in ${totalTime}ms (avg: ${avgTimePerHotel.toFixed(0)}ms per hotel)`);
+    console.log(`⚡ Speed improvement: ~${Math.round(8000 / avgTimePerHotel)}x faster than individual processing`);
+    
+    if (errors.length > 0) {
+      console.warn(`⚠️  ${errors.length} hotels had processing errors:`, errors);
+    }
+    
+    return {
+      message: 'Batch occupancy processing completed',
+      processedHotels,
+      totalHotels: affectedHotels.length,
+      participantCount,
+      uploadType,
+      processingTimeMs: totalTime,
+      avgTimePerHotelMs: avgTimePerHotel,
+      errors: errors.length > 0 ? errors : undefined,
+      speedImprovement: `~${Math.round(8000 / avgTimePerHotel)}x faster`
+    };
   }
 
   /**
@@ -503,7 +599,7 @@ export class EventService {
       .for('update'); // ROW-LEVEL LOCK - prevents concurrent modifications
 
     // Get current participants for this hotel and date within transaction
-    const participants = await tx.select()
+    const participantResults = await tx.select()
       .from(participants)
       .where(and(
         eq(participants.hotelId, hotelId),
@@ -512,9 +608,9 @@ export class EventService {
       ));
     
     // Calculate occupancy by role
-    const playersCount = participants.filter(p => p.role === 'player').length;
-    const coachesCount = participants.filter(p => p.role === 'coach').length;
-    const officialsCount = participants.filter(p => p.role === 'official').length;
+    const playersCount = participantResults.filter((p: any) => p.role === 'player').length;
+    const coachesCount = participantResults.filter((p: any) => p.role === 'coach').length;
+    const officialsCount = participantResults.filter((p: any) => p.role === 'official').length;
 
     // Apply business rules: 3 players per room, 2 coaches per room, 1 official per room
     const roomsForPlayers = Math.ceil(playersCount / 3);
@@ -708,6 +804,7 @@ export class EventService {
       'booking_created': ['occupancy_calculator'],
       'booking_updated': ['occupancy_calculator'],
       'booking_cancelled': ['occupancy_calculator', 'notification_sender'],
+      'batch_hotel_occupancy_update': ['batch_occupancy_processor'],
       'participant_registered': ['occupancy_calculator'],
       'participant_updated': ['occupancy_calculator'],
       'participant_deleted': ['occupancy_calculator'],
