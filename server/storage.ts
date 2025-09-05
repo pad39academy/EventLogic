@@ -1,9 +1,9 @@
 import { 
-  users, hotels, participants, reassignments, auditLog, notifications,
+  users, hotels, participants, reassignments, notifications,
   eventStore, eventHandlers, hotelOccupancyBalance,
   type User, type InsertUser, type Hotel, type InsertHotel, type UpdateHotel,
   type Participant, type InsertParticipant, type Reassignment, 
-  type InsertReassignment, type AuditLog, type InsertAuditLog,
+  type InsertReassignment,
   type Notification, type InsertNotification, type UpdateNotification,
   type EventStore, type InsertEventStore, type HotelOccupancyBalance,
   calculateHotelStatus, type HotelWithStatus
@@ -574,30 +574,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(reassignments.reassignedAt));
   }
 
-  async createAuditLog(insertAuditLog: InsertAuditLog): Promise<AuditLog> {
-    const [log] = await db.insert(auditLog).values(insertAuditLog).returning();
-    return log;
-  }
-
-  async getAuditLogs(filters: AuditFilters = {}): Promise<any[]> {
-    const auditLogs = await db
-      .select({
-        id: auditLog.id,
-        actionType: auditLog.actionType,
-        targetEntity: auditLog.targetEntity,
-        targetId: auditLog.targetId,
-        details: auditLog.details,
-        timestamp: auditLog.timestamp,
-        userName: users.name,
-        userEmail: users.email
-      })
-      .from(auditLog)
-      .leftJoin(users, eq(auditLog.userId, users.id))
-      .orderBy(desc(auditLog.timestamp))
-      .limit(100);
-    
-    return auditLogs;
-  }
+  // Audit logging methods removed - functionality consolidated into event_store table
+  // Use EventService.getAuditTrail() to query audit information from event_store
 
   // Calculate dynamic occupancy for a specific hotel
   async calculateHotelOccupancy(hotelId: string, instanceCode: string): Promise<{ occupiedRooms: number; occupancyRate: number }> {

@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import { 
-  eventStore, eventHandlers, hotelOccupancyBalance, hotelDailyBalance, hotels, participants, auditLog,
+  eventStore, eventHandlers, hotelOccupancyBalance, hotelDailyBalance, hotels, participants,
   type InsertEventStore, type InsertEventHandler, type EventStore,
   type InsertHotelOccupancyBalance, type HotelOccupancyBalance, type InsertHotelDailyBalance
 } from "@shared/schema";
@@ -83,6 +83,8 @@ export class EventService {
         eventDate: eventDate.toISOString().split('T')[0],
         sequenceNumber,
         partitionKey,
+        // Audit fields (consolidated from audit_log)
+        userId: metadata.userId || null,
         // Standard fields
         metadata: {
           ...metadata,
@@ -228,9 +230,7 @@ export class EventService {
         case 'notification_sender':
           result = await this.handleNotificationSending(event);
           break;
-        case 'audit_logger':
-          result = await this.handleAuditLoggingInTransaction(event, tx);
-          break;
+        // audit_logger case removed - functionality consolidated into event_store.user_id
         default:
           throw new Error(`Unknown handler: ${handlerName}`);
       }
@@ -697,63 +697,25 @@ export class EventService {
   /**
    * Handle audit logging events within transaction (ACID compliant)
    */
-  static async handleAuditLoggingInTransaction(event: EventStore, tx: any): Promise<any> {
-    console.log(`📝 Processing audit log for event: ${event.eventType}`);
-    
-    // Create audit log entry within transaction
-    await tx.insert(auditLog).values({
-      userId: event.metadata.userId || 'system',
-      actionType: event.eventType,
-      targetEntity: event.aggregateType,
-      targetId: event.aggregateId,
-      details: {
-        eventId: event.id,
-        eventData: event.eventData,
-        metadata: event.metadata
-      }
-    });
-
-    return { message: 'Audit log created successfully' };
-  }
-
-  /**
-   * Handle audit logging events (legacy method)
-   */
-  static async handleAuditLogging(event: EventStore): Promise<any> {
-    console.log(`📝 Processing audit log for event: ${event.eventType}`);
-    
-    // Create audit log entry
-    await storage.createAuditLog({
-      userId: event.metadata.userId || 'system',
-      actionType: event.eventType,
-      targetEntity: event.aggregateType,
-      targetId: event.aggregateId,
-      details: {
-        eventId: event.id,
-        eventData: event.eventData,
-        metadata: event.metadata
-      }
-    });
-
-    return { message: 'Audit log created successfully' };
-  }
+  // Audit logging methods removed - functionality consolidated into event_store table
+  // userId is now extracted from metadata and stored directly in event_store.user_id
 
   /**
    * Get registered handlers for an event type
    */
   static getEventHandlers(eventType: string): string[] {
     const handlerMap: Record<string, string[]> = {
-      'booking_created': ['occupancy_calculator', 'audit_logger'],
-      'booking_updated': ['occupancy_calculator', 'audit_logger'],
-      'booking_cancelled': ['occupancy_calculator', 'notification_sender', 'audit_logger'],
-      'participant_registered': ['occupancy_calculator', 'audit_logger'],
-      'participant_updated': ['occupancy_calculator', 'audit_logger'],
-      'participant_deleted': ['occupancy_calculator', 'audit_logger'],
-      'participant_checked_in': ['notification_sender', 'audit_logger'],
-      'participant_checked_out': ['notification_sender', 'audit_logger'],
-      'hotel_occupancy_changed': ['notification_sender', 'audit_logger'],
-      'hotel_capacity_updated': ['occupancy_calculator', 'audit_logger'],
-      'bulk_upload_completed': ['audit_logger'],
+      'booking_created': ['occupancy_calculator'],
+      'booking_updated': ['occupancy_calculator'],
+      'booking_cancelled': ['occupancy_calculator', 'notification_sender'],
+      'participant_registered': ['occupancy_calculator'],
+      'participant_updated': ['occupancy_calculator'],
+      'participant_deleted': ['occupancy_calculator'],
+      'participant_checked_in': ['notification_sender'],
+      'participant_checked_out': ['notification_sender'],
+      'hotel_occupancy_changed': ['notification_sender'],
+      'hotel_capacity_updated': ['occupancy_calculator'],
+      'bulk_upload_completed': [],
     };
 
     return handlerMap[eventType] || [];

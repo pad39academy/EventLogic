@@ -169,12 +169,15 @@ export const eventStore = pgTable("event_store", {
   sequenceNumber: bigint("sequence_number", { mode: "number" }).notNull(), // Daily sequence: 1, 2, 3...
   partitionKey: varchar("partition_key").notNull(), // "2025-09-05" format for daily partitions
   
+  // Audit fields (consolidated from audit_log)
+  userId: text("user_id"), // User who triggered this event
+  
   // Existing fields
   eventType: eventTypeEnum("event_type").notNull(),
   aggregateId: text("aggregate_id").notNull(), // The ID of the entity this event affects
   aggregateType: text("aggregate_type").notNull(), // participant, hotel, user, etc.
   eventData: jsonb("event_data").notNull(), // The full event payload
-  metadata: jsonb("metadata").default({}), // Additional context (user_id, correlation_id, etc.)
+  metadata: jsonb("metadata").default({}), // Additional context (correlation_id, etc.)
   eventVersion: integer("event_version").notNull().default(1), // For event schema evolution
   status: eventStatusEnum("status").default("pending"),
   processedAt: timestamp("processed_at"),
@@ -187,6 +190,10 @@ export const eventStore = pgTable("event_store", {
   partitionSeqIdx: index("event_partition_seq_idx").on(table.partitionKey, table.sequenceNumber),
   eventTypePartitionIdx: index("event_type_partition_idx").on(table.eventType, table.partitionKey),
   aggregatePartitionIdx: index("event_aggregate_partition_idx").on(table.aggregateId, table.partitionKey),
+  
+  // Audit query indexes (consolidated from audit_log)
+  userEventTypeIdx: index("event_store_user_action_idx").on(table.userId, table.eventType),
+  userAggregateIdx: index("event_store_user_target_idx").on(table.userId, table.aggregateType),
   
   // Legacy indexes for existing queries
   eventTypeIdx: index("event_store_event_type_idx").on(table.eventType),
@@ -273,20 +280,10 @@ export const hotelOccupancyBalance = pgTable("hotel_occupancy_balance", {
   uniqueHotelDateIdx: index("unique_hotel_date_idx").on(table.hotelId, table.instanceCode, table.date),
 }));
 
-// Audit log table
-export const auditLog = pgTable("audit_log", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: text("user_id").notNull(),
-  actionType: text("action_type").notNull(), // upload, edit, delete, checkin, checkout, reassign, verify_hotel
-  targetEntity: text("target_entity").notNull(), // participant, hotel, etc.
-  targetId: text("target_id"),
-  details: jsonb("details"),
-  timestamp: timestamp("timestamp").defaultNow(),
-});
+// Audit log functionality consolidated into event_store table for better performance
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
-  auditLogs: many(auditLog),
   sentNotifications: many(notifications, { relationName: "sentNotifications" }),
   receivedNotifications: many(notifications, { relationName: "receivedNotifications" }),
 }));
@@ -322,12 +319,7 @@ export const reassignmentsRelations = relations(reassignments, ({ one }) => ({
   }),
 }));
 
-export const auditLogRelations = relations(auditLog, ({ one }) => ({
-  user: one(users, {
-    fields: [auditLog.userId],
-    references: [users.id],
-  }),
-}));
+// Audit log relations removed - functionality consolidated into event_store
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -489,10 +481,7 @@ export const insertReassignmentSchema = createInsertSchema(reassignments).omit({
   reassignedAt: true,
 });
 
-export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
-  id: true,
-  timestamp: true,
-});
+// insertAuditLogSchema removed - functionality consolidated into event_store
 
 export const insertOtpSchema = createInsertSchema(otpVerifications).omit({
   id: true,
@@ -530,8 +519,7 @@ export type UpdateCoach = z.infer<typeof updateCoachSchema>;
 export type UpdateOfficial = z.infer<typeof updateOfficialSchema>;
 export type Reassignment = typeof reassignments.$inferSelect;
 export type InsertReassignment = z.infer<typeof insertReassignmentSchema>;
-export type AuditLog = typeof auditLog.$inferSelect;
-export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+// AuditLog types removed - functionality consolidated into event_store
 export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = z.infer<typeof insertOtpSchema>;
 export type Notification = typeof notifications.$inferSelect;
