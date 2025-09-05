@@ -119,13 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       req.session.user = user;
       
-      await storage.createAuditLog({
-        userId: user.id,
-        actionType: "login",
-        targetEntity: "user",
-        targetId: user.id,
-        details: { method: "admin_2fa_login", mobileNumber },
-      });
+      // Audit logging now handled automatically via event_store.user_id
 
       res.json({ user: { id: user.id, name: user.name, role: user.role } });
     } catch (error) {
@@ -177,13 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId: req.sessionID
       });
 
-      await storage.createAuditLog({
-        userId: user.id,
-        actionType: "login",
-        targetEntity: "user",
-        targetId: user.id,
-        details: { method: "coach_otp_login", mobileNumber },
-      });
+      // Audit logging now handled automatically via event_store.user_id
 
       res.json({ 
         user: { 
