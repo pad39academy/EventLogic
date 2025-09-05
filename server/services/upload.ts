@@ -312,7 +312,7 @@ export class UploadService {
             participantId: data.COACH_ID,
             name: data.NAME,
             mobileNumber: normalizedMobile,
-            role: data.ROLE.toLowerCase() as "coach" | "official",
+            role: data.ROLE.toLowerCase() as "coach" | "official" | "player",
             discipline: data.DISCIPLINE,
             district: data.DISTRICT,
             location: data.LOCATION,
