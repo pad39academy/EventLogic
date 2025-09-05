@@ -2,6 +2,7 @@ import { storage } from "../storage";
 import { type InsertHotel, type InsertParticipant, type InsertUser } from "@shared/schema";
 import { AuthService } from "./auth";
 import { EventService } from "./event";
+import { BalanceWindowManager } from "./balance-window-manager";
 import { db } from "../db";
 import { hotels, participants, users } from "@shared/schema";
 
@@ -435,46 +436,38 @@ export class UploadService {
         }
       }
 
-      // Step 5: Publish SINGLE batch event for all hotels (10-20x faster)
+      // Step 5: Create balance windows using SAFER chunked approach
       if (createdHotels.length > 0) {
-        console.log(`🚀 Publishing optimized batch event for ${createdHotels.length} hotels...`);
+        console.log(`🚀 Creating balance windows for ${createdHotels.length} hotels using chunked processing...`);
         
-        // Collect affected hotels with date ranges for batch processing
-        const affectedHotelsMap = new Map<string, {
-          hotelId: string;
-          instanceCode: string;
-          participantIds: string[];
-          earliestDate: Date;
-          latestDate: Date;
-        }>();
-
-        // Group hotels by hotel and calculate date ranges
-        for (const hotel of createdHotels) {
-          const hotelKey = `${hotel.hotelId}-${hotel.instanceCode}`;
-          affectedHotelsMap.set(hotelKey, {
-            hotelId: hotel.hotelId,
-            instanceCode: hotel.instanceCode,
-            participantIds: [], // Empty for hotel events
-            earliestDate: hotel.startDate,
-            latestDate: hotel.endDate,
-          });
-        }
-
-        // Publish single batch event for all affected hotels (10-20x faster)
-        await EventService.publishEvent(
-          "batch_hotel_occupancy_update",
-          "batch-hotel-upload-" + Date.now(),
-          "batch",
-          {
-            affectedHotels: Array.from(affectedHotelsMap.values()),
-            participantCount: 0, // Hotel uploads don't affect participants
-            uploadType: "hotel_inventory_batch",
-            timestamp: new Date().toISOString(),
-          },
-          { source: "batch_hotel_upload" }
+        // Prepare hotel data for chunked processing
+        const hotelData = createdHotels.map(hotel => ({
+          hotelId: hotel.hotelId,
+          instanceCode: hotel.instanceCode,
+          startDate: hotel.startDate,
+          endDate: hotel.endDate,
+          totalRooms: hotel.totalRooms
+        }));
+        
+        // Create balance windows using chunked approach (50 hotels per chunk)
+        const balanceResult = await BalanceWindowManager.createBalanceWindowsChunked(
+          hotelData,
+          50, // Process 50 hotels per chunk
+          (processed: number, total: number, errors: string[]) => {
+            console.log(`📊 Progress: ${processed}/${total} hotels processed (${Math.round(processed/total*100)}%)`);
+            if (errors.length > 0) {
+              console.log(`⚠️  Errors so far: ${errors.length}`);
+            }
+          }
         );
         
-        console.log(`⚡ Hotel batch event published for ${affectedHotelsMap.size} hotels (was ${createdHotels.length} individual events)`);
+        if (balanceResult.success) {
+          console.log(`✅ Balance windows created successfully for all ${balanceResult.processed} hotels`);
+        } else {
+          console.log(`⚠️  Balance windows created with some errors: ${balanceResult.processed}/${createdHotels.length} processed`);
+          result.warnings.push(`Balance window creation had ${balanceResult.errors.length} errors. Some hotels may need manual balance window setup.`);
+          result.warnings.push(...balanceResult.errors);
+        }
       }
 
       console.log(`🎉 Batch hotel upload complete! Created: ${result.created}, Errors: ${result.errors.length}, Warnings: ${result.warnings.length}`);

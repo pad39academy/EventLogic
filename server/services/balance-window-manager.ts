@@ -12,6 +12,140 @@ import { eq, and, sql, lte, gte, lt } from 'drizzle-orm';
  * Uses hotel's actual start_date to end_date for efficient, targeted balance tracking
  */
 export class BalanceWindowManager {
+
+  /**
+   * SAFER APPROACH: Chunked balance window creation for multiple hotels
+   * Processes hotels in chunks to avoid blocking and provide better error recovery
+   */
+  static async createBalanceWindowsChunked(
+    hotels: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>,
+    chunkSize: number = 50,
+    onProgress?: (processed: number, total: number, errors: string[]) => void
+  ): Promise<{success: boolean, processed: number, errors: string[]}> {
+    const result = {
+      success: true,
+      processed: 0,
+      errors: [] as string[]
+    };
+
+    console.log(`🚀 Starting chunked balance window creation for ${hotels.length} hotels (chunks of ${chunkSize})`);
+    
+    // Process hotels in chunks
+    for (let i = 0; i < hotels.length; i += chunkSize) {
+      const chunk = hotels.slice(i, i + chunkSize);
+      const chunkNumber = Math.floor(i / chunkSize) + 1;
+      const totalChunks = Math.ceil(hotels.length / chunkSize);
+      
+      console.log(`📦 Processing chunk ${chunkNumber}/${totalChunks} (${chunk.length} hotels)...`);
+      
+      try {
+        // Process this chunk of hotels
+        await this.processHotelChunk(chunk);
+        result.processed += chunk.length;
+        
+        console.log(`✅ Chunk ${chunkNumber} completed successfully: ${chunk.length} hotels processed`);
+        
+        // Report progress
+        if (onProgress) {
+          onProgress(result.processed, hotels.length, result.errors);
+        }
+        
+        // Small delay between chunks to allow other operations
+        if (i + chunkSize < hotels.length) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms pause
+        }
+        
+      } catch (error) {
+        const errorMsg = `Chunk ${chunkNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        result.errors.push(errorMsg);
+        console.error(`❌ ${errorMsg}`);
+        
+        // Try to process individual hotels in this chunk for partial recovery
+        const partialResults = await this.recoverFailedChunk(chunk);
+        result.processed += partialResults.processed;
+        result.errors.push(...partialResults.errors);
+        
+        if (onProgress) {
+          onProgress(result.processed, hotels.length, result.errors);
+        }
+      }
+    }
+    
+    if (result.errors.length > 0) {
+      result.success = false;
+      console.log(`⚠️  Chunked processing completed with errors: ${result.processed}/${hotels.length} processed`);
+    } else {
+      console.log(`🎉 Chunked processing completed successfully: ${result.processed}/${hotels.length} processed`);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Process a single chunk of hotels with bulk balance window creation
+   */
+  private static async processHotelChunk(
+    chunk: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): Promise<void> {
+    // Calculate all balance records for this chunk
+    const allBalanceRecords: InsertHotelDailyBalance[] = [];
+    
+    for (const hotel of chunk) {
+      const dates = this.generateDateRange(hotel.startDate, hotel.endDate);
+      
+      for (const date of dates) {
+        allBalanceRecords.push({
+          hotelId: hotel.hotelId,
+          instanceCode: hotel.instanceCode,
+          balanceDate: date.toISOString().split('T')[0],
+          totalRooms: hotel.totalRooms,
+          playersCount: 0,
+          coachesCount: 0,
+          officialsCount: 0,
+          calculatedOccupiedRooms: 0,
+          availableRooms: hotel.totalRooms,
+          occupancyPercentage: "0.00",
+          pendingCheckoutPlayers: 0,
+          pendingCheckoutCoaches: 0,
+          pendingCheckoutOfficials: 0,
+          pendingCheckoutRooms: 0,
+          calculatedAt: new Date(),
+        } as InsertHotelDailyBalance);
+      }
+    }
+    
+    // Bulk insert all balance records for this chunk
+    if (allBalanceRecords.length > 0) {
+      await db.insert(hotelDailyBalance).values(allBalanceRecords);
+      console.log(`📊 Created ${allBalanceRecords.length} balance records for ${chunk.length} hotels`);
+    }
+  }
+
+  /**
+   * Recover from failed chunk by processing hotels individually
+   */
+  private static async recoverFailedChunk(
+    chunk: Array<{hotelId: string, instanceCode: string, startDate: Date, endDate: Date, totalRooms: number}>
+  ): Promise<{processed: number, errors: string[]}> {
+    console.log(`🔄 Attempting individual recovery for ${chunk.length} hotels...`);
+    
+    let processed = 0;
+    const errors: string[] = [];
+    
+    for (const hotel of chunk) {
+      try {
+        await this.ensureBalanceWindow(hotel.hotelId, hotel.instanceCode);
+        processed++;
+      } catch (error) {
+        const errorMsg = `Failed to create balance window for ${hotel.hotelId}-${hotel.instanceCode}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        errors.push(errorMsg);
+        console.error(`❌ ${errorMsg}`);
+      }
+    }
+    
+    console.log(`🔧 Recovery completed: ${processed}/${chunk.length} hotels processed`);
+    return { processed, errors };
+  }
   
   /**
    * Ensures balance data only for hotel's actual operating date range
