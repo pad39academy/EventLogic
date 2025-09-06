@@ -322,12 +322,14 @@ export class DatabaseStorage implements IStorage {
 
     let hotelResults = await query;
 
-    // Convert occupancyPercentage to string and ensure defaults  
+    // ⚡ OPTIMIZED: Calculate derived fields on demand for better performance  
     hotelResults = hotelResults.map(hotel => ({
       ...hotel,
       occupiedRooms: hotel.occupiedRooms ?? 0,
-      availableRooms: hotel.availableRooms ?? (hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
-      occupancyPercentage: hotel.occupancyPercentage ? hotel.occupancyPercentage.toString() : "0.00",
+      // Calculate availableRooms and occupancyPercentage on demand
+      availableRooms: Math.max(0, hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
+      occupancyPercentage: hotel.totalRooms > 0 ? 
+        (((hotel.occupiedRooms ?? 0) / hotel.totalRooms) * 100).toFixed(2) : "0.00",
     }));
 
     // Apply sorting in JavaScript for now (to avoid TypeScript complexity)
@@ -463,12 +465,14 @@ export class DatabaseStorage implements IStorage {
 
     let hotelResults = await query;
 
-    // Convert occupancyPercentage to string and ensure defaults  
+    // ⚡ OPTIMIZED: Calculate derived fields on demand for better performance  
     hotelResults = hotelResults.map(hotel => ({
       ...hotel,
       occupiedRooms: hotel.occupiedRooms ?? 0,
-      availableRooms: hotel.availableRooms ?? (hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
-      occupancyPercentage: hotel.occupancyPercentage ? hotel.occupancyPercentage.toString() : "0.00",
+      // Calculate availableRooms and occupancyPercentage on demand
+      availableRooms: Math.max(0, hotel.totalRooms - (hotel.occupiedRooms ?? 0)),
+      occupancyPercentage: hotel.totalRooms > 0 ? 
+        (((hotel.occupiedRooms ?? 0) / hotel.totalRooms) * 100).toFixed(2) : "0.00",
     }));
 
     // Apply sorting in JavaScript
