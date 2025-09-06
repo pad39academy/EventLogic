@@ -641,13 +641,18 @@ export class UploadService {
     };
 
     const BATCH_SIZE = 500; // Process 500 participants at a time (smaller due to complexity)
+    const overallStartTime = Date.now();
     
     try {
       console.log("🔍 Starting batch participant upload validation...");
+      console.log(`⏱️  TIMING: Upload started at ${new Date().toISOString()}`);
       
       // Step 1: Parse and validate structure
+      const parseStartTime = Date.now();
+      console.log("⏱️  TIMING: Step 1 - Parsing PSV content...");
       const rows = this.parsePSV(content);
       const headers = rows[0];
+      console.log(`⏱️  TIMING: Step 1 completed in ${Date.now() - parseStartTime}ms - Parsed ${rows.length} rows`);
       
       const expectedHeaders = [
         'ROLE', 'COACH_ID', 'NAME', 'MOBILE_NUMBER', 'DISCIPLINE', 'LOCATION', 'DISTRICT',
@@ -664,25 +669,39 @@ export class UploadService {
       }
 
       // Step 2: Load reference data into memory for fast validation
+      const refDataStartTime = Date.now();
+      console.log("⏱️  TIMING: Step 2 - Loading reference data for validation...");
       console.log("💾 Loading reference data for validation...");
+      
+      const hotelsStartTime = Date.now();
       const existingHotels = await storage.getHotels();
+      console.log(`⏱️  TIMING: Loaded ${existingHotels.length} hotels in ${Date.now() - hotelsStartTime}ms`);
+      
       const hotelMap = new Map();
       existingHotels.forEach(hotel => {
         hotelMap.set(`${hotel.hotelId}-${hotel.instanceCode}`, hotel);
       });
 
+      const participantsStartTime = Date.now();
       const existingParticipants = await storage.getParticipants();
+      console.log(`⏱️  TIMING: Loaded ${existingParticipants.length} participants in ${Date.now() - participantsStartTime}ms`);
       const participantKeys = new Set(existingParticipants.map(p => p.participantId));
 
+      const usersStartTime = Date.now();
       const existingUsers = await storage.getUsers();
+      console.log(`⏱️  TIMING: Loaded ${existingUsers.length} users in ${Date.now() - usersStartTime}ms`);
       const usersByCoachId = new Map();
       const usersByMobile = new Map();
       existingUsers.forEach(user => {
         if (user.coachId) usersByCoachId.set(user.coachId, user);
         if (user.mobileNumber) usersByMobile.set(user.mobileNumber, user);
       });
+      
+      console.log(`⏱️  TIMING: Step 2 completed in ${Date.now() - refDataStartTime}ms - Reference data loaded`);
 
       // Step 3: Pre-validate ALL records
+      const validationStartTime = Date.now();
+      console.log("⏱️  TIMING: Step 3 - Pre-validating all records...");
       console.log(`📋 Validating ${rows.length - 1} participant records...`);
       
       interface ValidatedParticipant {
@@ -813,6 +832,8 @@ export class UploadService {
       console.log(`✅ Pre-validation complete. ${validParticipants.length} valid participants ready for batch insertion.`);
 
       // Step 5: Process in batches with transaction safety
+      const batchProcessStartTime = Date.now();
+      console.log("⏱️  TIMING: Step 5 - Starting batch database operations...");
       const createdParticipants: any[] = [];
       
       for (let i = 0; i < validParticipants.length; i += BATCH_SIZE) {
@@ -852,8 +873,12 @@ export class UploadService {
         }
       }
 
+      console.log(`⏱️  TIMING: Step 5 completed in ${Date.now() - batchProcessStartTime}ms - Batch processing finished`);
+
       // Step 6: Smart Event Publishing - Batch processing for performance
       if (createdParticipants.length > 0) {
+        const eventStartTime = Date.now();
+        console.log("⏱️  TIMING: Step 6 - Publishing batch events...");
         console.log(`🚀 Publishing optimized batch events for ${createdParticipants.length} participants...`);
         
         // Collect affected hotels with date ranges for batch processing
@@ -904,8 +929,10 @@ export class UploadService {
         );
         
         console.log(`⚡ Batch event published for ${affectedHotelsMap.size} hotels (was ${createdParticipants.length} individual events)`);
+        console.log(`⏱️  TIMING: Step 6 completed in ${Date.now() - eventStartTime}ms - Event publishing finished`);
       }
 
+      console.log(`⏱️  TIMING: TOTAL UPLOAD TIME: ${Date.now() - overallStartTime}ms`);
       console.log(`🎉 Batch participant upload complete! Created: ${result.created}, Errors: ${result.errors.length}, Warnings: ${result.warnings.length}`);
       
     } catch (error) {
