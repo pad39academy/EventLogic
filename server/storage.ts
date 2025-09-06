@@ -1048,7 +1048,8 @@ export class DatabaseStorage implements IStorage {
     const [occupancyStats] = await db
       .select({
         occupiedRooms: sql<number>`sum(calculated_occupied_rooms)`,
-        avgOccupancyRate: sql<number>`avg(occupancy_percentage::numeric)`
+        avgOccupancyRate: sql<number>`avg(cast(occupancy_percentage as numeric))`,
+        lastMaterialized: sql<Date>`max(calculated_at)`
       })
       .from(hotelDailyBalance)
       .where(eq(hotelDailyBalance.balanceDate, today));
@@ -1070,7 +1071,8 @@ export class DatabaseStorage implements IStorage {
       totalRooms: hotelStats.totalRooms || 0,
       occupiedRooms: occupancyStats.occupiedRooms || 0,
       occupancyRate: Math.round(occupancyStats.avgOccupancyRate || 0),
-      estimatedRoomsNeeded
+      estimatedRoomsNeeded,
+      lastUpdated: occupancyStats.lastMaterialized?.toISOString() || new Date().toISOString()
     };
 
     // Cache the computed stats
