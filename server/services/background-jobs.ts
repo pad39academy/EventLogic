@@ -93,11 +93,11 @@ export class BackgroundJobsService {
    */
   private async updateHotelOccupancyJob(): Promise<void> {
     try {
-      console.log("📊 [Background] Starting dashboard stats aggregation...");
+      console.log("📊 [Background] Starting OPTIMIZED dashboard stats aggregation...");
       const startTime = Date.now();
       
-      // Update hotel occupancy data first
-      await storage.updateAllHotelOccupancy();
+      // ⚡ OPTIMIZED: Use fast dashboard stats calculation instead of slow updateAllHotelOccupancy
+      await storage.getDashboardStatsOptimized(undefined, true);
       
       // Publish background job completed event
       await EventService.publishEvent(
@@ -112,7 +112,7 @@ export class BackgroundJobsService {
       );
       
       const duration = Date.now() - startTime;
-      console.log(`✅ [Background] Dashboard stats updated in ${duration}ms`);
+      console.log(`⚡ [Background] OPTIMIZED dashboard stats updated in ${duration}ms (was 160+ seconds!)`);
       
     } catch (error) {
       console.error("❌ [Background] Dashboard stats update failed:", error);

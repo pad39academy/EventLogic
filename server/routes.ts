@@ -474,6 +474,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Performance monitoring endpoint
+  app.get("/api/admin/performance/monitor", requireAdmin, async (req, res) => {
+    try {
+      const startTime = Date.now();
+      
+      // Test key operations and their timing
+      const tests = [];
+      
+      // Test 1: Database connection
+      const dbStart = Date.now();
+      await db.execute(sql`SELECT 1 as test`);
+      tests.push({ operation: "Database Connection", time: Date.now() - dbStart });
+      
+      // Test 2: Hotel count query  
+      const hotelStart = Date.now();
+      const hotelCount = await db.select({ count: sql<number>`count(*)` }).from(hotels);
+      tests.push({ operation: "Hotel Count Query", time: Date.now() - hotelStart });
+      
+      // Test 3: Participant count query
+      const participantStart = Date.now(); 
+      const participantCount = await db.select({ count: sql<number>`count(*)` }).from(participants);
+      tests.push({ operation: "Participant Count Query", time: Date.now() - participantStart });
+      
+      // Test 4: Balance data query
+      const balanceStart = Date.now();
+      const balanceCount = await db.select({ count: sql<number>`count(*)` }).from(hotelDailyBalance);
+      tests.push({ operation: "Balance Data Query", time: Date.now() - balanceStart });
+      
+      // Test 5: Optimized dashboard stats
+      const dashboardStart = Date.now();
+      await storage.getDashboardStatsOptimized();
+      tests.push({ operation: "Optimized Dashboard Stats", time: Date.now() - dashboardStart });
+      
+      const totalTime = Date.now() - startTime;
+      
+      res.json({
+        success: true,
+        totalTime,
+        dataCount: {
+          hotels: hotelCount[0].count,
+          participants: participantCount[0].count, 
+          balanceRecords: balanceCount[0].count
+        },
+        performanceTests: tests,
+        status: "All operations completed successfully"
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : "Performance test failed" 
+      });
+    }
+  });
+
   // Dashboard routes - OPTIMIZED for sub-second loading
   app.get("/api/admin/dashboard/stats", requireAdmin, async (req, res) => {
     try {
