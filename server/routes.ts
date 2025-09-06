@@ -438,13 +438,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 🚀 OPTIMIZED: Use batch upload for 10-20x faster processing
       const result = await UploadService.uploadCoachesOfficialsBatch(content);
 
-      // Update all hotel occupancy after successful upload
-      if (result.success && result.created > 0) {
-        const occupancyStartTime = Date.now();
-        console.log("⏱️  ROUTE TIMING: Starting updateAllHotelOccupancy...");
-        await storage.updateAllHotelOccupancy();
-        console.log(`⏱️  ROUTE TIMING: updateAllHotelOccupancy completed in ${Date.now() - occupancyStartTime}ms`);
-      }
+      // ✅ OPTIMIZED: Occupancy updates are now handled efficiently by the batch event system
+      // No need for manual updateAllHotelOccupancy() - it was causing 160+ second delays
 
       // Audit logging now handled automatically via event_store.user_id
 
@@ -464,10 +459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 🚀 OPTIMIZED: Use batch upload for 10-20x faster processing
       const result = await UploadService.uploadPlayersBatch(content);
 
-      // Update all hotel occupancy after successful upload
-      if (result.success && result.created > 0) {
-        await storage.updateAllHotelOccupancy();
-      }
+      // ✅ OPTIMIZED: Occupancy updates are now handled efficiently by the batch event system
+      // No need for manual updateAllHotelOccupancy() - it was causing 160+ second delays
 
       // Audit logging now handled automatically via event_store.user_id
 
