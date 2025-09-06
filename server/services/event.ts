@@ -744,6 +744,9 @@ export class EventService {
       throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
     }
     
+    // DEBUG: Verify hotel data is correct
+    console.log(`🐛 DEBUG HOTEL FETCH - ${hotelId}-${instanceCode}: Found hotel with totalRooms=${hotel.totalRooms}`);
+    
     // BULK: Calculate all balance records that need updates
     const dates = BalanceWindowManager.generateDateRange(startDate, endDate);
     const bulkUpdates: Array<{
@@ -767,6 +770,9 @@ export class EventService {
         ...balance,
         totalRooms: hotel.totalRooms
       };
+      
+      // DEBUG: Log to verify totalRooms is preserved
+      console.log(`🐛 DEBUG - Hotel ${hotelId}-${instanceCode}: hotel.totalRooms=${hotel.totalRooms}, balance.totalRooms=${balanceWithTotalRooms.totalRooms}`);
       
       bulkUpdates.push({
         hotelId,
@@ -802,17 +808,22 @@ export class EventService {
     const dbInstance = tx || db;
     
     // ⚡ PHASE 1 OPTIMIZED: Use only essential columns (removed heavy columns)
-    const bulkValues = updates.map(({ hotelId, instanceCode, balanceDate, balance }) => ({
-      hotelId,
-      instanceCode,
-      balanceDate,
-      totalRooms: balance.totalRooms, // ✅ CRITICAL FIX: Don't default to 0, preserve existing totalRooms
-      playersCount: balance.playersCount || 0,
-      coachesCount: balance.coachesCount || 0,
-      officialsCount: balance.officialsCount || 0,
-      calculatedOccupiedRooms: balance.calculatedOccupiedRooms || 0,
-      // ⚡ OPTIMIZED: Removed availableRooms, occupancyPercentage, pendingCheckout*, calculatedAt
-    }));
+    const bulkValues = updates.map(({ hotelId, instanceCode, balanceDate, balance }) => {
+      // DEBUG: Log balance.totalRooms value before database insert
+      console.log(`🐛 DEBUG BULK - ${hotelId}-${instanceCode}: balance.totalRooms=${balance.totalRooms}`);
+      
+      return {
+        hotelId,
+        instanceCode,
+        balanceDate,
+        totalRooms: balance.totalRooms, // ✅ CRITICAL FIX: Don't default to 0, preserve existing totalRooms
+        playersCount: balance.playersCount || 0,
+        coachesCount: balance.coachesCount || 0,
+        officialsCount: balance.officialsCount || 0,
+        calculatedOccupiedRooms: balance.calculatedOccupiedRooms || 0,
+        // ⚡ OPTIMIZED: Removed availableRooms, occupancyPercentage, pendingCheckout*, calculatedAt
+      };
+    });
     
     // ⚡ TRUE BULK UPSERT: Single database operation for ALL records
     await dbInstance
