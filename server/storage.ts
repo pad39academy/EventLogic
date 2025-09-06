@@ -1003,6 +1003,88 @@ export class DatabaseStorage implements IStorage {
     return stats;
   }
 
+  /**
+   * OPTIMIZED: Fast dashboard stats using pre-calculated balance data
+   * Replaces 160+ second manual calculations with sub-second queries
+   */
+  async getDashboardStatsOptimized(date?: string, forceRefresh = false): Promise<DashboardStats> {
+    // Return cached data if available and not expired
+    if (!forceRefresh && this.dashboardStatsCache) {
+      const isExpired = Date.now() - this.dashboardStatsCache.timestamp > this.CACHE_TTL;
+      if (!isExpired) {
+        console.log('⚡ Dashboard stats served from cache (OPTIMIZED)');
+        return this.dashboardStatsCache.data;
+      }
+    }
+
+    console.log('⚡ OPTIMIZED: Fast dashboard stats calculation...');
+    const startTime = Date.now();
+
+    // FAST: Single aggregated query for participant stats
+    const [participantStats] = await db
+      .select({
+        totalParticipants: sql<number>`count(*)`,
+        totalPlayers: sql<number>`count(*) filter (where role = 'player')`,
+        totalCoaches: sql<number>`count(*) filter (where role = 'coach')`, 
+        totalOfficials: sql<number>`count(*) filter (where role = 'official')`,
+        checkedInCount: sql<number>`count(*) filter (where checkin_status = 'checked_in')`,
+        checkedOutCount: sql<number>`count(*) filter (where checkin_status = 'checked_out')`,
+        pendingActions: sql<number>`count(*) filter (where checkin_status = 'pending')`,
+        totalTeams: sql<number>`count(distinct team_name) filter (where team_name is not null)`
+      })
+      .from(participants);
+
+    // FAST: Single aggregated query for hotel stats  
+    const [hotelStats] = await db
+      .select({
+        totalHotels: sql<number>`count(*)`,
+        totalRooms: sql<number>`sum(total_rooms)`,
+        totalAvailableRooms: sql<number>`sum(available_rooms)`
+      })
+      .from(hotels);
+
+    // FAST: Use pre-calculated balance data for occupancy (instead of manual calculations)
+    const today = new Date().toISOString().split('T')[0];
+    const [occupancyStats] = await db
+      .select({
+        occupiedRooms: sql<number>`sum(calculated_occupied_rooms)`,
+        avgOccupancyRate: sql<number>`avg(occupancy_percentage::numeric)`
+      })
+      .from(hotelDailyBalance)
+      .where(eq(hotelDailyBalance.balanceDate, today));
+
+    // Calculate estimated rooms needed (same logic, but from aggregated data)
+    const estimatedRoomsNeeded = Math.ceil(participantStats.totalPlayers / 3) + 
+                                Math.ceil(participantStats.totalCoaches / 2) + 
+                                participantStats.totalOfficials;
+
+    const stats = {
+      totalParticipants: participantStats.totalParticipants || 0,
+      totalTeams: participantStats.totalTeams || 0,
+      totalPlayers: participantStats.totalPlayers || 0,
+      checkedInCount: participantStats.checkedInCount || 0,
+      checkedOutCount: participantStats.checkedOutCount || 0,
+      pendingActions: participantStats.pendingActions || 0,
+      totalHotels: hotelStats.totalHotels || 0,
+      totalAvailableRooms: hotelStats.totalAvailableRooms || 0,
+      totalRooms: hotelStats.totalRooms || 0,
+      occupiedRooms: occupancyStats.occupiedRooms || 0,
+      occupancyRate: Math.round(occupancyStats.avgOccupancyRate || 0),
+      estimatedRoomsNeeded
+    };
+
+    // Cache the computed stats
+    this.dashboardStatsCache = {
+      data: stats,
+      timestamp: Date.now()
+    };
+
+    const totalTime = Date.now() - startTime;
+    console.log(`⚡ OPTIMIZED dashboard stats completed in ${totalTime}ms (was 160+ seconds!)`);
+    console.log('💾 Dashboard stats cached for 5 minutes');
+    return stats;
+  }
+
   // Job execution tracking methods using direct SQL  
   async updateJobExecution(
     jobName: string, 

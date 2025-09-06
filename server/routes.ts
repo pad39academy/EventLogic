@@ -474,24 +474,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard routes - now using pre-aggregated views for instant loading
+  // Dashboard routes - OPTIMIZED for sub-second loading
   app.get("/api/admin/dashboard/stats", requireAdmin, async (req, res) => {
     try {
-      // Check if user wants to force refresh views (fallback to old method)
+      // Check if user wants to force refresh (fallback to old method)
       const forceRefresh = req.query.forceRefresh === 'true';
       
       if (forceRefresh) {
-        // Use old method for manual refresh
+        // Use old SLOW method for manual refresh
         const stats = await storage.getDashboardStats(undefined, true);
         res.json(stats);
       } else {
-        // Use lightning-fast pre-aggregated views
-        const stats = await storage.getDashboardStatsFromViews();
+        // Use OPTIMIZED fast method (replaces missing views)
+        const stats = await storage.getDashboardStatsOptimized();
         res.json(stats);
       }
     } catch (error) {
       console.error('Dashboard stats error:', error);
-      // Fallback to old method if views fail
+      // Fallback to old method if optimized method fails
       try {
         const stats = await storage.getDashboardStats();
         res.json(stats);
