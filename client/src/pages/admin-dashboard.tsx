@@ -22,7 +22,6 @@ import AddHotelModal from "@/components/add-hotel-modal";
 import { SendNotificationEnhanced } from "@/components/send-notification-enhanced";
 import { AdminNotificationsList } from "@/components/admin-notifications-list";
 import TimeWindowSettings from "@/components/time-window-settings";
-import FailedBatchesSection from "@/components/failed-batches-section";
 
 import type { DashboardStats } from "@/lib/types";
 
@@ -208,26 +207,11 @@ export default function AdminDashboard() {
                     Reports
                   </button>
                   <button 
-                    onClick={() => setActiveTab("failed-batches")}
-                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "failed-batches" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
-                    data-testid="nav-failed-batches"
-                  >
-                    Failed Batches
-                  </button>
-                  <button 
                     onClick={() => setActiveTab("notifications")}
                     className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "notifications" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
                     data-testid="nav-notifications"
                   >
                     Send Notification
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab("database-optimize")}
-                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "database-optimize" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
-                    data-testid="nav-database-optimize"
-                  >
-                    <Zap className="h-4 w-4 mr-2 inline" />
-                    DB Optimize
                   </button>
                   {/* <button 
                     onClick={() => setActiveTab("settings")}
@@ -352,16 +336,6 @@ export default function AdminDashboard() {
                     >
                       <Bell className="h-4 w-4 mr-3 inline" />
                       Send Notification
-                    </button>
-                    <button
-                      onClick={() => { setActiveTab("database-optimize"); setMobileMenuOpen(false); }}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                        activeTab === "database-optimize" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
-                      }`}
-                      data-testid="nav-database-optimize-mobile"
-                    >
-                      <Zap className="h-4 w-4 mr-3 inline" />
-                      DB Optimize
                     </button>
                     <div className="border-t pt-4 mt-4">
                       <div className="px-3 py-2">
@@ -660,132 +634,6 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {activeTab === "failed-batches" && <FailedBatchesSection />}
-
-        {activeTab === "database-optimize" && (
-          <>
-            {/* Database Optimize Header */}
-            <div className="mb-8">
-              <div className="md:flex md:items-center md:justify-between">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
-                    <Zap className="h-6 w-6 mr-3 inline text-yellow-500" />
-                    Database Optimization
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
-                    Manually warm database indexes and application caches for optimal performance after data reloads
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Database Optimization Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              
-              {/* Database Index Warming */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="h-5 w-5 mr-2 text-blue-500" />
-                    Database Index Warming
-                  </CardTitle>
-                  <CardDescription>
-                    Warm critical database indexes through strategic queries to improve query performance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DatabaseIndexWarming />
-                </CardContent>
-              </Card>
-
-              {/* Application Cache Warming */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="h-5 w-5 mr-2 text-green-500" />
-                    Application Cache Warming
-                  </CardTitle>
-                  <CardDescription>
-                    Pre-load application caches for dashboard, hotels, and participants data
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ApplicationCacheWarming />
-                </CardContent>
-              </Card>
-
-              {/* Database Table Analysis */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-purple-500" />
-                    Database Table Analysis
-                  </CardTitle>
-                  <CardDescription>
-                    Update PostgreSQL table statistics for optimal query planning and performance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DatabaseTableAnalysis />
-                </CardContent>
-              </Card>
-
-            </div>
-
-            {/* Database Management Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              
-              {/* Database Diagnostics */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <User className="h-5 w-5 mr-2 text-orange-500" />
-                    Database Diagnostics
-                  </CardTitle>
-                  <CardDescription>
-                    Check table row counts, foreign key constraints, and identify why data persists after truncate
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DatabaseDiagnostics />
-                </CardContent>
-              </Card>
-
-              {/* Comprehensive Cleanup */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Building className="h-5 w-5 mr-2 text-red-500" />
-                    Comprehensive Cleanup
-                  </CardTitle>
-                  <CardDescription>
-                    Complete database cleanup with foreign key handling and sequence resets
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ComprehensiveCleanup />
-                </CardContent>
-              </Card>
-
-            </div>
-
-            {/* Performance Tips */}
-            <Card className="bg-blue-50 border-blue-200">
-              <CardHeader>
-                <CardTitle className="text-blue-800">💡 Database Management Guide</CardTitle>
-              </CardHeader>
-              <CardContent className="text-blue-700">
-                <ul className="space-y-2 text-sm">
-                  <li><strong>Performance optimization:</strong> Run Index warming → Table analysis → Cache warming</li>
-                  <li><strong>Data persistence issue:</strong> Use Diagnostics to identify what data remains after truncate</li>
-                  <li><strong>Complete cleanup:</strong> Use Comprehensive Cleanup for proper foreign key handling</li>
-                  <li><strong>Background processes:</strong> System may auto-regenerate data - check logs for uploads</li>
-                  <li><strong>Expected timing:</strong> Diagnostics ~200ms, Cleanup ~800ms, Optimization ~2-4 seconds</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </>
-        )}
 
         {/* Temporarily disabled - Sent Notifications
         {activeTab === "sent-notifications" && (

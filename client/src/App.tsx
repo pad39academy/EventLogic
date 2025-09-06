@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser } from "./lib/auth";
 import Login from "@/pages/login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import TechnicalAdminDashboard from "@/pages/technical-admin-dashboard";
 import CoachDashboard from "@/pages/coach-dashboard";
 import NotFound from "@/pages/not-found";
 
@@ -37,14 +38,22 @@ function AuthWrapper() {
 
   return (
     <Switch>
-      <Route path="/" component={() => 
-        user.role === 'admin' ? <AdminDashboard /> : <CoachDashboard />
-      } />
+      <Route path="/" component={() => {
+        if (user.role === 'admin') return <AdminDashboard />;
+        if (user.role === 'technical_admin') return <TechnicalAdminDashboard />;
+        return <CoachDashboard />;
+      }} />
       <Route path="/admin" component={() => 
         user.role === 'admin' ? <AdminDashboard /> : <NotFound />
       } />
       <Route path="/admin-dashboard" component={() => 
         user.role === 'admin' ? <AdminDashboard /> : <NotFound />
+      } />
+      <Route path="/technical-admin" component={() => 
+        user.role === 'technical_admin' ? <TechnicalAdminDashboard /> : <NotFound />
+      } />
+      <Route path="/technical-admin-dashboard" component={() => 
+        user.role === 'technical_admin' ? <TechnicalAdminDashboard /> : <NotFound />
       } />
       <Route path="/coach" component={() => 
         user.role === 'coach' ? <CoachDashboard /> : <NotFound />

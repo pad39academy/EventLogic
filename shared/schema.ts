@@ -5,7 +5,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "coach"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "coach", "technical_admin"]);
 export const participantRoleEnum = pgEnum("participant_role", ["coach", "official", "player"]);
 export const checkinStatusEnum = pgEnum("checkin_status", ["pending", "checked_in", "checked_out"]);
 export const bookingTypeEnum = pgEnum("booking_type", ["regular", "pre_event", "post_event"]);
@@ -502,6 +502,7 @@ export const updateNotificationSchema = createSelectSchema(notifications).pick({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserRole = 'admin' | 'coach' | 'technical_admin';
 export type Hotel = typeof hotels.$inferSelect;
 export type InsertHotel = z.infer<typeof insertHotelSchema>;
 export type UpdateHotel = z.infer<typeof updateHotelSchema>;
