@@ -798,7 +798,7 @@ export class EventService {
       hotelId,
       instanceCode,
       balanceDate,
-      totalRooms: balance.totalRooms || 0,
+      totalRooms: balance.totalRooms, // ✅ CRITICAL FIX: Don't default to 0, preserve existing totalRooms
       playersCount: balance.playersCount || 0,
       coachesCount: balance.coachesCount || 0,
       officialsCount: balance.officialsCount || 0,
@@ -813,7 +813,8 @@ export class EventService {
       .onConflictDoUpdate({
         target: [hotelDailyBalance.hotelId, hotelDailyBalance.instanceCode, hotelDailyBalance.balanceDate],
         set: {
-          totalRooms: sql`excluded.total_rooms`,
+          // ✅ CRITICAL FIX: Only update totalRooms if new value is provided (non-null)
+          totalRooms: sql`COALESCE(excluded.total_rooms, ${hotelDailyBalance.totalRooms})`,
           playersCount: sql`excluded.players_count`,
           coachesCount: sql`excluded.coaches_count`,
           officialsCount: sql`excluded.officials_count`,
