@@ -762,11 +762,17 @@ export class EventService {
         hotel.totalRooms
       );
       
+      // CRITICAL FIX: Add totalRooms back to balance object since calculateDailyBalance doesn't return it
+      const balanceWithTotalRooms = {
+        ...balance,
+        totalRooms: hotel.totalRooms
+      };
+      
       bulkUpdates.push({
         hotelId,
         instanceCode,
         balanceDate: date.toISOString().split('T')[0],
-        balance
+        balance: balanceWithTotalRooms
       });
     }
     
