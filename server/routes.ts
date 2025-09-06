@@ -15,7 +15,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { users, participants, settings, hotelDailyBalance } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import multer from "multer";
 import { z } from "zod";
 
@@ -651,6 +651,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         message: error instanceof Error ? error.message : "Cache warming failed" 
+      });
+    }
+  });
+
+  app.post("/api/admin/database/analyze-tables", requireAdmin, async (req, res) => {
+    try {
+      console.log("📊 Manual database table analysis initiated...");
+      const startTime = Date.now();
+      const results: any = {};
+      
+      // PostgreSQL ANALYZE commands to update table statistics
+      const analyzeQueries = [
+        { table: "hotels", query: "ANALYZE hotels" },
+        { table: "participants", query: "ANALYZE participants" }, 
+        { table: "hotel_daily_balance", query: "ANALYZE hotel_daily_balance" },
+        { table: "users", query: "ANALYZE users" },
+        { table: "audit_logs", query: "ANALYZE audit_logs" }
+      ];
+      
+      // Execute ANALYZE commands sequentially for better control
+      for (const { table, query } of analyzeQueries) {
+        try {
+          const tableStart = Date.now();
+          await db.execute(sql.raw(query));
+          results[table] = {
+            duration: Date.now() - tableStart,
+            analyzed: true
+          };
+          console.log(`✅ Analyzed ${table} table in ${results[table].duration}ms`);
+        } catch (tableError) {
+          console.warn(`⚠️  Could not analyze ${table}: ${tableError}`);
+          results[table] = {
+            duration: 0,
+            analyzed: false,
+            error: tableError instanceof Error ? tableError.message : "Analysis failed"
+          };
+        }
+      }
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`📊 Database table analysis completed in ${totalDuration}ms`);
+      
+      res.json({
+        success: true,
+        message: `Database table analysis completed in ${totalDuration}ms`,
+        operations: results,
+        summary: {
+          totalDuration,
+          tablesAnalyzed: Object.values(results).filter((r: any) => r.analyzed).length,
+          totalTables: analyzeQueries.length
+        }
+      });
+    } catch (error) {
+      console.error("❌ Database analysis failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Database analysis failed" 
       });
     }
   });

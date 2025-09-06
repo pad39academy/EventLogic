@@ -670,7 +670,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Database Optimization Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               
               {/* Database Index Warming */}
               <Card>
@@ -704,6 +704,22 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
+              {/* Database Table Analysis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2 text-purple-500" />
+                    Database Table Analysis
+                  </CardTitle>
+                  <CardDescription>
+                    Update PostgreSQL table statistics for optimal query planning and performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DatabaseTableAnalysis />
+                </CardContent>
+              </Card>
+
             </div>
 
             {/* Performance Tips */}
@@ -713,10 +729,11 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent className="text-blue-700">
                 <ul className="space-y-2 text-sm">
-                  <li><strong>After data deletion:</strong> Use both warming operations to restore optimal performance</li>
-                  <li><strong>Best practice:</strong> Run index warming first, then cache warming</li>
-                  <li><strong>Expected timing:</strong> Index warming ~100-500ms, Cache warming ~1-3 seconds</li>
-                  <li><strong>When to use:</strong> After bulk data operations, database restarts, or slow performance</li>
+                  <li><strong>After data deletion:</strong> Use all three optimization operations to restore peak performance</li>
+                  <li><strong>Best practice:</strong> Run in order: Index warming → Table analysis → Cache warming</li>
+                  <li><strong>Expected timing:</strong> Index warming ~100-500ms, Analysis ~200-800ms, Cache warming ~1-3 seconds</li>
+                  <li><strong>When to use:</strong> After bulk data operations, database restarts, slow queries, or performance degradation</li>
+                  <li><strong>Table analysis:</strong> Updates PostgreSQL statistics for better query planning after data changes</li>
                 </ul>
               </CardContent>
             </Card>
@@ -1023,6 +1040,72 @@ function ApplicationCacheWarming() {
         <p><strong>Target:</strong> Dashboard stats, hotel listings, participant data</p>
         <p><strong>Method:</strong> Pre-load application caches through API calls</p>
         <p><strong>Duration:</strong> ~1-3 seconds</p>
+      </div>
+    </div>
+  );
+}
+
+// 📊 Database Table Analysis Component
+function DatabaseTableAnalysis() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const analyzeTablesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/database/analyze-tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to analyze database tables');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const { summary } = data;
+      toast({
+        title: "📊 Database Tables Analyzed",
+        description: `${summary.tablesAnalyzed}/${summary.totalTables} tables analyzed in ${summary.totalDuration}ms`,
+        duration: 5000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard/stats'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Table Analysis Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <Button 
+        onClick={() => analyzeTablesMutation.mutate()}
+        disabled={analyzeTablesMutation.isPending}
+        className="w-full"
+        variant="outline"
+        data-testid="button-analyze-tables"
+      >
+        {analyzeTablesMutation.isPending ? (
+          <>
+            <Clock className="h-4 w-4 mr-2 animate-spin" />
+            Analyzing Tables...
+          </>
+        ) : (
+          <>
+            <Calendar className="h-4 w-4 mr-2" />
+            Analyze Database Tables
+          </>
+        )}
+      </Button>
+      
+      <div className="text-xs text-gray-500 space-y-1">
+        <p><strong>Target:</strong> Hotels, participants, balance, users, audit tables</p>
+        <p><strong>Method:</strong> PostgreSQL ANALYZE commands to update statistics</p>
+        <p><strong>Duration:</strong> ~200-800ms</p>
       </div>
     </div>
   );
