@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   name: string;
-  role: 'admin' | 'coach';
+  role: 'admin' | 'coach' | 'technical_admin';
   coachId?: string;
 }
 
