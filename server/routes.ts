@@ -2131,6 +2131,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Failed batch analysis endpoint (Admin only)
+  app.get("/api/admin/failed-batches", requireAdmin, async (req, res) => {
+    try {
+      // Query for failed batch uploads and handler errors
+      const failedEvents = await db.select().from(eventStore)
+        .where(eq(eventStore.status, 'failed'))
+        .orderBy(desc(eventStore.createdAt));
+        
+      const failedBatches = [];
+      
+      for (const event of failedEvents) {
+        // Parse batch upload errors
+        if (event.errorMessage && event.errorMessage.includes('Batch')) {
+          const batchMatch = event.errorMessage.match(/Batch (\d+)/);
+          if (batchMatch) {
+            const batchNumber = parseInt(batchMatch[1]);
+            const batchSize = 500; // Standard batch size for participants
+            
+            const startRow = (batchNumber - 1) * batchSize + 2; // +2 for header and 1-indexed
+            const endRow = batchNumber * batchSize + 1;
+            
+            failedBatches.push({
+              eventId: event.id,
+              batchNumber,
+              errorMessage: event.errorMessage,
+              failedAt: event.failedAt,
+              uploadType: event.aggregateType,
+              rowNumbers: {
+                start: startRow,
+                end: endRow,
+                count: batchSize
+              }
+            });
+          }
+        }
+      }
+      
+      res.json({ failedBatches, totalFailed: failedBatches.length });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch batch information" });
+    }
+  });
+
   // Manual occupancy recalculation endpoint (Admin only)
   app.post("/api/admin/recalculate-occupancy", requireAdmin, async (req, res) => {
     try {
