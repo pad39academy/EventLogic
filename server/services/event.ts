@@ -720,6 +720,7 @@ export class EventService {
   /**
    * OPTIMIZED: Bulk occupancy update - replaces redundant ensureBalanceWindow calls
    */
+
   static async updateOccupancyBulk(
     hotelId: string, 
     instanceCode: string, 
@@ -744,8 +745,7 @@ export class EventService {
       throw new Error(`Hotel not found: ${hotelId}-${instanceCode}`);
     }
     
-    // DEBUG: Verify hotel data is correct
-    console.log(`🐛 DEBUG HOTEL FETCH - ${hotelId}-${instanceCode}: Found hotel with totalRooms=${hotel.totalRooms}`);
+    // FIXED: Hotel fetch now correctly retrieves totalRooms
     
     // BULK: Calculate all balance records that need updates
     const dates = BalanceWindowManager.generateDateRange(startDate, endDate);
@@ -771,8 +771,7 @@ export class EventService {
         totalRooms: hotel.totalRooms
       };
       
-      // DEBUG: Log to verify totalRooms is preserved
-      console.log(`🐛 DEBUG - Hotel ${hotelId}-${instanceCode}: hotel.totalRooms=${hotel.totalRooms}, balance.totalRooms=${balanceWithTotalRooms.totalRooms}`);
+      // FIXED: totalRooms is now correctly preserved
       
       bulkUpdates.push({
         hotelId,
@@ -809,8 +808,7 @@ export class EventService {
     
     // ⚡ PHASE 1 OPTIMIZED: Use only essential columns (removed heavy columns)
     const bulkValues = updates.map(({ hotelId, instanceCode, balanceDate, balance }) => {
-      // DEBUG: Log balance.totalRooms value before database insert
-      console.log(`🐛 DEBUG BULK - ${hotelId}-${instanceCode}: balance.totalRooms=${balance.totalRooms}`);
+      // FIXED: totalRooms is now correctly preserved from hotel.totalRooms
       
       return {
         hotelId,
