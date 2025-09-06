@@ -9,7 +9,7 @@ import { logout } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { 
   Calendar, Bell, User, Upload, Download, Plus, Menu,
-  Building, UserCheck, Users as UsersIcon, LogOut, Clock, Shield
+  Building, UserCheck, Users as UsersIcon, LogOut, Clock, Shield, Zap
 } from "lucide-react";
 import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
 import StatsCards from "@/components/stats-cards";
@@ -213,6 +213,14 @@ export default function AdminDashboard() {
                   >
                     Send Notification
                   </button>
+                  <button 
+                    onClick={() => setActiveTab("database-optimize")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "database-optimize" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
+                    data-testid="nav-database-optimize"
+                  >
+                    <Zap className="h-4 w-4 mr-2 inline" />
+                    DB Optimize
+                  </button>
                   {/* <button 
                     onClick={() => setActiveTab("settings")}
                     className={`px-3 py-2 rounded-md text-sm font-medium ${activeTab === "settings" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"}`}
@@ -336,6 +344,16 @@ export default function AdminDashboard() {
                     >
                       <Bell className="h-4 w-4 mr-3 inline" />
                       Send Notification
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab("database-optimize"); setMobileMenuOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                        activeTab === "database-optimize" ? "bg-primary-100 text-primary-700" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      data-testid="nav-database-optimize-mobile"
+                    >
+                      <Zap className="h-4 w-4 mr-3 inline" />
+                      DB Optimize
                     </button>
                     <div className="border-t pt-4 mt-4">
                       <div className="px-3 py-2">
@@ -631,6 +649,77 @@ export default function AdminDashboard() {
             <div className="mb-8">
               <SendNotificationEnhanced />
             </div>
+          </>
+        )}
+
+        {activeTab === "database-optimize" && (
+          <>
+            {/* Database Optimize Header */}
+            <div className="mb-8">
+              <div className="md:flex md:items-center md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
+                    <Zap className="h-6 w-6 mr-3 inline text-yellow-500" />
+                    Database Optimization
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
+                    Manually warm database indexes and application caches for optimal performance after data reloads
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Database Optimization Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              
+              {/* Database Index Warming */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Shield className="h-5 w-5 mr-2 text-blue-500" />
+                    Database Index Warming
+                  </CardTitle>
+                  <CardDescription>
+                    Warm critical database indexes through strategic queries to improve query performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DatabaseIndexWarming />
+                </CardContent>
+              </Card>
+
+              {/* Application Cache Warming */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-green-500" />
+                    Application Cache Warming
+                  </CardTitle>
+                  <CardDescription>
+                    Pre-load application caches for dashboard, hotels, and participants data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ApplicationCacheWarming />
+                </CardContent>
+              </Card>
+
+            </div>
+
+            {/* Performance Tips */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-blue-800">💡 Performance Tips</CardTitle>
+              </CardHeader>
+              <CardContent className="text-blue-700">
+                <ul className="space-y-2 text-sm">
+                  <li><strong>After data deletion:</strong> Use both warming operations to restore optimal performance</li>
+                  <li><strong>Best practice:</strong> Run index warming first, then cache warming</li>
+                  <li><strong>Expected timing:</strong> Index warming ~100-500ms, Cache warming ~1-3 seconds</li>
+                  <li><strong>When to use:</strong> After bulk data operations, database restarts, or slow performance</li>
+                </ul>
+              </CardContent>
+            </Card>
           </>
         )}
 
