@@ -524,8 +524,10 @@ export class UploadService {
           const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
-          if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Coach/Official booking duration must be at least 3 days. Current: ${daysDiff} days`);
+          // Fixed: For 3 calendar days minimum (e.g., Oct 2,3,4), duration should be >= 2 days
+          if (daysDiff < 2) {
+            const calendarDays = daysDiff + 1; // Convert duration to calendar days for user-friendly message
+            result.errors.push(`Row ${i + 1}: Coach/Official booking must span at least 3 calendar days. Current: ${calendarDays} calendar days`);
             continue;
           }
 
@@ -734,8 +736,10 @@ export class UploadService {
           const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
-          if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Coach/Official booking duration must be at least 3 days. Current: ${daysDiff} days`);
+          // Fixed: For 3 calendar days minimum (e.g., Oct 2,3,4), duration should be >= 2 days
+          if (daysDiff < 2) {
+            const calendarDays = daysDiff + 1; // Convert duration to calendar days for user-friendly message
+            result.errors.push(`Row ${i + 1}: Coach/Official booking must span at least 3 calendar days. Current: ${calendarDays} calendar days`);
             continue;
           }
 
@@ -1024,8 +1028,10 @@ export class UploadService {
           const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
-          if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Player booking duration must be at least 3 days. Current: ${daysDiff} days`);
+          // Fixed: For 3 calendar days minimum (e.g., Oct 2,3,4), duration should be >= 2 days
+          if (daysDiff < 2) {
+            const calendarDays = daysDiff + 1; // Convert duration to calendar days for user-friendly message
+            result.errors.push(`Row ${i + 1}: Player booking must span at least 3 calendar days. Current: ${calendarDays} calendar days`);
             continue;
           }
 
@@ -1256,8 +1262,10 @@ export class UploadService {
           const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
-          if (daysDiff < 3) {
-            result.errors.push(`Row ${i + 1}: Player booking duration must be at least 3 days. Current: ${daysDiff} days`);
+          // Fixed: For 3 calendar days minimum (e.g., Oct 2,3,4), duration should be >= 2 days
+          if (daysDiff < 2) {
+            const calendarDays = daysDiff + 1; // Convert duration to calendar days for user-friendly message
+            result.errors.push(`Row ${i + 1}: Player booking must span at least 3 calendar days. Current: ${calendarDays} calendar days`);
             continue;
           }
 
