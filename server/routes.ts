@@ -555,6 +555,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ⚡ DATABASE OPTIMIZATION ROUTES - For manual database warming
+  app.post("/api/admin/database/warm-indexes", requireAdmin, async (req, res) => {
+    try {
+      console.log("🔥 Manual database index warming initiated...");
+      const startTime = Date.now();
+      
+      // Warm critical indexes through strategic queries
+      const warmingQueries = [
+        // Hotel balance index warming
+        db.select().from(hotelDailyBalance).limit(1),
+        // Participant role index warming  
+        storage.getParticipants({ role: 'coach', page: 1, limit: 1 }),
+        // Hotel occupancy index warming
+        storage.getHotelsWithTodayOccupancyPaginated({ page: 1, limit: 1 }),
+        // Date-based index warming
+        db.select().from(hotelDailyBalance).where(eq(hotelDailyBalance.balanceDate, new Date().toISOString().split('T')[0])).limit(1),
+      ];
+      
+      // Execute all warming queries in parallel
+      await Promise.all(warmingQueries);
+      
+      const duration = Date.now() - startTime;
+      console.log(`✅ Database indexes warmed in ${duration}ms`);
+      
+      res.json({
+        success: true,
+        message: `Database indexes warmed successfully in ${duration}ms`,
+        operations: [
+          "Hotel balance table indexes",
+          "Participant role-based indexes", 
+          "Hotel occupancy date indexes",
+          "Balance date-range indexes"
+        ]
+      });
+    } catch (error) {
+      console.error("❌ Database warming failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Database warming failed" 
+      });
+    }
+  });
+
+  app.post("/api/admin/database/warm-caches", requireAdmin, async (req, res) => {
+    try {
+      console.log("🔥 Manual application cache warming initiated...");
+      const startTime = Date.now();
+      const results: any = {};
+      
+      // 1. Warm Dashboard Stats Cache
+      console.log("📊 Warming dashboard stats cache...");
+      const dashboardStart = Date.now();
+      const stats = await storage.getDashboardStatsOptimized();
+      results.dashboardStats = {
+        duration: Date.now() - dashboardStart,
+        cached: true,
+        participants: stats.totalParticipants
+      };
+      
+      // 2. Warm Hotel Listing Cache  
+      console.log("🏨 Warming hotel listing cache...");
+      const hotelStart = Date.now();
+      const hotels = await storage.getHotelsWithTodayOccupancyPaginated({ page: 1, limit: 50 });
+      results.hotelListing = {
+        duration: Date.now() - hotelStart,
+        hotels: hotels.data.length,
+        cached: true
+      };
+      
+      // 3. Warm Participant Listing Cache
+      console.log("👥 Warming participant listing cache...");
+      const participantStart = Date.now();
+      const participants = await storage.getParticipants({ page: 1, limit: 50 });
+      results.participantListing = {
+        duration: Date.now() - participantStart,
+        participants: participants.data.length,
+        cached: true
+      };
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`✅ Application caches warmed in ${totalDuration}ms`);
+      
+      res.json({
+        success: true,
+        message: `Application caches warmed successfully in ${totalDuration}ms`,
+        operations: results,
+        summary: {
+          totalDuration,
+          caches: ["Dashboard Stats", "Hotel Listings", "Participant Listings"]
+        }
+      });
+    } catch (error) {
+      console.error("❌ Cache warming failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Cache warming failed" 
+      });
+    }
+  });
+
   // Update participant endpoint
   app.put("/api/admin/participants/:id", requireAdmin, async (req, res) => {
     try {
