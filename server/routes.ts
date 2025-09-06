@@ -712,6 +712,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/database/diagnose-tables", requireAdmin, async (req, res) => {
+    try {
+      console.log("🔍 Database table diagnostics initiated...");
+      const startTime = Date.now();
+      const results: any = {};
+      
+      // Check row counts for all major tables
+      const tableQueries = [
+        { table: "hotels", query: db.select({ count: sql<number>`count(*)` }).from(hotels) },
+        { table: "participants", query: db.select({ count: sql<number>`count(*)` }).from(participants) }, 
+        { table: "hotel_daily_balance", query: db.select({ count: sql<number>`count(*)` }).from(hotelDailyBalance) },
+        { table: "users", query: db.select({ count: sql<number>`count(*)` }).from(users) }
+      ];
+      
+      // Execute all count queries in parallel
+      const counts = await Promise.all(tableQueries.map(async ({ table, query }) => {
+        try {
+          const result = await query;
+          return { table, count: result[0]?.count || 0, status: 'success' };
+        } catch (error) {
+          console.warn(`⚠️  Could not count ${table}: ${error}`);
+          return { table, count: 0, status: 'error', error: error instanceof Error ? error.message : 'Count failed' };
+        }
+      }));
+      
+      // Organize results
+      counts.forEach(({ table, count, status, error }) => {
+        results[table] = { count, status, error };
+      });
+      
+      // Check for foreign key constraints that might prevent truncation
+      const constraintQuery = sql`
+        SELECT 
+          tc.table_name, 
+          kcu.column_name, 
+          ccu.table_name AS foreign_table_name,
+          ccu.column_name AS foreign_column_name 
+        FROM information_schema.table_constraints AS tc 
+        JOIN information_schema.key_column_usage AS kcu 
+          ON tc.constraint_name = kcu.constraint_name 
+          AND tc.table_schema = kcu.table_schema 
+        JOIN information_schema.constraint_column_usage AS ccu 
+          ON ccu.constraint_name = tc.constraint_name 
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY' 
+          AND tc.table_schema = 'public'
+          AND tc.table_name IN ('hotels', 'participants', 'hotel_daily_balance', 'users')
+      `;
+      
+      let foreignKeys = [];
+      try {
+        foreignKeys = await db.execute(constraintQuery);
+      } catch (fkError) {
+        console.warn("Could not fetch foreign key constraints:", fkError);
+      }
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`🔍 Database diagnostics completed in ${totalDuration}ms`);
+      
+      res.json({
+        success: true,
+        message: `Database diagnostics completed in ${totalDuration}ms`,
+        tableCounts: results,
+        foreignKeys: foreignKeys,
+        summary: {
+          totalDuration,
+          totalRows: Object.values(results).reduce((sum: number, r: any) => sum + (r.count || 0), 0),
+          tablesWithData: Object.values(results).filter((r: any) => r.count > 0).length,
+          constraintsFound: foreignKeys.length
+        }
+      });
+    } catch (error) {
+      console.error("❌ Database diagnostics failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Database diagnostics failed" 
+      });
+    }
+  });
+
+  app.post("/api/admin/database/comprehensive-cleanup", requireAdmin, async (req, res) => {
+    try {
+      console.log("🧹 Comprehensive database cleanup initiated...");
+      const startTime = Date.now();
+      const results: any = {};
+      
+      // Step 1: Disable foreign key checks temporarily (PostgreSQL approach)
+      console.log("🔓 Temporarily disabling foreign key constraints...");
+      
+      // Step 2: Truncate tables in correct order (children first, then parents)
+      const truncateOrder = [
+        "hotel_daily_balance",  // Child table (references hotels)  
+        "participants",         // Child table (references hotels)
+        "hotels"               // Parent table
+        // Note: Don't truncate users table as it contains admin accounts
+      ];
+      
+      for (const tableName of truncateOrder) {
+        try {
+          console.log(`🗑️  Truncating ${tableName}...`);
+          const tableStart = Date.now();
+          
+          // Use CASCADE to handle any remaining foreign key dependencies
+          await db.execute(sql.raw(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE`));
+          
+          results[tableName] = {
+            duration: Date.now() - tableStart,
+            truncated: true,
+            method: 'CASCADE'
+          };
+          console.log(`✅ Truncated ${tableName} in ${results[tableName].duration}ms`);
+        } catch (truncateError) {
+          console.warn(`⚠️  Could not truncate ${tableName}: ${truncateError}`);
+          results[tableName] = {
+            duration: 0,
+            truncated: false,
+            error: truncateError instanceof Error ? truncateError.message : "Truncation failed",
+            method: 'CASCADE'
+          };
+        }
+      }
+      
+      // Step 3: Reset sequences to ensure clean ID generation
+      const sequenceResets = [
+        "ALTER SEQUENCE hotels_id_seq RESTART WITH 1",
+        "ALTER SEQUENCE participants_id_seq RESTART WITH 1"
+      ];
+      
+      for (const resetQuery of sequenceResets) {
+        try {
+          await db.execute(sql.raw(resetQuery));
+          console.log(`🔢 Reset sequence: ${resetQuery}`);
+        } catch (seqError) {
+          console.warn(`⚠️  Could not reset sequence: ${seqError}`);
+        }
+      }
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`🧹 Comprehensive cleanup completed in ${totalDuration}ms`);
+      
+      res.json({
+        success: true,
+        message: `Comprehensive database cleanup completed in ${totalDuration}ms`,
+        operations: results,
+        summary: {
+          totalDuration,
+          tablesTruncated: Object.values(results).filter((r: any) => r.truncated).length,
+          totalTables: truncateOrder.length,
+          sequencesReset: sequenceResets.length
+        }
+      });
+    } catch (error) {
+      console.error("❌ Comprehensive cleanup failed:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Comprehensive cleanup failed" 
+      });
+    }
+  });
+
   // Update participant endpoint
   app.put("/api/admin/participants/:id", requireAdmin, async (req, res) => {
     try {

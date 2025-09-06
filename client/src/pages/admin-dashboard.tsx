@@ -722,18 +722,55 @@ export default function AdminDashboard() {
 
             </div>
 
+            {/* Database Management Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              
+              {/* Database Diagnostics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <User className="h-5 w-5 mr-2 text-orange-500" />
+                    Database Diagnostics
+                  </CardTitle>
+                  <CardDescription>
+                    Check table row counts, foreign key constraints, and identify why data persists after truncate
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DatabaseDiagnostics />
+                </CardContent>
+              </Card>
+
+              {/* Comprehensive Cleanup */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Building className="h-5 w-5 mr-2 text-red-500" />
+                    Comprehensive Cleanup
+                  </CardTitle>
+                  <CardDescription>
+                    Complete database cleanup with foreign key handling and sequence resets
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ComprehensiveCleanup />
+                </CardContent>
+              </Card>
+
+            </div>
+
             {/* Performance Tips */}
             <Card className="bg-blue-50 border-blue-200">
               <CardHeader>
-                <CardTitle className="text-blue-800">💡 Performance Tips</CardTitle>
+                <CardTitle className="text-blue-800">💡 Database Management Guide</CardTitle>
               </CardHeader>
               <CardContent className="text-blue-700">
                 <ul className="space-y-2 text-sm">
-                  <li><strong>After data deletion:</strong> Use all three optimization operations to restore peak performance</li>
-                  <li><strong>Best practice:</strong> Run in order: Index warming → Table analysis → Cache warming</li>
-                  <li><strong>Expected timing:</strong> Index warming ~100-500ms, Analysis ~200-800ms, Cache warming ~1-3 seconds</li>
-                  <li><strong>When to use:</strong> After bulk data operations, database restarts, slow queries, or performance degradation</li>
-                  <li><strong>Table analysis:</strong> Updates PostgreSQL statistics for better query planning after data changes</li>
+                  <li><strong>Performance optimization:</strong> Run Index warming → Table analysis → Cache warming</li>
+                  <li><strong>Data persistence issue:</strong> Use Diagnostics to identify what data remains after truncate</li>
+                  <li><strong>Complete cleanup:</strong> Use Comprehensive Cleanup for proper foreign key handling</li>
+                  <li><strong>Background processes:</strong> System may auto-regenerate data - check logs for uploads</li>
+                  <li><strong>Expected timing:</strong> Diagnostics ~200ms, Cleanup ~800ms, Optimization ~2-4 seconds</li>
                 </ul>
               </CardContent>
             </Card>
@@ -1106,6 +1143,142 @@ function DatabaseTableAnalysis() {
         <p><strong>Target:</strong> Hotels, participants, balance, users, audit tables</p>
         <p><strong>Method:</strong> PostgreSQL ANALYZE commands to update statistics</p>
         <p><strong>Duration:</strong> ~200-800ms</p>
+      </div>
+    </div>
+  );
+}
+
+// 🔍 Database Diagnostics Component
+function DatabaseDiagnostics() {
+  const { toast } = useToast();
+
+  const diagnoseMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/database/diagnose-tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to diagnose database tables');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const { summary, tableCounts } = data;
+      const tableDetails = Object.entries(tableCounts)
+        .map(([table, info]: [string, any]) => `${table}: ${info.count} rows`)
+        .join(', ');
+      
+      toast({
+        title: "🔍 Database Diagnostics Complete",
+        description: `${summary.totalRows} total rows in ${summary.tablesWithData} tables. ${tableDetails}`,
+        duration: 8000,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Diagnostics Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <Button 
+        onClick={() => diagnoseMutation.mutate()}
+        disabled={diagnoseMutation.isPending}
+        className="w-full"
+        variant="secondary"
+        data-testid="button-diagnose-tables"
+      >
+        {diagnoseMutation.isPending ? (
+          <>
+            <Clock className="h-4 w-4 mr-2 animate-spin" />
+            Running Diagnostics...
+          </>
+        ) : (
+          <>
+            <User className="h-4 w-4 mr-2" />
+            Diagnose Database
+          </>
+        )}
+      </Button>
+      
+      <div className="text-xs text-gray-500 space-y-1">
+        <p><strong>Checks:</strong> Row counts, foreign keys, constraint conflicts</p>
+        <p><strong>Purpose:</strong> Identify why data persists after truncate</p>
+        <p><strong>Duration:</strong> ~200-500ms</p>
+      </div>
+    </div>
+  );
+}
+
+// 🧹 Comprehensive Cleanup Component
+function ComprehensiveCleanup() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const cleanupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/database/comprehensive-cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to perform comprehensive cleanup');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const { summary } = data;
+      toast({
+        title: "🧹 Database Cleanup Complete",
+        description: `${summary.tablesTruncated}/${summary.totalTables} tables cleaned, sequences reset`,
+        duration: 5000,
+      });
+      // Invalidate all caches after cleanup
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/participants'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Cleanup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <Button 
+        onClick={() => cleanupMutation.mutate()}
+        disabled={cleanupMutation.isPending}
+        className="w-full bg-red-500 hover:bg-red-600"
+        data-testid="button-comprehensive-cleanup"
+      >
+        {cleanupMutation.isPending ? (
+          <>
+            <Clock className="h-4 w-4 mr-2 animate-spin" />
+            Cleaning Database...
+          </>
+        ) : (
+          <>
+            <Building className="h-4 w-4 mr-2" />
+            Complete Cleanup
+          </>
+        )}
+      </Button>
+      
+      <div className="text-xs text-gray-500 space-y-1">
+        <p><strong>⚠️ WARNING:</strong> Deletes all hotels, participants, balance data</p>
+        <p><strong>Method:</strong> CASCADE truncation with sequence reset</p>
+        <p><strong>Duration:</strong> ~500-1000ms</p>
       </div>
     </div>
   );
