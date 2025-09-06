@@ -895,3 +895,135 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+// ⚡ Database Index Warming Component
+function DatabaseIndexWarming() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const warmIndexesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/database/warm-indexes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to warm database indexes');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "✅ Database Indexes Warmed",
+        description: data.message,
+        duration: 5000,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard/stats'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Database Warming Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <Button 
+        onClick={() => warmIndexesMutation.mutate()}
+        disabled={warmIndexesMutation.isPending}
+        className="w-full"
+        data-testid="button-warm-indexes"
+      >
+        {warmIndexesMutation.isPending ? (
+          <>
+            <Clock className="h-4 w-4 mr-2 animate-spin" />
+            Warming Indexes...
+          </>
+        ) : (
+          <>
+            <Shield className="h-4 w-4 mr-2" />
+            Warm Database Indexes
+          </>
+        )}
+      </Button>
+      
+      <div className="text-xs text-gray-500 space-y-1">
+        <p><strong>Target:</strong> Hotel balance, participant role, occupancy date indexes</p>
+        <p><strong>Method:</strong> Strategic query execution to warm PostgreSQL indexes</p>
+        <p><strong>Duration:</strong> ~100-500ms</p>
+      </div>
+    </div>
+  );
+}
+
+// 🔥 Application Cache Warming Component  
+function ApplicationCacheWarming() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const warmCachesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/database/warm-caches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to warm application caches');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "🔥 Application Caches Warmed",
+        description: data.message,
+        duration: 5000,
+      });
+      // Invalidate all relevant caches
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/participants'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Cache Warming Failed", 
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <Button 
+        onClick={() => warmCachesMutation.mutate()}
+        disabled={warmCachesMutation.isPending}
+        className="w-full"
+        variant="secondary"
+        data-testid="button-warm-caches"
+      >
+        {warmCachesMutation.isPending ? (
+          <>
+            <Clock className="h-4 w-4 mr-2 animate-spin" />
+            Warming Caches...
+          </>
+        ) : (
+          <>
+            <Zap className="h-4 w-4 mr-2" />
+            Warm Application Caches
+          </>
+        )}
+      </Button>
+      
+      <div className="text-xs text-gray-500 space-y-1">
+        <p><strong>Target:</strong> Dashboard stats, hotel listings, participant data</p>
+        <p><strong>Method:</strong> Pre-load application caches through API calls</p>
+        <p><strong>Duration:</strong> ~1-3 seconds</p>
+      </div>
+    </div>
+  );
+}
