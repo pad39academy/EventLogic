@@ -425,15 +425,14 @@ export class EventService {
       const batch = hotelBatches[batchIndex];
       console.log(`🔄 Processing batch ${batchIndex + 1}/${hotelBatches.length} with ${batch.length} hotels`);
       
-      // Process hotels in this batch sequentially to avoid transaction conflicts
-      const batchResults: any[] = [];
-      for (const hotelData of batch) {
+      // PERFORMANCE FIX: Process hotels in parallel with individual transactions
+      const batchPromises = batch.map(async (hotelData: any) => {
         try {
           const { hotelId, instanceCode, earliestDate, latestDate, participantIds } = hotelData;
           
           console.log(`🏨 Processing occupancy for ${hotelId}-${instanceCode} (${participantIds.length} participants)`);
           
-          // CRITICAL FIX: Use individual transactions for each hotel to prevent cascading failures
+          // CRITICAL FIX: Each hotel gets its own transaction - failures don't cascade
           await db.transaction(async (hotelTx) => {
             await this.updateOccupancyBulk(
               hotelId,
@@ -446,16 +445,17 @@ export class EventService {
             );
           });
           
-          batchResults.push({ hotelId, instanceCode, success: true });
+          return { hotelId, instanceCode, success: true };
         } catch (error) {
           const errorMsg = `Failed to process hotel ${hotelData.hotelId}-${hotelData.instanceCode}: ${error instanceof Error ? error.message : 'Unknown error'}`;
           console.error(`❌ ${errorMsg}`);
           errors.push(errorMsg);
-          batchResults.push({ hotelId: hotelData.hotelId, instanceCode: hotelData.instanceCode, success: false, error: errorMsg });
+          return { hotelId: hotelData.hotelId, instanceCode: hotelData.instanceCode, success: false, error: errorMsg };
         }
-      }
+      });
       
-      // Sequential processing completed
+      // Wait for all hotels in this batch to complete in parallel
+      const batchResults = await Promise.all(batchPromises);
       const batchSuccesses = batchResults.filter(r => r.success).length;
       processedHotels += batchSuccesses;
       
