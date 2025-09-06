@@ -14,7 +14,7 @@ import {
   type User, type Participant, type Hotel, type UpdateHotel 
 } from "@shared/schema";
 import { db } from "./db";
-import { users, participants, settings } from "@shared/schema";
+import { users, participants, settings, hotelDailyBalance } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import multer from "multer";
 import { z } from "zod";
