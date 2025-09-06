@@ -440,7 +440,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update all hotel occupancy after successful upload
       if (result.success && result.created > 0) {
+        const occupancyStartTime = Date.now();
+        console.log("⏱️  ROUTE TIMING: Starting updateAllHotelOccupancy...");
         await storage.updateAllHotelOccupancy();
+        console.log(`⏱️  ROUTE TIMING: updateAllHotelOccupancy completed in ${Date.now() - occupancyStartTime}ms`);
       }
 
       // Audit logging now handled automatically via event_store.user_id
