@@ -281,8 +281,10 @@ export class DatabaseStorage implements IStorage {
         
         // ⚡ FAST: Pre-calculated occupancy from balance table
         occupiedRooms: hotelDailyBalance.calculatedOccupiedRooms,
-        availableRooms: hotelDailyBalance.availableRooms,
-        occupancyPercentage: hotelDailyBalance.occupancyPercentage,
+        // ⚡ OPTIMIZED: Calculate derived fields on demand for better performance
+        playersCount: hotelDailyBalance.playersCount,
+        coachesCount: hotelDailyBalance.coachesCount,
+        officialsCount: hotelDailyBalance.officialsCount,
       })
       .from(hotels)
       .leftJoin(
@@ -420,8 +422,10 @@ export class DatabaseStorage implements IStorage {
         
         // ⚡ FAST: Pre-calculated occupancy from balance table
         occupiedRooms: hotelDailyBalance.calculatedOccupiedRooms,
-        availableRooms: hotelDailyBalance.availableRooms,
-        occupancyPercentage: hotelDailyBalance.occupancyPercentage,
+        // ⚡ OPTIMIZED: Calculate derived fields on demand for better performance
+        playersCount: hotelDailyBalance.playersCount,
+        coachesCount: hotelDailyBalance.coachesCount,
+        officialsCount: hotelDailyBalance.officialsCount,
       })
       .from(hotels)
       .leftJoin(

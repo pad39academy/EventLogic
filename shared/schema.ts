@@ -228,36 +228,29 @@ export const hotelDailyBalance = pgTable("hotel_daily_balance", {
   instanceCode: text("instance_code").notNull(),
   balanceDate: date("balance_date").notNull(), // YYYY-MM-DD for date-based partitioning
   
-  // Pre-calculated occupancy data
+  // ⚡ OPTIMIZED: Essential fast calculations only
   totalRooms: integer("total_rooms").notNull(),
   playersCount: integer("players_count").default(0),
   coachesCount: integer("coaches_count").default(0),
   officialsCount: integer("officials_count").default(0),
   calculatedOccupiedRooms: integer("calculated_occupied_rooms").default(0),
-  availableRooms: integer("available_rooms").default(0),
-  occupancyPercentage: decimal("occupancy_percentage", { precision: 5, scale: 2 }).default("0.00"),
   
-  // Pending checkout tracking (checked in but not checked out)
-  pendingCheckoutPlayers: integer("pending_checkout_players").default(0),
-  pendingCheckoutCoaches: integer("pending_checkout_coaches").default(0),
-  pendingCheckoutOfficials: integer("pending_checkout_officials").default(0),
-  pendingCheckoutRooms: integer("pending_checkout_rooms").default(0),
+  // ⚡ REMOVED for performance:
+  // - availableRooms (derived calculation - calculate on demand)
+  // - occupancyPercentage (heavy decimal math - calculate offline)
+  // - pendingCheckout* fields (use existing participant status)
+  // - lastUpdatedEventId/Sequence (event tracking overhead)
+  // - calculatedAt (timestamp overhead)
   
-  // Event tracking for idempotency
-  lastUpdatedEventId: varchar("last_updated_event_id"),
-  lastUpdatedSequence: bigint("last_updated_sequence", { mode: "number" }),
-  
-  // Audit fields
-  calculatedAt: timestamp("calculated_at").defaultNow(),
+  // Minimal audit
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // PRIMARY: Fast hotel-date queries for dashboard
   hotelDateIdx: uniqueIndex("hotel_date_unique_idx").on(table.hotelId, table.instanceCode, table.balanceDate),
   
-  // Secondary indexes for analytics
+  // ⚡ OPTIMIZED: Essential indexes only
   dateRangeIdx: index("balance_date_range_idx").on(table.balanceDate),
-  occupancyIdx: index("occupancy_percentage_idx").on(table.occupancyPercentage),
-  pendingCheckoutIdx: index("pending_checkout_idx").on(table.hotelId, table.pendingCheckoutRooms),
+  // ⚡ REMOVED: occupancyIdx, pendingCheckoutIdx (heavy columns removed)
 }));
 
 // Legacy table (keep for migration compatibility)
