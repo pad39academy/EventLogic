@@ -7,6 +7,8 @@ import { sendSMS, generateOTP, formatOTPMessage } from "./sms";
 export class AuthService {
   // Admin login with email/password + SMS OTP (2FA)
   static async loginAdminStep1(email: string, password: string) {
+    console.log(`🔍 Login attempt for email: ${email}`);
+    
     const [user] = await db.select().from(users).where(
       and(
         eq(users.email, email), 
@@ -14,12 +16,19 @@ export class AuthService {
       )
     );
     
+    console.log(`👤 User found:`, user ? `${user.name} (${user.role})` : 'None');
+    
     if (!user || !user.password) {
+      console.log(`❌ User not found or no password`);
       throw new Error("Invalid credentials");
     }
 
+    console.log(`🔐 Comparing passwords...`);
     const isValidPassword = await bcrypt.compare(password, user.password);
+    console.log(`🔑 Password valid:`, isValidPassword);
+    
     if (!isValidPassword) {
+      console.log(`❌ Invalid password for user: ${user.email}`);
       throw new Error("Invalid credentials");
     }
 
