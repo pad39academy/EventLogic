@@ -620,7 +620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hotels = await storage.getHotelsWithTodayOccupancyPaginated({ page: 1, limit: 50 });
       results.hotelListing = {
         duration: Date.now() - hotelStart,
-        hotels: hotels.data.length,
+        hotels: hotels?.data?.length || 0,
         cached: true
       };
       
@@ -630,7 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const participants = await storage.getParticipants({ page: 1, limit: 50 });
       results.participantListing = {
         duration: Date.now() - participantStart,
-        participants: participants.data.length,
+        participants: Array.isArray(participants) ? participants.length : 0,
         cached: true
       };
       
