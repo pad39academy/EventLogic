@@ -425,35 +425,37 @@ export class EventService {
       const batch = hotelBatches[batchIndex];
       console.log(`🔄 Processing batch ${batchIndex + 1}/${hotelBatches.length} with ${batch.length} hotels`);
       
-      // Process hotels in this batch in parallel
-      const batchPromises = batch.map(async (hotelData: any) => {
+      // Process hotels in this batch sequentially to avoid transaction conflicts
+      const batchResults: any[] = [];
+      for (const hotelData of batch) {
         try {
           const { hotelId, instanceCode, earliestDate, latestDate, participantIds } = hotelData;
           
           console.log(`🏨 Processing occupancy for ${hotelId}-${instanceCode} (${participantIds.length} participants)`);
           
-          // OPTIMIZED: Single bulk occupancy update (replaces redundant calls)
-          await this.updateOccupancyBulk(
-            hotelId,
-            instanceCode,
-            new Date(earliestDate),
-            new Date(latestDate),
-            event.id,
-            Number(event.sequenceNumber),
-            tx
-          );
+          // CRITICAL FIX: Use individual transactions for each hotel to prevent cascading failures
+          await db.transaction(async (hotelTx) => {
+            await this.updateOccupancyBulk(
+              hotelId,
+              instanceCode,
+              new Date(earliestDate),
+              new Date(latestDate),
+              event.id,
+              Number(event.sequenceNumber),
+              hotelTx
+            );
+          });
           
-          return { hotelId, instanceCode, success: true };
+          batchResults.push({ hotelId, instanceCode, success: true });
         } catch (error) {
           const errorMsg = `Failed to process hotel ${hotelData.hotelId}-${hotelData.instanceCode}: ${error instanceof Error ? error.message : 'Unknown error'}`;
           console.error(`❌ ${errorMsg}`);
           errors.push(errorMsg);
-          return { hotelId: hotelData.hotelId, instanceCode: hotelData.instanceCode, success: false, error: errorMsg };
+          batchResults.push({ hotelId: hotelData.hotelId, instanceCode: hotelData.instanceCode, success: false, error: errorMsg });
         }
-      });
+      }
       
-      // Wait for all hotels in this batch to complete
-      const batchResults = await Promise.all(batchPromises);
+      // Sequential processing completed
       const batchSuccesses = batchResults.filter(r => r.success).length;
       processedHotels += batchSuccesses;
       
@@ -950,23 +952,22 @@ export class EventService {
     startDate?: Date, 
     endDate?: Date
   ): Promise<HotelOccupancyBalance[]> {
-    let query = db.select()
-      .from(hotelOccupancyBalance)
-      .where(and(
-        eq(hotelOccupancyBalance.hotelId, hotelId),
-        eq(hotelOccupancyBalance.instanceCode, instanceCode)
-      ));
+    const conditions = [
+      eq(hotelOccupancyBalance.hotelId, hotelId),
+      eq(hotelOccupancyBalance.instanceCode, instanceCode)
+    ];
 
     if (startDate && endDate) {
-      query = query.where(and(
-        eq(hotelOccupancyBalance.hotelId, hotelId),
-        eq(hotelOccupancyBalance.instanceCode, instanceCode),
+      conditions.push(
         gte(hotelOccupancyBalance.date, startDate),
         lte(hotelOccupancyBalance.date, endDate)
-      )) as any;
+      );
     }
 
-    return await query.orderBy(desc(hotelOccupancyBalance.date));
+    return await db.select()
+      .from(hotelOccupancyBalance)
+      .where(and(...conditions))
+      .orderBy(desc(hotelOccupancyBalance.date));
   }
 
   /**
@@ -1011,7 +1012,7 @@ export class EventService {
         await db.update(eventStore)
           .set({ 
             status: 'retrying',
-            retryCount: event.retryCount + 1
+            retryCount: (event.retryCount || 0) + 1
           })
           .where(eq(eventStore.id, event.id));
 

@@ -53,7 +53,7 @@ const requireAuth = (req: express.Request, res: express.Response, next: express.
 
 // Middleware to check admin role
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (!req.session.user || req.session.user.role !== "admin") {
+  if (!req.session.user || (req.session.user.role !== "admin" && req.session.user.role !== "technical_admin")) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();
