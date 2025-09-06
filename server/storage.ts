@@ -1072,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
       occupiedRooms: occupancyStats.occupiedRooms || 0,
       occupancyRate: Math.round(occupancyStats.avgOccupancyRate || 0),
       estimatedRoomsNeeded,
-      lastUpdated: occupancyStats.lastMaterialized?.toISOString() || new Date().toISOString()
+      lastUpdated: occupancyStats.lastMaterialized ? new Date(occupancyStats.lastMaterialized).toISOString() : new Date().toISOString()
     };
 
     // Cache the computed stats
