@@ -1,14 +1,17 @@
 import bcrypt from "bcryptjs";
 import { users, otpVerifications, type User, type InsertUser, type InsertOtpVerification } from "../../shared/schema";
 import { db } from "../db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, or, gt } from "drizzle-orm";
 import { sendSMS, generateOTP, formatOTPMessage } from "./sms";
 
 export class AuthService {
   // Admin login with email/password + SMS OTP (2FA)
   static async loginAdminStep1(email: string, password: string) {
     const [user] = await db.select().from(users).where(
-      and(eq(users.email, email), eq(users.role, "admin"))
+      and(
+        eq(users.email, email), 
+        or(eq(users.role, "admin"), eq(users.role, "technical_admin"))
+      )
     );
     
     if (!user || !user.password) {
@@ -42,7 +45,10 @@ export class AuthService {
     }
 
     const [user] = await db.select().from(users).where(
-      and(eq(users.mobileNumber, mobileNumber), eq(users.role, "admin"))
+      and(
+        eq(users.mobileNumber, mobileNumber), 
+        or(eq(users.role, "admin"), eq(users.role, "technical_admin"))
+      )
     );
 
     if (!user) {
