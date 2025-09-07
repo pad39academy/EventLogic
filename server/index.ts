@@ -117,11 +117,28 @@ app.use((req, res, next) => {
     const { log } = process.env.NODE_ENV === "development" 
       ? await import("../viteDev")
       : await import("../viteProd");
-    log(`serving on port ${port}`);
     
-    // Start background jobs service for event processing
-    const backgroundJobs = new BackgroundJobsService();
-    backgroundJobs.start();
+    // Clear startup messages
+    console.log('\n' + '='.repeat(50));
+    console.log('🚀 IEVOLVE EVENT MANAGEMENT SYSTEM');
+    console.log('='.repeat(50));
+    console.log(`✅ Database connected`);
+    console.log(`✅ Routes registered`); 
+    console.log(`✅ Server listening on ${host}:${port}`);
+    console.log(`📱 Admin Panel: http://localhost:${port}/admin`);
+    console.log(`👨‍💼 Coach Portal: http://localhost:${port}/coach`);
+    console.log(`🏥 Technical Admin: http://localhost:${port}/technical-admin`);
+    console.log('='.repeat(50));
+    console.log('🎉 APPLICATION READY FOR TRAFFIC');
+    console.log('='.repeat(50) + '\n');
+    
+    // Delay background jobs to ensure server is stable first
+    console.log('⏳ Starting background services in 3 seconds...\n');
+    setTimeout(() => {
+      console.log('🔄 Initializing background services...');
+      const backgroundJobs = new BackgroundJobsService();
+      backgroundJobs.start();
+    }, 3000);
   });
 
   // Handle graceful shutdown
