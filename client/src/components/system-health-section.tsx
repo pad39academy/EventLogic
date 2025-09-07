@@ -162,9 +162,19 @@ export default function SystemHealthSection() {
   };
 
   const formatPercentage = (value: any) => {
-    if (value === null || value === undefined || isNaN(value)) return 'N/A';
+    if (value === null || value === undefined) return 'N/A';
+    
+    // Convert to number and validate
     const numValue = Number(value);
-    return isNaN(numValue) ? 'N/A' : `${numValue.toFixed(1)}%`;
+    if (isNaN(numValue) || !isFinite(numValue)) return 'N/A';
+    
+    // Ensure we have a valid number before calling toFixed
+    try {
+      return `${numValue.toFixed(1)}%`;
+    } catch (error) {
+      console.warn('Error formatting percentage:', value, error);
+      return 'N/A';
+    }
   };
 
   return (

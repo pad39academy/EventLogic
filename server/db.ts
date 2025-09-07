@@ -10,12 +10,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Create connection pool with proper error handling
+// Create connection pool with improved timeout handling for long-running operations
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
   max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 300000,     // 5 minutes - increased from 30 seconds
+  connectionTimeoutMillis: 60000, // 1 minute - increased from 10 seconds
+  allowExitOnIdle: true,
 });
 
 // Add error handling for pool connection issues
