@@ -63,7 +63,7 @@ export default function SystemHealthSection() {
       if (!response.ok) throw new Error('Failed to fetch connections');
       return await response.json();
     },
-    refetchInterval: autoRefresh ? 5000 : false
+    refetchInterval: autoRefresh ? 15000 : false
   });
 
   // Fetch running queries
@@ -76,7 +76,7 @@ export default function SystemHealthSection() {
       if (!response.ok) throw new Error('Failed to fetch running queries');
       return await response.json();
     },
-    refetchInterval: autoRefresh ? 5000 : false
+    refetchInterval: autoRefresh ? 15000 : false
   });
 
   // Fetch performance metrics
@@ -89,7 +89,7 @@ export default function SystemHealthSection() {
       if (!response.ok) throw new Error('Failed to fetch performance metrics');
       return await response.json();
     },
-    refetchInterval: autoRefresh ? 30000 : false
+    refetchInterval: autoRefresh ? 60000 : false
   });
 
   // Fetch slow queries
@@ -255,7 +255,7 @@ export default function SystemHealthSection() {
           </CardTitle>
           <CardDescription>
             {autoRefresh 
-              ? "Automatically refreshing every 5 seconds" 
+              ? "Auto-refresh: queries every 15s, metrics every 60s" 
               : "Click auto refresh to enable real-time updates"
             }
           </CardDescription>

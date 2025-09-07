@@ -2181,36 +2181,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stats = await db.execute(sql`
         SELECT 
-          schemaname,
-          tablename,
-          pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
-          pg_total_relation_size(schemaname||'.'||tablename) AS size_bytes,
-          n_tup_ins as inserts,
-          n_tup_upd as updates,
-          n_tup_del as deletes,
-          n_live_tup as live_tuples,
-          n_dead_tup as dead_tuples,
-          last_vacuum,
-          last_autovacuum,
-          last_analyze,
-          last_autoanalyze
+          pt.schemaname,
+          pt.tablename,
+          pg_size_pretty(pg_total_relation_size(pt.schemaname||'.'||pt.tablename)) AS size,
+          pg_total_relation_size(pt.schemaname||'.'||pt.tablename) AS size_bytes,
+          COALESCE(pst.n_tup_ins, 0) as inserts,
+          COALESCE(pst.n_tup_upd, 0) as updates,
+          COALESCE(pst.n_tup_del, 0) as deletes,
+          COALESCE(pst.n_live_tup, 0) as live_tuples,
+          COALESCE(pst.n_dead_tup, 0) as dead_tuples,
+          pst.last_vacuum,
+          pst.last_autovacuum,
+          pst.last_analyze,
+          pst.last_autoanalyze
         FROM pg_tables pt
-        LEFT JOIN pg_stat_user_tables pst ON pt.tablename = pst.relname
+        LEFT JOIN pg_stat_user_tables pst ON pt.tablename = pst.relname AND pt.schemaname = pst.schemaname
         WHERE pt.schemaname = 'public'
-        ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+        ORDER BY pg_total_relation_size(pt.schemaname||'.'||pt.tablename) DESC
       `);
       
       const indexStats = await db.execute(sql`
         SELECT 
-          schemaname,
-          tablename,
-          indexname,
-          pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
-          idx_tup_read,
-          idx_tup_fetch
-        FROM pg_stat_user_indexes
-        WHERE schemaname = 'public'
-        ORDER BY pg_relation_size(indexrelid) DESC
+          psi.schemaname,
+          psi.tablename,
+          psi.indexname,
+          pg_size_pretty(pg_relation_size(psi.indexrelid)) as index_size,
+          COALESCE(psi.idx_tup_read, 0) as idx_tup_read,
+          COALESCE(psi.idx_tup_fetch, 0) as idx_tup_fetch
+        FROM pg_stat_user_indexes psi
+        WHERE psi.schemaname = 'public'
+        ORDER BY pg_relation_size(psi.indexrelid) DESC
       `);
 
       res.json({ tables: stats.rows, indexes: indexStats.rows });
@@ -2265,13 +2265,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/technical/reindex-tables", requireAdmin, async (req, res) => {
     try {
       const startTime = Date.now();
-      await db.execute(sql`REINDEX DATABASE CURRENT`);
+      
+      // Get all user tables and reindex them individually
+      const tables = await db.execute(sql`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+      `);
+      
+      let reindexedCount = 0;
+      for (const table of tables.rows) {
+        try {
+          await db.execute(sql`REINDEX TABLE ${sql.raw(table.tablename)}`);
+          reindexedCount++;
+        } catch (tableError) {
+          console.warn(`Failed to reindex table ${table.tablename}:`, tableError);
+        }
+      }
+      
       const duration = Date.now() - startTime;
       
       res.json({ 
         success: true, 
-        message: `Database reindexing completed successfully in ${duration}ms`,
-        duration 
+        message: `Reindexed ${reindexedCount} tables successfully in ${duration}ms`,
+        duration,
+        reindexedCount
       });
     } catch (error) {
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to reindex tables" });
