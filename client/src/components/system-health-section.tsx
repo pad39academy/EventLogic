@@ -477,7 +477,7 @@ export default function SystemHealthSection() {
               Slow Query Analysis
             </CardTitle>
             <CardDescription>
-              Queries that may need optimization (avg execution time > 1s)
+              Queries that may need optimization (avg execution time &gt; 1s)
             </CardDescription>
           </CardHeader>
           <CardContent>
