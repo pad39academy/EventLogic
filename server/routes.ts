@@ -2174,6 +2174,339 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Database Optimization Endpoints (Technical Admin only)
+  
+  // Get database statistics and health overview
+  app.get("/api/admin/technical/db-stats", requireAdmin, async (req, res) => {
+    try {
+      const stats = await db.execute(sql`
+        SELECT 
+          schemaname,
+          tablename,
+          pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
+          pg_total_relation_size(schemaname||'.'||tablename) AS size_bytes,
+          n_tup_ins as inserts,
+          n_tup_upd as updates,
+          n_tup_del as deletes,
+          n_live_tup as live_tuples,
+          n_dead_tup as dead_tuples,
+          last_vacuum,
+          last_autovacuum,
+          last_analyze,
+          last_autoanalyze
+        FROM pg_tables pt
+        LEFT JOIN pg_stat_user_tables pst ON pt.tablename = pst.relname
+        WHERE pt.schemaname = 'public'
+        ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+      `);
+      
+      const indexStats = await db.execute(sql`
+        SELECT 
+          schemaname,
+          tablename,
+          indexname,
+          pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+          idx_tup_read,
+          idx_tup_fetch
+        FROM pg_stat_user_indexes
+        WHERE schemaname = 'public'
+        ORDER BY pg_relation_size(indexrelid) DESC
+      `);
+
+      res.json({ tables: stats.rows, indexes: indexStats.rows });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch database statistics" });
+    }
+  });
+
+  // Analyze all tables (gather statistics)
+  app.post("/api/admin/technical/analyze-tables", requireAdmin, async (req, res) => {
+    try {
+      const startTime = Date.now();
+      await db.execute(sql`ANALYZE`);
+      const duration = Date.now() - startTime;
+      
+      res.json({ 
+        success: true, 
+        message: `Database analysis completed successfully in ${duration}ms`,
+        duration 
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to analyze tables" });
+    }
+  });
+
+  // Vacuum all tables (cleanup dead tuples)
+  app.post("/api/admin/technical/vacuum-tables", requireAdmin, async (req, res) => {
+    try {
+      const { vacuum_full = false } = req.body;
+      const startTime = Date.now();
+      
+      if (vacuum_full) {
+        await db.execute(sql`VACUUM FULL`);
+      } else {
+        await db.execute(sql`VACUUM`);
+      }
+      
+      const duration = Date.now() - startTime;
+      
+      res.json({ 
+        success: true, 
+        message: `Vacuum ${vacuum_full ? 'FULL' : ''} completed successfully in ${duration}ms`,
+        duration,
+        type: vacuum_full ? 'full' : 'standard'
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to vacuum tables" });
+    }
+  });
+
+  // Reindex all tables
+  app.post("/api/admin/technical/reindex-tables", requireAdmin, async (req, res) => {
+    try {
+      const startTime = Date.now();
+      await db.execute(sql`REINDEX DATABASE CURRENT`);
+      const duration = Date.now() - startTime;
+      
+      res.json({ 
+        success: true, 
+        message: `Database reindexing completed successfully in ${duration}ms`,
+        duration 
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to reindex tables" });
+    }
+  });
+
+  // Get index recommendations
+  app.get("/api/admin/technical/index-recommendations", requireAdmin, async (req, res) => {
+    try {
+      // Check for missing indexes on frequently queried columns
+      const recommendations = await db.execute(sql`
+        SELECT 
+          schemaname,
+          tablename,
+          seq_scan,
+          seq_tup_read,
+          idx_scan,
+          idx_tup_fetch,
+          CASE 
+            WHEN seq_scan > 1000 AND seq_tup_read > 100000 THEN 'High'
+            WHEN seq_scan > 500 AND seq_tup_read > 50000 THEN 'Medium'
+            ELSE 'Low'
+          END as priority,
+          'Consider adding indexes for frequently scanned table' as recommendation
+        FROM pg_stat_user_tables
+        WHERE schemaname = 'public'
+          AND seq_scan > 100
+        ORDER BY seq_tup_read DESC
+      `);
+
+      res.json({ recommendations: recommendations.rows });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get index recommendations" });
+    }
+  });
+
+  // Connection Monitoring Endpoints
+
+  // Get active database connections
+  app.get("/api/admin/technical/connections", requireAdmin, async (req, res) => {
+    try {
+      const connections = await db.execute(sql`
+        SELECT 
+          pid,
+          usename as username,
+          datname as database,
+          client_addr,
+          client_port,
+          application_name,
+          state,
+          query_start,
+          state_change,
+          now() - query_start as duration,
+          query,
+          wait_event,
+          wait_event_type
+        FROM pg_stat_activity
+        WHERE state != 'idle'
+          AND pid != pg_backend_pid()
+        ORDER BY query_start DESC
+      `);
+
+      const summary = await db.execute(sql`
+        SELECT 
+          state,
+          COUNT(*) as count
+        FROM pg_stat_activity
+        WHERE pid != pg_backend_pid()
+        GROUP BY state
+      `);
+
+      res.json({ 
+        connections: connections.rows,
+        summary: summary.rows,
+        total: connections.rows.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch connections" });
+    }
+  });
+
+  // Get running queries with details
+  app.get("/api/admin/technical/running-queries", requireAdmin, async (req, res) => {
+    try {
+      const queries = await db.execute(sql`
+        SELECT 
+          pid,
+          usename,
+          datname,
+          state,
+          query_start,
+          now() - query_start as duration,
+          wait_event,
+          wait_event_type,
+          query,
+          client_addr,
+          application_name
+        FROM pg_stat_activity
+        WHERE state = 'active'
+          AND pid != pg_backend_pid()
+          AND query NOT LIKE '%pg_stat_activity%'
+        ORDER BY query_start ASC
+      `);
+
+      const longRunning = queries.rows.filter((q: any) => {
+        const duration = q.duration;
+        return duration && duration.includes('00:') && !duration.startsWith('00:00:');
+      });
+
+      res.json({ 
+        queries: queries.rows,
+        longRunning: longRunning,
+        total: queries.rows.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch running queries" });
+    }
+  });
+
+  // Get slow query history
+  app.get("/api/admin/technical/slow-queries", requireAdmin, async (req, res) => {
+    try {
+      // Get queries from pg_stat_statements if available, otherwise use current activity
+      const slowQueries = await db.execute(sql`
+        SELECT 
+          query,
+          calls,
+          total_time,
+          mean_time,
+          rows,
+          100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+        FROM pg_stat_statements
+        WHERE mean_time > 1000  -- Queries taking more than 1 second on average
+        ORDER BY mean_time DESC
+        LIMIT 20
+      `).catch(async () => {
+        // Fallback if pg_stat_statements is not available
+        return await db.execute(sql`
+          SELECT 
+            'pg_stat_statements extension not available' as query,
+            0 as calls,
+            0 as total_time,
+            0 as mean_time,
+            0 as rows,
+            0 as hit_percent
+        `);
+      });
+
+      res.json({ slowQueries: slowQueries.rows });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch slow queries" });
+    }
+  });
+
+  // Kill a running query
+  app.post("/api/admin/technical/kill-query", requireAdmin, async (req, res) => {
+    try {
+      const { pid } = req.body;
+      
+      if (!pid || isNaN(parseInt(pid))) {
+        return res.status(400).json({ message: "Valid PID is required" });
+      }
+
+      await db.execute(sql`SELECT pg_cancel_backend(${pid})`);
+      
+      res.json({ 
+        success: true, 
+        message: `Query with PID ${pid} has been cancelled`,
+        pid: parseInt(pid)
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to kill query" });
+    }
+  });
+
+  // Get database cache hit ratios and performance metrics
+  app.get("/api/admin/technical/performance-metrics", requireAdmin, async (req, res) => {
+    try {
+      const cacheHit = await db.execute(sql`
+        SELECT 
+          sum(heap_blks_read) as heap_read,
+          sum(heap_blks_hit) as heap_hit,
+          sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)) * 100 as ratio
+        FROM pg_statio_user_tables
+      `);
+
+      const indexHit = await db.execute(sql`
+        SELECT 
+          sum(idx_blks_read) as idx_read,
+          sum(idx_blks_hit) as idx_hit,
+          sum(idx_blks_hit) / (sum(idx_blks_hit) + sum(idx_blks_read)) * 100 as ratio
+        FROM pg_statio_user_indexes
+      `);
+
+      const dbSize = await db.execute(sql`
+        SELECT 
+          pg_size_pretty(pg_database_size(current_database())) as size,
+          pg_database_size(current_database()) as size_bytes
+      `);
+
+      res.json({ 
+        cacheHit: cacheHit.rows[0],
+        indexHit: indexHit.rows[0],
+        databaseSize: dbSize.rows[0]
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch performance metrics" });
+    }
+  });
+
+  // Clean up old events (data maintenance)
+  app.post("/api/admin/technical/cleanup-events", requireAdmin, async (req, res) => {
+    try {
+      const { days = 30 } = req.body;
+      const startTime = Date.now();
+      
+      const result = await db.execute(sql`
+        DELETE FROM event_store 
+        WHERE status = 'processed' 
+          AND created_at < NOW() - INTERVAL '${sql.raw(days.toString())} days'
+      `);
+      
+      const duration = Date.now() - startTime;
+      
+      res.json({ 
+        success: true, 
+        message: `Cleaned up events older than ${days} days in ${duration}ms`,
+        deletedCount: result.rowCount || 0,
+        duration 
+      });
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to cleanup events" });
+    }
+  });
+
   // Manual occupancy recalculation endpoint (Admin only)
   app.post("/api/admin/recalculate-occupancy", requireAdmin, async (req, res) => {
     try {
