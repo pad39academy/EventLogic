@@ -161,8 +161,10 @@ export default function SystemHealthSection() {
     }
   };
 
-  const formatPercentage = (value: number) => {
-    return value ? `${value.toFixed(1)}%` : 'N/A';
+  const formatPercentage = (value: any) => {
+    if (value === null || value === undefined || isNaN(value)) return 'N/A';
+    const numValue = Number(value);
+    return isNaN(numValue) ? 'N/A' : `${numValue.toFixed(1)}%`;
   };
 
   return (
