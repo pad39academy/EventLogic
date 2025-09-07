@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
 import FailedBatchesSection from "@/components/failed-batches-section";
+import DbOptimizeSection from "@/components/db-optimize-section";
+import SystemHealthSection from "@/components/system-health-section";
 
 export default function TechnicalAdminDashboard() {
   const [activeTab, setActiveTab] = useState("failed-batches");
@@ -225,7 +227,7 @@ export default function TechnicalAdminDashboard() {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {activeTab === "failed-batches" && <FailedBatchesSection />}
 
-        {activeTab === "db-optimize" && <DatabaseOptimizeSection />}
+        {activeTab === "db-optimize" && <DbOptimizeSection />}
 
         {activeTab === "system-health" && <SystemHealthSection />}
       </main>
@@ -233,74 +235,4 @@ export default function TechnicalAdminDashboard() {
   );
 }
 
-// Database Optimize Section Component
-function DatabaseOptimizeSection() {
-  return (
-    <>
-      {/* Database Optimize Header */}
-      <div className="mb-8">
-        <div className="md:flex md:items-center md:justify-between">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
-              Database Optimization & Management
-            </h2>
-            <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
-              Advanced tools for database performance optimization, diagnostics, and maintenance
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-blue-800">
-            <Database className="h-5 w-5 mr-2" />
-            Database Tools
-          </CardTitle>
-          <CardDescription>
-            Maintenance and optimization tools for database management
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-600">Database optimization tools will be implemented here.</p>
-        </CardContent>
-      </Card>
-    </>
-  );
-}
-
-// System Health Section Component  
-function SystemHealthSection() {
-  return (
-    <>
-      {/* System Health Header */}
-      <div className="mb-8">
-        <div className="md:flex md:items-center md:justify-between">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate" data-testid="header-title">
-              System Health & Monitoring
-            </h2>
-            <p className="mt-1 text-sm text-gray-500" data-testid="header-subtitle">
-              Real-time system performance monitoring and diagnostics
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-green-800">
-            <Server className="h-5 w-5 mr-2" />
-            System Monitoring
-          </CardTitle>
-          <CardDescription>
-            Monitor system performance, memory usage, and application health
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-600">System health monitoring tools will be implemented here.</p>
-        </CardContent>
-      </Card>
-    </>
-  );
-}
+// Database optimization and system health components are imported from external files
