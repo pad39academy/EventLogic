@@ -23,6 +23,15 @@ export const eventTypeEnum = pgEnum("event_type", [
   // Participant events
   "participant_registered", "participant_updated", "participant_deleted",
   "participant_checked_in", "participant_checked_out",
+  // Entity creation events
+  "hotel_created", "hotel_updated", "hotel_deleted",
+  "coach_user_created", "coach_updated", "coach_deleted",
+  "official_created", "official_updated", "official_deleted",
+  "player_created", "player_updated", "player_deleted",
+  "balance_window_created", "balance_window_updated",
+  // Operation coordination events
+  "operation_locked", "operation_unlocked", "operation_queued",
+  "operation_ready", "operation_cancelled", "queue_position_updated",
   // Admin events
   "bulk_upload_completed", "hotel_verification_completed",
   // Notification events
@@ -32,6 +41,10 @@ export const eventTypeEnum = pgEnum("event_type", [
 ]);
 
 export const eventStatusEnum = pgEnum("event_status", ["pending", "processed", "failed", "retrying"]);
+
+// Operation coordination enums
+export const operationStatusEnum = pgEnum("operation_status", ["active", "completed", "failed", "expired", "cancelled"]);
+export const queueStatusEnum = pgEnum("queue_status", ["waiting", "processing", "ready", "completed", "cancelled"]);
 
 // Users table (Admins and Coaches)
 export const users = pgTable("users", {
@@ -271,6 +284,53 @@ export const hotelOccupancyBalance = pgTable("hotel_occupancy_balance", {
 }, (table) => ({
   hotelDateIdx: index("hotel_occupancy_hotel_date_idx").on(table.hotelId, table.instanceCode, table.date),
   uniqueHotelDateIdx: index("unique_hotel_date_idx").on(table.hotelId, table.instanceCode, table.date),
+}));
+
+// Operation Locks table - for coordinating concurrent operations
+export const operationLocks = pgTable("operation_locks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  operationType: text("operation_type").notNull(), // 'hotel_upload', 'coach_upload', etc.
+  operationScope: text("operation_scope").notNull(), // 'global', 'hotel:123', etc.
+  lockedByUserId: varchar("locked_by_user_id").references(() => users.id),
+  lockedBySessionId: text("locked_by_session_id"),
+  lockedAt: timestamp("locked_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  status: operationStatusEnum("status").default("active"),
+  metadata: jsonb("metadata"), // Additional operation details
+  completedAt: timestamp("completed_at"),
+  failedAt: timestamp("failed_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  operationTypeIdx: index("operation_type_idx").on(table.operationType),
+  statusIdx: index("operation_status_idx").on(table.status),
+  expiresAtIdx: index("expires_at_idx").on(table.expiresAt),
+  userIdx: index("operation_user_idx").on(table.lockedByUserId),
+}));
+
+// Operation Queue table - for managing queued operations
+export const operationQueue = pgTable("operation_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  sessionId: text("session_id").notNull(),
+  operationType: text("operation_type").notNull(),
+  operationData: jsonb("operation_data"), // Stored operation details
+  queuedAt: timestamp("queued_at").defaultNow(),
+  priority: integer("priority").default(5), // Lower number = higher priority
+  status: queueStatusEnum("status").default("waiting"),
+  blockedByOperationId: varchar("blocked_by_operation_id").references(() => operationLocks.id),
+  estimatedWaitTime: integer("estimated_wait_time"), // in seconds
+  notifiedAt: timestamp("notified_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("queue_user_idx").on(table.userId),
+  statusIdx: index("queue_status_idx").on(table.status),
+  priorityIdx: index("queue_priority_idx").on(table.priority, table.queuedAt),
+  operationTypeIdx: index("queue_operation_type_idx").on(table.operationType),
 }));
 
 // Audit log functionality consolidated into event_store table for better performance
@@ -555,6 +615,54 @@ export const insertHotelDailyBalanceSchema = createInsertSchema(hotelDailyBalanc
 });
 export type HotelDailyBalance = typeof hotelDailyBalance.$inferSelect;
 export type InsertHotelDailyBalance = z.infer<typeof insertHotelDailyBalanceSchema>;
+
+// Operation Locks schemas
+export const insertOperationLockSchema = createInsertSchema(operationLocks).omit({
+  id: true,
+  createdAt: true,
+  lockedAt: true,
+  completedAt: true,
+  failedAt: true,
+});
+
+export const updateOperationLockSchema = createInsertSchema(operationLocks).omit({
+  id: true,
+  operationType: true,
+  operationScope: true,
+  lockedByUserId: true,
+  lockedBySessionId: true,
+  lockedAt: true,
+  createdAt: true,
+});
+
+export type OperationLock = typeof operationLocks.$inferSelect;
+export type InsertOperationLock = z.infer<typeof insertOperationLockSchema>;
+export type UpdateOperationLock = z.infer<typeof updateOperationLockSchema>;
+
+// Operation Queue schemas
+export const insertOperationQueueSchema = createInsertSchema(operationQueue).omit({
+  id: true,
+  createdAt: true,
+  queuedAt: true,
+  notifiedAt: true,
+  startedAt: true,
+  completedAt: true,
+  cancelledAt: true,
+});
+
+export const updateOperationQueueSchema = createInsertSchema(operationQueue).omit({
+  id: true,
+  userId: true,
+  sessionId: true,
+  operationType: true,
+  operationData: true,
+  queuedAt: true,
+  createdAt: true,
+});
+
+export type OperationQueue = typeof operationQueue.$inferSelect;
+export type InsertOperationQueue = z.infer<typeof insertOperationQueueSchema>;
+export type UpdateOperationQueue = z.infer<typeof updateOperationQueueSchema>;
 
 // Additional schemas for API validation
 export const loginSchema = z.object({
