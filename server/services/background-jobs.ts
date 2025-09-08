@@ -13,8 +13,10 @@ import { WebSocketService } from "./websocket-service";
 export class BackgroundJobsService {
   private intervalId: NodeJS.Timeout | null = null;
   private eventProcessorInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutes
   private readonly EVENT_PROCESSING_INTERVAL = 30 * 1000; // 30 seconds for event processing
+  private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes for cleanup tasks
   private isRunning = false;
 
   /**
@@ -42,11 +44,17 @@ export class BackgroundJobsService {
     this.eventProcessorInterval = setInterval(() => {
       this.processEventsJob();
     }, this.EVENT_PROCESSING_INTERVAL);
+
+    // Schedule cleanup tasks
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupJob();
+    }, this.CLEANUP_INTERVAL);
     
     this.isRunning = true;
     console.log(`✅ Background jobs started:`);
     console.log(`   - Hotel occupancy updates every ${this.UPDATE_INTERVAL / 60000} minutes`);
     console.log(`   - Event processing every ${this.EVENT_PROCESSING_INTERVAL / 1000} seconds`);
+    console.log(`   - Cleanup tasks every ${this.CLEANUP_INTERVAL / 60000} minutes`);
   }
 
   /**
@@ -60,6 +68,10 @@ export class BackgroundJobsService {
     if (this.eventProcessorInterval) {
       clearInterval(this.eventProcessorInterval);
       this.eventProcessorInterval = null;
+    }
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
     }
     this.isRunning = false;
     console.log("🛑 Background jobs stopped");
@@ -193,6 +205,85 @@ export class BackgroundJobsService {
       
     } catch (error) {
       console.error("❌ [Background] Event processing failed:", error);
+    }
+  }
+
+  /**
+   * Background job to run cleanup tasks
+   */
+  private async cleanupJob(): Promise<void> {
+    try {
+      console.log("🧹 [Background] Starting cleanup tasks...");
+      const startTime = Date.now();
+
+      // Run cleanup tasks in parallel
+      const [
+        expiredCleanupResult,
+        sessionCleanupResult
+      ] = await Promise.all([
+        // Clean up expired locks
+        OperationLockService.cleanupExpiredLocks(),
+        
+        // Clean up stale sessions (after 1 hour of inactivity)
+        OperationLockService.cleanupStaleSessions(60)
+      ]);
+
+      // Clean up old queue entries (if method exists)
+      let queueCleanupCount = 0;
+      try {
+        if (typeof OperationQueueService.cleanupOldQueueEntries === 'function') {
+          queueCleanupCount = await OperationQueueService.cleanupOldQueueEntries();
+        }
+      } catch (error) {
+        console.error("❌ Queue cleanup error:", error);
+      }
+
+      const duration = Date.now() - startTime;
+      const totalCleaned = expiredCleanupResult.cleanedCount + 
+                          sessionCleanupResult.cleanedCount + 
+                          queueCleanupCount;
+      const totalErrors = expiredCleanupResult.errorCount + 
+                         sessionCleanupResult.errorCount;
+
+      console.log(`🧹 [Background] Cleanup completed in ${duration}ms`);
+      console.log(`   - Total cleaned: ${totalCleaned} items`);
+      console.log(`   - Total errors: ${totalErrors} errors`);
+
+      // Publish cleanup event if items were cleaned or errors occurred
+      if (totalCleaned > 0 || totalErrors > 0) {
+        await EventService.publishEvent(
+          'background_job_executed',
+          'cleanup_tasks',
+          'system',
+          {
+            jobName: 'cleanup_tasks',
+            duration: duration,
+            status: totalErrors > 0 ? 'partial_success' : 'success',
+            cleaned: totalCleaned,
+            errors: totalErrors,
+            details: {
+              expiredLocks: expiredCleanupResult,
+              staleSessions: sessionCleanupResult,
+              queueCleanup: { cleanedCount: queueCleanupCount, errorCount: 0 }
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error("❌ [Background] Cleanup tasks failed:", error);
+      
+      // Publish failure event
+      await EventService.publishEvent(
+        'background_job_executed',
+        'cleanup_tasks',
+        'system',
+        {
+          jobName: 'cleanup_tasks',
+          duration: 0,
+          status: 'error',
+          error: (error as Error).message || 'Unknown error'
+        }
+      );
     }
   }
 }

@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { operationLocks, operationQueue, users } from "../../shared/schema";
-import { and, eq, lt, gte, or, desc, asc } from "drizzle-orm";
+import { and, eq, lt, gte, or, desc, asc, sql } from "drizzle-orm";
 import type { 
   OperationLock, 
   InsertOperationLock, 
@@ -300,52 +300,329 @@ export class OperationLockService {
   }
   
   /**
-   * Force release expired locks (cleanup job)
+   * Comprehensive cleanup of expired locks with queue processing
    */
-  static async cleanupExpiredLocks(): Promise<number> {
-    console.log(`🧹 Cleaning up expired locks...`);
-    
-    const now = new Date();
-    
-    const expiredLocks = await db.select()
-      .from(operationLocks)
-      .where(
-        and(
-          eq(operationLocks.status, 'active'),
-          lt(operationLocks.expiresAt, now)
-        )
-      );
-    
-    if (expiredLocks.length === 0) {
-      return 0;
-    }
-    
-    // Mark expired locks
-    await db.update(operationLocks)
-      .set({
-        status: 'expired',
-        completedAt: now
-      })
-      .where(
-        and(
-          eq(operationLocks.status, 'active'),
-          lt(operationLocks.expiresAt, now)
-        )
-      );
-    
-    console.log(`🧹 Cleaned up ${expiredLocks.length} expired locks`);
-    
-    // Process queues for each expired operation type
-    const processedTypes = new Set<string>();
-    for (const lock of expiredLocks) {
-      if (!processedTypes.has(lock.operationType)) {
-        processedTypes.add(lock.operationType);
-        // Trigger queue processing (will be implemented in OperationQueueService)
-        console.log(`🔄 Processing queue for expired operation: ${lock.operationType}`);
+  static async cleanupExpiredLocks(): Promise<{ cleanedCount: number; errorCount: number }> {
+    let cleanedCount = 0;
+    let errorCount = 0;
+
+    try {
+      console.log('🧹 Starting comprehensive expired lock cleanup...');
+      
+      // Import OperationQueueService dynamically to avoid circular dependency
+      const { OperationQueueService } = await import('./operation-queue-service');
+      
+      // Find all expired locks
+      const expiredLocks = await db
+        .select()
+        .from(operationLocks)
+        .where(
+          and(
+            eq(operationLocks.status, 'active'),
+            sql`${operationLocks.expiresAt} < now()`
+          )
+        );
+
+      console.log(`🔍 Found ${expiredLocks.length} expired locks to clean up`);
+
+      for (const lock of expiredLocks) {
+        try {
+          await db.transaction(async (tx) => {
+            // Mark lock as expired
+            await tx
+              .update(operationLocks)
+              .set({
+                status: 'expired',
+                failedAt: new Date(),
+                errorMessage: 'Lock expired due to timeout'
+              })
+              .where(eq(operationLocks.id, lock.id));
+
+            // Process any queued operations for this operation type
+            await OperationQueueService.processQueueForOperationType(lock.operationType);
+
+            // Publish unlock event
+            await EventService.publishEvent(
+              'operation_unlocked',
+              lock.operationType,
+              'operation',
+              {
+                operationType: lock.operationType,
+                userId: lock.lockedByUserId,
+                sessionId: lock.lockedBySessionId,
+                reason: 'expired'
+              },
+              { userId: lock.lockedByUserId || 'system', source: 'lock_cleanup' }
+            );
+
+            cleanedCount++;
+          });
+
+          console.log(`✅ Cleaned expired lock: ${lock.operationType} (${lock.id})`);
+        } catch (error) {
+          console.error(`❌ Failed to clean expired lock ${lock.id}:`, error);
+          errorCount++;
+        }
       }
+
+      console.log(`🧹 Lock cleanup completed: ${cleanedCount} cleaned, ${errorCount} errors`);
+      return { cleanedCount, errorCount };
+    } catch (error) {
+      console.error('❌ Lock cleanup failed:', error);
+      return { cleanedCount, errorCount: errorCount + 1 };
     }
-    
-    return expiredLocks.length;
+  }
+
+  /**
+   * Clean up stale session locks
+   */
+  static async cleanupStaleSessions(maxSessionIdleMinutes: number = 60): Promise<{ cleanedCount: number; errorCount: number }> {
+    let cleanedCount = 0;
+    let errorCount = 0;
+
+    try {
+      console.log(`🧹 Starting stale session cleanup (idle > ${maxSessionIdleMinutes} minutes)...`);
+      
+      // Import OperationQueueService dynamically to avoid circular dependency
+      const { OperationQueueService } = await import('./operation-queue-service');
+      
+      const staleThreshold = new Date(Date.now() - (maxSessionIdleMinutes * 60 * 1000));
+
+      // Find locks from potentially stale sessions
+      const staleLocks = await db
+        .select()
+        .from(operationLocks)
+        .where(
+          and(
+            eq(operationLocks.status, 'active'),
+            sql`${operationLocks.lockedAt} < ${staleThreshold}`
+          )
+        );
+
+      console.log(`🔍 Found ${staleLocks.length} potentially stale session locks`);
+
+      for (const lock of staleLocks) {
+        try {
+          // Check if session is still active by looking for recent activity
+          const hasRecentActivity = await this.checkSessionActivity(lock.lockedBySessionId);
+          
+          if (!hasRecentActivity) {
+            await db.transaction(async (tx) => {
+              // Mark lock as expired due to stale session
+              await tx
+                .update(operationLocks)
+                .set({
+                  status: 'expired',
+                  failedAt: new Date(),
+                  errorMessage: 'Lock expired due to stale session'
+                })
+                .where(eq(operationLocks.id, lock.id));
+
+              // Process any queued operations for this operation type
+              await OperationQueueService.processQueueForOperationType(lock.operationType);
+
+              // Publish unlock event
+              await EventService.publishEvent(
+                'operation_unlocked',
+                lock.operationType,
+                'operation',
+                {
+                  operationType: lock.operationType,
+                  userId: lock.lockedByUserId,
+                  sessionId: lock.lockedBySessionId,
+                  reason: 'stale_session'
+                },
+                { userId: lock.lockedByUserId || 'system', source: 'session_cleanup' }
+              );
+
+              cleanedCount++;
+            });
+
+            console.log(`✅ Cleaned stale session lock: ${lock.operationType} (${lock.id})`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to clean stale lock ${lock.id}:`, error);
+          errorCount++;
+        }
+      }
+
+      console.log(`🧹 Session cleanup completed: ${cleanedCount} cleaned, ${errorCount} errors`);
+      return { cleanedCount, errorCount };
+    } catch (error) {
+      console.error('❌ Session cleanup failed:', error);
+      return { cleanedCount, errorCount: errorCount + 1 };
+    }
+  }
+
+  /**
+   * Check if a session has recent activity (simple heuristic)
+   * Since we don't have direct access to session storage, we use lock creation time
+   */
+  private static async checkSessionActivity(sessionId?: string | null): Promise<boolean> {
+    if (!sessionId) return false;
+
+    try {
+      // Simple heuristic: Check if there are other recent locks from the same session
+      // This indicates the session is still active
+      const recentThreshold = new Date(Date.now() - (30 * 60 * 1000)); // 30 minutes
+      
+      const recentLocks = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(operationLocks)
+        .where(
+          and(
+            eq(operationLocks.lockedBySessionId, sessionId),
+            sql`${operationLocks.lockedAt} > ${recentThreshold}`
+          )
+        );
+
+      // If there are recent locks from this session, consider it active
+      const hasRecentActivity = (recentLocks[0]?.count || 0) > 1;
+      
+      return hasRecentActivity;
+    } catch (error) {
+      console.error('Error checking session activity:', error);
+      return false; // Assume inactive on error to err on the side of cleanup
+    }
+  }
+
+  /**
+   * Emergency force unlock - removes all active locks for a specific operation type
+   */
+  static async forceUnlockOperationType(operationType: string, reason: string = 'force_unlock'): Promise<{ unlockedCount: number; errorCount: number }> {
+    let unlockedCount = 0;
+    let errorCount = 0;
+
+    try {
+      console.log(`🚨 Force unlocking all locks for operation type: ${operationType}`);
+      
+      // Import OperationQueueService dynamically to avoid circular dependency
+      const { OperationQueueService } = await import('./operation-queue-service');
+      
+      const activeLocks = await db
+        .select()
+        .from(operationLocks)
+        .where(
+          and(
+            eq(operationLocks.operationType, operationType),
+            eq(operationLocks.status, 'active')
+          )
+        );
+
+      for (const lock of activeLocks) {
+        try {
+          await db.transaction(async (tx) => {
+            // Mark lock as cancelled
+            await tx
+              .update(operationLocks)
+              .set({
+                status: 'cancelled',
+                failedAt: new Date(),
+                errorMessage: reason
+              })
+              .where(eq(operationLocks.id, lock.id));
+
+            // Publish unlock event
+            await EventService.publishEvent(
+              'operation_unlocked',
+              lock.operationType,
+              'operation',
+              {
+                operationType: lock.operationType,
+                userId: lock.lockedByUserId,
+                sessionId: lock.lockedBySessionId,
+                reason: 'force_unlock'
+              },
+              { userId: 'system', source: 'force_unlock' }
+            );
+
+            unlockedCount++;
+          });
+
+          console.log(`✅ Force unlocked: ${lock.operationType} (${lock.id})`);
+        } catch (error) {
+          console.error(`❌ Failed to force unlock ${lock.id}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Process any queued operations
+      await OperationQueueService.processQueueForOperationType(operationType);
+
+      console.log(`🚨 Force unlock completed: ${unlockedCount} unlocked, ${errorCount} errors`);
+      return { unlockedCount, errorCount };
+    } catch (error) {
+      console.error('❌ Force unlock failed:', error);
+      return { unlockedCount: 0, errorCount: errorCount + 1 };
+    }
+  }
+
+  /**
+   * Get comprehensive lock status and statistics
+   */
+  static async getLockStatistics(): Promise<{
+    activeLocks: number;
+    expiredLocks: number;
+    completedLocks: number;
+    failedLocks: number;
+    queuedOperations: number;
+    oldestActiveLock?: Date;
+    locksByType: Record<string, number>;
+  }> {
+    try {
+      const [lockStats, queueStats] = await Promise.all([
+        db
+          .select({
+            status: operationLocks.status,
+            operationType: operationLocks.operationType,
+            lockedAt: operationLocks.lockedAt
+          })
+          .from(operationLocks),
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(operationQueue)
+          .where(eq(operationQueue.status, 'waiting'))
+      ]);
+
+      const stats = {
+        activeLocks: 0,
+        expiredLocks: 0,
+        completedLocks: 0,
+        failedLocks: 0,
+        queuedOperations: queueStats[0]?.count || 0,
+        oldestActiveLock: undefined as Date | undefined,
+        locksByType: {} as Record<string, number>
+      };
+
+      lockStats.forEach(lock => {
+        // Count by status
+        switch (lock.status) {
+          case 'active':
+            stats.activeLocks++;
+            if (!stats.oldestActiveLock || lock.lockedAt < stats.oldestActiveLock) {
+              stats.oldestActiveLock = lock.lockedAt;
+            }
+            break;
+          case 'expired':
+            stats.expiredLocks++;
+            break;
+          case 'completed':
+            stats.completedLocks++;
+            break;
+          case 'failed':
+            stats.failedLocks++;
+            break;
+        }
+
+        // Count by operation type
+        stats.locksByType[lock.operationType] = (stats.locksByType[lock.operationType] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('❌ Failed to get lock statistics:', error);
+      throw error;
+    }
   }
   
   /**
