@@ -107,6 +107,8 @@ export class BackgroundJobsService {
    * Background job to update dashboard statistics views with operation coordination
    */
   private async updateHotelOccupancyJob(): Promise<void> {
+    let lockResult: any = null;
+    
     try {
       console.log("📊 [Background] Starting coordinated dashboard stats aggregation...");
       const startTime = Date.now();
