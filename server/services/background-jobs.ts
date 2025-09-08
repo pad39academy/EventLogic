@@ -6,6 +6,9 @@
 
 import { storage } from "../storage";
 import { EventService } from "./event";
+import { OperationLockService } from "./operation-lock-service";
+import { OperationQueueService } from "./operation-queue-service";
+import { WebSocketService } from "./websocket-service";
 
 export class BackgroundJobsService {
   private intervalId: NodeJS.Timeout | null = null;
@@ -89,30 +92,69 @@ export class BackgroundJobsService {
   }
 
   /**
-   * Background job to update dashboard statistics views
+   * Background job to update dashboard statistics views with operation coordination
    */
   private async updateHotelOccupancyJob(): Promise<void> {
     try {
-      console.log("📊 [Background] Starting OPTIMIZED dashboard stats aggregation...");
+      console.log("📊 [Background] Starting coordinated dashboard stats aggregation...");
       const startTime = Date.now();
       
-      // ⚡ OPTIMIZED: Use fast dashboard stats calculation instead of slow updateAllHotelOccupancy
-      await storage.getDashboardStatsOptimized(undefined, true);
-      
-      // Publish background job completed event
-      await EventService.publishEvent(
-        'background_job_executed',
-        'dashboard_stats_aggregation',
+      // Try to acquire operation lock for balance calculation
+      const lockResult = await OperationLockService.acquireOperationLock(
+        'balance_recalculation',
         'system',
-        {
-          jobName: 'dashboard_stats_aggregation',
-          duration: Date.now() - startTime,
-          status: 'success'
-        }
+        'background_session',
+        'global',
+        30 // 30 minute timeout
       );
-      
-      const duration = Date.now() - startTime;
-      console.log(`⚡ [Background] OPTIMIZED dashboard stats updated in ${duration}ms (was 160+ seconds!)`);
+
+      if (!lockResult.granted) {
+        console.log("⏳ [Background] Dashboard stats blocked by user operation, skipping this cycle");
+        
+        // Notify about background job being skipped via broadcast
+        WebSocketService.broadcast('system_notifications', {
+          type: 'background_job_status',
+          data: {
+            jobType: 'dashboard_stats',
+            status: 'skipped',
+            reason: lockResult.reason,
+            blockedBy: lockResult.conflictingOperation,
+            nextAttempt: new Date(Date.now() + this.UPDATE_INTERVAL).toISOString()
+          },
+          timestamp: new Date().toISOString()
+        });
+        
+        return;
+      }
+
+      try {
+        // ⚡ OPTIMIZED: Use fast dashboard stats calculation
+        console.log("⚡ OPTIMIZED: Fast dashboard stats calculation...");
+        await storage.getDashboardStatsOptimized(undefined, true);
+        
+        const duration = Date.now() - startTime;
+        console.log(`⚡ [Background] OPTIMIZED dashboard stats updated in ${duration}ms (was 160+ seconds!)`);
+        
+        // Publish background job completed event
+        await EventService.publishEvent(
+          'background_job_executed',
+          'dashboard_stats_aggregation',
+          'system',
+          {
+            jobName: 'dashboard_stats_aggregation',
+            duration: duration,
+            status: 'success',
+            operationId: lockResult.lock?.id
+          }
+        );
+
+      } finally {
+        // Always release lock
+        if (lockResult.lock) {
+          await OperationLockService.releaseOperationLock(lockResult.lock.id, 'system');
+          console.log("🔓 [Background] Dashboard stats lock released");
+        }
+      }
       
     } catch (error) {
       console.error("❌ [Background] Dashboard stats update failed:", error);
