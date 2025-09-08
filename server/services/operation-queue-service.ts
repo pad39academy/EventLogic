@@ -9,6 +9,7 @@ import type {
 } from "../../shared/schema";
 import { EventService } from "./event";
 import { OperationLockService, OPERATION_PRIORITIES } from "./operation-lock-service";
+import { WebSocketService } from "./websocket-service";
 
 export interface QueueEntry {
   id: string;
@@ -191,9 +192,8 @@ export class OperationQueueService {
       { userId, source: 'operation_queue_service' }
     );
     
-    // TODO: Send WebSocket notification to user
-    // This will be implemented when we add WebSocket support
-    console.log(`📱 WebSocket notification would be sent to user ${userId} session ${sessionId}`);
+    // Send WebSocket notification to user
+    WebSocketService.notifyOperationReady(userId, sessionId, operationType, queueId);
   }
   
   /**

@@ -10,6 +10,7 @@ import type {
   UpdateOperationQueue
 } from "../../shared/schema";
 import { EventService } from "./event";
+import { WebSocketService } from "./websocket-service";
 
 // Operation priorities (lower number = higher priority)
 export const OPERATION_PRIORITIES = {
@@ -187,6 +188,16 @@ export class OperationLockService {
           .from(users)
           .where(eq(users.id, conflictingOp.lockedByUserId!))
           .limit(1);
+        
+        // Send WebSocket notification about blocked operation
+        WebSocketService.notifyOperationBlocked(
+          userId, 
+          sessionId, 
+          operationType, 
+          conflictingOp.operationType, 
+          1, // Position in queue (will be updated by queue service)
+          conflictCheck.estimatedWaitTime
+        );
         
         return {
           granted: false,
