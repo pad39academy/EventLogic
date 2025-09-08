@@ -21,16 +21,9 @@ export async function setupVite(app: Express, server: Server) {
     },
     server: {
       middlewareMode: true,
-      hmr: { 
-        server,
-        overlay: false, // Disable error overlay that can cause issues
-        clientPort: 5000 // Use same port as main server
-      },
+      hmr: false, // Completely disable hot module replacement in cloud environment
       allowedHosts: true,
-      watch: {
-        usePolling: true, // Better compatibility in cloud environments
-        interval: 2000,   // Reduce polling frequency to prevent connection spam
-      }
+      watch: null, // Disable file watching to prevent connection issues
     },
     appType: "custom",
     customLogger: {
