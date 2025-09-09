@@ -17,6 +17,17 @@ interface CalculationStatus {
 export function CalculationStatusBanner() {
   const { data: status, isLoading } = useQuery<CalculationStatus>({
     queryKey: ["/api/admin/dashboard/calculation-status"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/dashboard/calculation-status", {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch calculation status');
+      }
+      
+      return response.json();
+    },
     refetchInterval: 10000, // Refresh every 10 seconds for better detection
     staleTime: 8000, // Consider data stale after 8 seconds
   });
