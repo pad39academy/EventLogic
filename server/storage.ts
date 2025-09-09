@@ -1420,17 +1420,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(hotelOccupancyBalance.date));
   }
 
-  // Optimized check-in participants with pre-calculated stats
+  // Simplified check-in participants - only show pending participants
   async getCheckinParticipants(filters: { search?: string; status?: string; page?: number; limit?: number } = {}): Promise<{ participants: any[]; stats: any; pagination?: any }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Build conditions for participants relevant to check-in
+    // Build conditions for pending participants only
     const conditions = [
-      or(
-        eq(participants.checkinStatus, "pending"),
-        eq(participants.checkinStatus, "checked_in")
-      )
+      eq(participants.checkinStatus, "pending") // Only pending participants on check-in page
     ];
 
     // Apply search filter
@@ -1445,36 +1442,22 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    // Apply status filter
+    // Apply specific status filter for pending participants
     if (filters.status && filters.status !== 'all') {
       switch (filters.status) {
-        case 'pending':
-          conditions.push(eq(participants.checkinStatus, "pending"));
-          break;
         case 'due_today':
-          conditions.push(
-            and(
-              eq(participants.checkinStatus, "pending"),
-              sql`DATE(${participants.bookingStartDate}) = DATE(${today})`
-            )
-          );
+          conditions.push(sql`DATE(${participants.bookingStartDate}) = DATE(${today})`);
           break;
         case 'late':
-          conditions.push(
-            and(
-              eq(participants.checkinStatus, "pending"),
-              sql`DATE(${participants.bookingStartDate}) < DATE(${today})`
-            )
-          );
+          conditions.push(sql`DATE(${participants.bookingStartDate}) < DATE(${today})`);
           break;
-        case 'checked_in':
-          conditions.push(eq(participants.checkinStatus, "checked_in"));
-          break;
+        // No need for 'pending' case since we already filter by pending only
+        // No need for 'checked_in' case since this is check-in page for pending only
       }
     }
 
-    // Base query with calculated fields
-    const baseQuery = db.selectDistinct({
+    // Simplified query for pending participants only
+    const baseQuery = db.select({
       id: participants.id,
       participantId: participants.participantId,
       name: participants.name,
@@ -1488,10 +1471,9 @@ export class DatabaseStorage implements IStorage {
       bookingEndDate: participants.bookingEndDate,
       checkinStatus: participants.checkinStatus,
       checkinTime: participants.checkinTime,
-      createdAt: participants.createdAt, // Add createdAt to fix ORDER BY issue
       // Pre-calculate fields that would be computed client-side
       daysUntilArrival: sql<number>`CAST(DATE_PART('day', ${participants.bookingStartDate} - ${today}) AS INTEGER)`.as('daysUntilArrival'),
-      isLate: sql<boolean>`(DATE(${participants.bookingStartDate}) < DATE(${today}) AND ${participants.checkinStatus} = 'pending')`.as('isLate')
+      isLate: sql<boolean>`(DATE(${participants.bookingStartDate}) < DATE(${today}))`.as('isLate')
     })
     .from(participants)
     .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
@@ -1520,20 +1502,15 @@ export class DatabaseStorage implements IStorage {
 
     const participantData = await query;
 
-    // Calculate stats in a single query
+    // Calculate stats for pending participants only
     const statsQuery = await db.select({
-      totalPending: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending')`.as('totalPending'),
-      dueToday: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending' AND DATE(${participants.bookingStartDate}) = DATE(${today}))`.as('dueToday'),
-      late: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending' AND DATE(${participants.bookingStartDate}) < DATE(${today}))`.as('late'),
-      completed: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_in' AND DATE(${participants.checkinTime}) = DATE(${today}))`.as('completed')
+      totalPending: sql<number>`COUNT(*)`.as('totalPending'),
+      dueToday: sql<number>`COUNT(*) FILTER (WHERE DATE(${participants.bookingStartDate}) = DATE(${today}))`.as('dueToday'),
+      late: sql<number>`COUNT(*) FILTER (WHERE DATE(${participants.bookingStartDate}) < DATE(${today}))`.as('late'),
+      completed: sql<number>`0`.as('completed') // Not relevant for check-in page
     })
     .from(participants)
-    .where(
-      or(
-        eq(participants.checkinStatus, "pending"),
-        eq(participants.checkinStatus, "checked_in")
-      )
-    );
+    .where(eq(participants.checkinStatus, "pending"));
 
     const stats = statsQuery[0];
     
