@@ -22,13 +22,13 @@ export const eventTypeEnum = pgEnum("event_type", [
   "hotel_occupancy_changed", "hotel_capacity_updated", "batch_hotel_occupancy_update",
   // Participant events
   "participant_registered", "participant_updated", "participant_deleted",
-  "participant_checked_in", "participant_checked_out",
+  "participant_checked_in", "participant_checked_out", "participant_early_checkout",
   // Admin events
-  "bulk_upload_completed", "hotel_verification_completed",
+  "bulk_upload_completed", "hotel_verification_completed", "hotel_verification_failed", "hotel_verification_successful",
   // Notification events
   "notification_sent", "otp_generated",
   // System events
-  "audit_logged", "background_job_executed"
+  "audit_logged", "background_job_executed", "participant_created", "hotel_created", "hotel_updated", "occupancy_recalculated", "setting_updated"
 ]);
 
 export const eventStatusEnum = pgEnum("event_status", ["pending", "processed", "failed", "retrying"]);

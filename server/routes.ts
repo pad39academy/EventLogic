@@ -233,21 +233,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .where(eq(users.id, userId));
 
-        await EventService.publishEvent("hotel_verification_failed", {
-          aggregateType: "hotel",
-          aggregateId: hotelCode,
-          eventData: { 
+        await EventService.publishEvent(
+          "hotel_verification_failed", 
+          hotelCode,
+          "hotel",
+          { 
             success: false, 
             coachId, 
             attemptedCode: hotelCode, 
             assignedHotel: coachParticipant.hotelId,
             failedAttempts: (currentUser.verificationFailedAttempts || 0) + 1
           },
-          metadata: {
+          {
             userId: userId,
             correlationId: `hotel_verify_fail_${Date.now()}`
           }
-        });
+        );
 
         return res.status(400).json({ 
           message: `Invalid hotel code. This code does not match your assigned hotel.`,
@@ -271,20 +272,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.user!.verifiedHotelId = hotelCode;
       req.session.user!.verificationFailedAttempts = 0;
 
-      await EventService.publishEvent("hotel_verification_successful", {
-        aggregateType: "hotel",
-        aggregateId: hotelCode,
-        eventData: { 
+      await EventService.publishEvent(
+        "hotel_verification_successful", 
+        hotelCode,
+        "hotel",
+        { 
           success: true, 
           coachId, 
           verifiedHotel: hotelCode,
           coachName: req.session.user?.name || 'Coach'
         },
-        metadata: {
+        {
           userId: userId,
           correlationId: `hotel_verify_success_${Date.now()}`
         }
-      });
+      );
 
       // Force session save
       req.session.save((err) => {
