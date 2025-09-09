@@ -1642,21 +1642,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await EventService.publishEvent("participant_checked_in", {
-        aggregateType: "participant",
-        aggregateId: "bulk_checkin",
-        eventData: { 
+      await EventService.publishEvent(
+        "participant_checked_in", 
+        "bulk_checkin",
+        "participant",
+        { 
           participantIds, 
           checkedInCount: checkedInParticipants.length,
           accessDeniedCount: accessDeniedParticipants.length,
           accessDeniedNames: accessDeniedParticipants,
           processedBy: req.session.user!.name
         },
-        metadata: {
+        {
           userId: req.session.user!.id,
           correlationId: `checkin_${Date.now()}`
         }
-      });
+      );
 
       let message = "";
       if (checkedInParticipants.length > 0 && accessDeniedParticipants.length === 0) {
@@ -1734,21 +1735,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await EventService.publishEvent("participant_checked_out", {
-        aggregateType: "participant",
-        aggregateId: "coach_checkout",
-        eventData: { 
+      await EventService.publishEvent(
+        "participant_checked_out", 
+        "coach_checkout",
+        "participant",
+        { 
           participantIds, 
           checkedOutCount: checkedOutParticipants.length, 
           newCheckoutDate,
           coachId,
           processedBy: req.session.user!.name
         },
-        metadata: {
+        {
           userId: req.session.user!.id,
           correlationId: `coach_checkout_${Date.now()}`
         }
-      });
+      );
 
       res.json({ 
         message: "Check-out successful", 
