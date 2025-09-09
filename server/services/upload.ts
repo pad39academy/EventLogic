@@ -879,10 +879,17 @@ export class UploadService {
           let userData: InsertUser | undefined;
 
           if (data.ROLE === 'COACH') {
+            console.log(`🔍 Checking coach ${data.COACH_ID} (${data.NAME}) with mobile ${normalizedMobile}`);
+            
             const existingUserByCoach = usersByCoachId.get(data.COACH_ID);
             const existingUserByMobile = usersByMobile.get(normalizedMobile);
             const alreadyProcessingCoach = coachesInCurrentUpload.has(data.COACH_ID);
             const alreadyProcessingMobile = mobilesInCurrentUpload.has(normalizedMobile);
+            
+            console.log(`  - Existing by coach ID: ${!!existingUserByCoach}`);
+            console.log(`  - Existing by mobile: ${!!existingUserByMobile}`);
+            console.log(`  - Already processing coach: ${alreadyProcessingCoach}`);
+            console.log(`  - Already processing mobile: ${alreadyProcessingMobile}`);
             
             if (!existingUserByCoach && !existingUserByMobile && !alreadyProcessingCoach && !alreadyProcessingMobile) {
               needsUserCreation = true;
@@ -894,9 +901,13 @@ export class UploadService {
                 isActive: true,
               };
               
+              console.log(`  ✅ WILL CREATE USER for coach ${data.COACH_ID}`);
+              
               // Track this coach to prevent duplicates in same upload
               coachesInCurrentUpload.set(data.COACH_ID, normalizedMobile);
               mobilesInCurrentUpload.add(normalizedMobile);
+            } else {
+              console.log(`  ❌ SKIPPING USER creation for coach ${data.COACH_ID}`);
             }
           }
 
