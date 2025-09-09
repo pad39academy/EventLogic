@@ -956,9 +956,16 @@ export class UploadService {
           const batchResults = await db.transaction(async (tx) => {
             // First, create any needed user accounts
             const usersToCreate = batch.filter(item => item.needsUserCreation && item.userData);
+            console.log(`  🔍 BATCH DEBUG: ${batch.length} total items, ${usersToCreate.length} need user creation`);
+            
             if (usersToCreate.length > 0) {
               console.log(`  👤 Creating ${usersToCreate.length} user accounts...`);
-              await tx.insert(users).values(usersToCreate.map(item => item.userData!));
+              const userValues = usersToCreate.map(item => item.userData!);
+              console.log(`  📋 User data to create:`, userValues.map(u => `${u.coachId}:${u.name}`));
+              await tx.insert(users).values(userValues);
+              console.log(`  ✅ Successfully created ${usersToCreate.length} user accounts in database`);
+            } else {
+              console.log(`  ⚠️ No users to create in this batch`);
             }
             
             // Then, create participants
