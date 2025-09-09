@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Phone, Mail, Lock, Shield, ArrowRight, RefreshCw } from "lucide-react";
 import ievolveFullLogo from "@/assets/logos/ievolve-full-logo.png";
+import sdatLogo from "@/assets/logos/sdat-logo.png";
+import tamilNaduLogo from "@/assets/logos/tamil-nadu-logo.png";
+import cmTrophyLogo from "@/assets/logos/cm-trophy-logo.png";
 import HotelVerification from "@/components/hotel-verification";
 
 // Login form schemas
@@ -275,13 +278,23 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
+        {/* Header with Three Official Logos */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center items-center gap-8 mb-6">
             <img 
-              src={ievolveFullLogo} 
-              alt="Ievolve Events" 
-              className="h-20 w-auto object-contain"
+              src={sdatLogo} 
+              alt="SDAT Logo" 
+              className="h-16 w-auto object-contain"
+            />
+            <img 
+              src={tamilNaduLogo} 
+              alt="Tamil Nadu Government Logo" 
+              className="h-16 w-auto object-contain"
+            />
+            <img 
+              src={cmTrophyLogo} 
+              alt="Chief Minister Trophy 2025" 
+              className="h-16 w-auto object-contain"
             />
           </div>
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold py-2 px-4 rounded-lg">
@@ -585,7 +598,16 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6 text-sm text-gray-600">
+        {/* Ievolve Logo at Bottom */}
+        <div className="flex justify-center mt-6 mb-4">
+          <img 
+            src={ievolveFullLogo} 
+            alt="Powered by Ievolve Events" 
+            className="h-8 w-auto object-contain opacity-70"
+          />
+        </div>
+
+        <div className="text-center mt-2 text-sm text-gray-600">
           Having trouble? Contact support for assistance.
         </div>
       </div>
