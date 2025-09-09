@@ -233,12 +233,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .where(eq(users.id, userId));
 
-        await storage.createAuditLog({
-          userId: userId,
-          actionType: "verify_hotel",
-          targetEntity: "hotel",
-          targetId: hotelCode,
-          details: { success: false, coachId, attemptedCode: hotelCode, assignedHotel: coachParticipant.hotelId },
+        await EventService.publishEvent("hotel_verification_failed", {
+          aggregateType: "hotel",
+          aggregateId: hotelCode,
+          eventData: { 
+            success: false, 
+            coachId, 
+            attemptedCode: hotelCode, 
+            assignedHotel: coachParticipant.hotelId,
+            failedAttempts: (currentUser.verificationFailedAttempts || 0) + 1
+          },
+          metadata: {
+            userId: userId,
+            correlationId: `hotel_verify_fail_${Date.now()}`
+          }
         });
 
         return res.status(400).json({ 
@@ -263,12 +271,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.user!.verifiedHotelId = hotelCode;
       req.session.user!.verificationFailedAttempts = 0;
 
-      await storage.createAuditLog({
-        userId: userId,
-        actionType: "verify_hotel",
-        targetEntity: "hotel",
-        targetId: hotelCode,
-        details: { success: true, coachId, verifiedHotel: hotelCode },
+      await EventService.publishEvent("hotel_verification_successful", {
+        aggregateType: "hotel",
+        aggregateId: hotelCode,
+        eventData: { 
+          success: true, 
+          coachId, 
+          verifiedHotel: hotelCode,
+          coachName: req.session.user?.name || 'Coach'
+        },
+        metadata: {
+          userId: userId,
+          correlationId: `hotel_verify_success_${Date.now()}`
+        }
       });
 
       // Force session save
@@ -343,12 +358,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(newSetting);
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "update_setting",
-        targetEntity: "setting",
-        targetId: "checkin_time_window_hours",
-        details: { newValue: value, updatedBy: req.session.user!.name },
+      await EventService.publishEvent("setting_updated", {
+        aggregateType: "setting",
+        aggregateId: "checkin_time_window_hours",
+        eventData: { 
+          settingKey: "checkin_time_window_hours",
+          newValue: value, 
+          updatedBy: req.session.user!.name,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `setting_update_${Date.now()}`
+        }
       });
 
       res.json(updated);
@@ -921,17 +943,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create audit log
-      await storage.createAuditLog({
-        userId: req.session.userId!,
-        actionType: "edit",
-        targetEntity: "participant",
-        targetId: id,
-        details: {
+      // Create audit event
+      await EventService.publishEvent("participant_updated", {
+        aggregateType: "participant",
+        aggregateId: currentParticipant.participantId,
+        eventData: {
           changes: participantUpdateData,
           hotelChanged,
           reason: changeReason || null,
+          processedBy: req.session.user?.name || 'Technical Admin'
         },
+        metadata: {
+          userId: req.session.userId!,
+          correlationId: `participant_update_${Date.now()}`
+        }
       });
 
       res.json(updatedParticipant);
@@ -1164,22 +1189,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         instanceCode
       });
 
-      // Create audit log entry
+      // Create audit event
       const user = req.session.user;
       if (user) {
-        await storage.createAuditLog({
-          userId: user.id,
-          actionType: 'create',
-          targetEntity: 'hotel',
-          targetId: newHotel.id,
-          details: {
+        await EventService.publishEvent("hotel_created", {
+          aggregateType: "hotel",
+          aggregateId: newHotel.hotelId,
+          eventData: {
             action: mode === 'new' ? 'manual_hotel_creation' : 'manual_instance_creation',
             mode: mode,
             hotelId: hotelData.hotelId,
             instanceCode: instanceCode,
             hotelName: hotelData.hotelName,
             location: hotelData.location,
-            district: hotelData.district
+            district: hotelData.district,
+            processedBy: user.name
+          },
+          metadata: {
+            userId: user.id,
+            correlationId: `hotel_create_${Date.now()}`
           }
         });
       }
@@ -1320,12 +1348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedHotels = await storage.updateHotelsByHotelId(originalHotel.hotelId, propertyWideChanges);
         
         // Log property-wide changes
-        await storage.createAuditLog({
-          userId: req.session.user!.id,
-          actionType: "edit",
-          targetEntity: "hotel",
-          targetId: originalHotel.hotelId,
-          details: { 
+        await EventService.publishEvent("hotel_updated", {
+          aggregateType: "hotel",
+          aggregateId: originalHotel.hotelId,
+          eventData: { 
             hotelId: originalHotel.hotelId,
             action: "property_wide_update",
             affectedInstances: updatedHotels.length,
@@ -1333,8 +1359,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               acc[field] = { from: originalHotel[field as keyof typeof originalHotel], to: propertyWideChanges[field] };
               return acc;
             }, {} as Record<string, any>),
-            changedFields: Object.keys(propertyWideChanges)
+            changedFields: Object.keys(propertyWideChanges),
+            processedBy: req.session.user!.name
           },
+          metadata: {
+            userId: req.session.user!.id,
+            correlationId: `hotel_property_update_${Date.now()}`
+          }
         });
       }
 
@@ -1349,12 +1380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedHotel = result;
 
         // Log instance-specific changes
-        await storage.createAuditLog({
-          userId: req.session.user!.id,
-          actionType: "edit",
-          targetEntity: "hotel",
-          targetId: id,
-          details: { 
+        await EventService.publishEvent("hotel_updated", {
+          aggregateType: "hotel",
+          aggregateId: originalHotel.hotelId,
+          eventData: { 
             hotelId: originalHotel.hotelId,
             instanceCode: originalHotel.instanceCode,
             action: "instance_specific_update",
@@ -1362,8 +1391,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               acc[field] = { from: originalHotel[field as keyof typeof originalHotel], to: instanceSpecificChanges[field] };
               return acc;
             }, {} as Record<string, any>),
-            changedFields: Object.keys(instanceSpecificChanges)
+            changedFields: Object.keys(instanceSpecificChanges),
+            processedBy: req.session.user!.name
           },
+          metadata: {
+            userId: req.session.user!.id,
+            correlationId: `hotel_instance_update_${Date.now()}`
+          }
         });
       }
 
@@ -1528,16 +1562,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "checkin",
-        targetEntity: "participant",
-        details: { 
+      await EventService.publishEvent("participant_checked_in", {
+        aggregateType: "participant",
+        aggregateId: "bulk_checkin",
+        eventData: { 
           participantIds, 
           checkedInCount: checkedInParticipants.length,
           accessDeniedCount: accessDeniedParticipants.length,
-          accessDeniedNames: accessDeniedParticipants 
+          accessDeniedNames: accessDeniedParticipants,
+          processedBy: req.session.user!.name
         },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `checkin_${Date.now()}`
+        }
       });
 
       let message = "";
@@ -1616,11 +1654,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "checkout",
-        targetEntity: "participant",
-        details: { participantIds, checkedOutCount: checkedOutParticipants.length, newCheckoutDate },
+      await EventService.publishEvent("participant_checked_out", {
+        aggregateType: "participant",
+        aggregateId: "coach_checkout",
+        eventData: { 
+          participantIds, 
+          checkedOutCount: checkedOutParticipants.length, 
+          newCheckoutDate,
+          coachId,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `coach_checkout_${Date.now()}`
+        }
       });
 
       res.json({ 
@@ -1657,11 +1704,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "checkin",
-        targetEntity: "participant",
-        details: { participantIds, checkedInCount: checkedInParticipants.length },
+      await EventService.publishEvent("participant_checked_in", {
+        aggregateType: "participant",
+        aggregateId: "admin_checkin",
+        eventData: { 
+          participantIds, 
+          checkedInCount: checkedInParticipants.length,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `admin_checkin_${Date.now()}`
+        }
       });
 
       res.json({ 
@@ -1706,11 +1760,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "checkout",
-        targetEntity: "participant",
-        details: { participantIds, checkedOutCount: checkedOutParticipants.length, newCheckoutDate },
+      await EventService.publishEvent("participant_checked_out", {
+        aggregateType: "participant",
+        aggregateId: "admin_checkout",
+        eventData: { 
+          participantIds, 
+          checkedOutCount: checkedOutParticipants.length, 
+          newCheckoutDate,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `admin_checkout_${Date.now()}`
+        }
       });
 
       res.json({ 
@@ -1845,11 +1907,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await NotificationService.sendBulkNotifications(notifications);
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "early_checkout",
-        targetEntity: "participant",
-        details: { participantIds, newCheckoutDate, notificationsSent: notifications.length },
+      await EventService.publishEvent("participant_early_checkout", {
+        aggregateType: "participant",
+        aggregateId: "early_checkout",
+        eventData: { 
+          participantIds, 
+          newCheckoutDate, 
+          notificationsSent: notifications.length,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `early_checkout_${Date.now()}`
+        }
       });
 
       res.json({ 
@@ -1893,12 +1963,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateHotelOccupancy(updated.hotelId, '1');
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "edit",
-        targetEntity: "participant",
-        targetId: req.params.id,
-        details: req.body,
+      await EventService.publishEvent("participant_updated", {
+        aggregateType: "participant",
+        aggregateId: updated.participantId,
+        eventData: {
+          changes: req.body,
+          originalData: original,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `admin_participant_update_${Date.now()}`
+        }
       });
 
       res.json(updated);
@@ -1920,11 +1996,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateHotelOccupancy(participant.hotelId, '1');
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "delete",
-        targetEntity: "participant",
-        targetId: req.params.id,
+      await EventService.publishEvent("participant_deleted", {
+        aggregateType: "participant",
+        aggregateId: participant?.participantId || req.params.id,
+        eventData: {
+          deletedParticipant: participant,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `participant_delete_${Date.now()}`
+        }
       });
 
       res.json({ message: "Participant deleted successfully" });
@@ -2037,13 +2119,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update hotel occupancy
       await storage.updateHotelOccupancy(participantData.hotelId, '1');
 
-      // Create audit log
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "create",
-        targetEntity: "participant",
-        targetId: newParticipant.id,
-        details: { participantData }
+      // Create audit event
+      await EventService.publishEvent("participant_created", {
+        aggregateType: "participant",
+        aggregateId: newParticipant.participantId,
+        eventData: { 
+          participantData,
+          isCoachUserCreated: participantData.role === 'coach' && participantData.mobileNumber,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `participant_create_${Date.now()}`
+        }
       });
 
       res.status(201).json(newParticipant);
@@ -2529,11 +2617,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.updateAllHotelOccupancy();
       
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "recalculate",
-        targetEntity: "hotel",
-        details: { action: "manual_occupancy_recalculation" },
+      await EventService.publishEvent("occupancy_recalculated", {
+        aggregateType: "hotel",
+        aggregateId: "all_hotels",
+        eventData: { 
+          action: "manual_occupancy_recalculation",
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `occupancy_recalc_${Date.now()}`
+        }
       });
       
       res.json({ message: "Hotel occupancy recalculated successfully" });
@@ -2609,17 +2703,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send all SMS notifications concurrently
       await Promise.allSettled(smsPromises);
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "notification_send",
-        targetEntity: "notification",
-        details: { 
+      await EventService.publishEvent("notification_sent", {
+        aggregateType: "notification",
+        aggregateId: "bulk_notification",
+        eventData: { 
           audienceType, 
           targetDisciplines, 
           notificationType, 
           subject, 
-          recipientCount: notifications.length 
+          recipientCount: notifications.length,
+          processedBy: req.session.user!.name
         },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `bulk_notification_${Date.now()}`
+        }
       });
 
       res.json({ 
@@ -2666,12 +2764,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await NotificationService.sendSMS(coach.mobileNumber, message);
       }
 
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "notification_send",
-        targetEntity: "notification",
-        targetId: notification.id,
-        details: { toCoachId, teamName, notificationType, subject },
+      await EventService.publishEvent("notification_sent", {
+        aggregateType: "notification",
+        aggregateId: notification.id,
+        eventData: { 
+          toCoachId, 
+          teamName, 
+          notificationType, 
+          subject,
+          processedBy: req.session.user!.name
+        },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `coach_notification_${Date.now()}`
+        }
       });
 
       res.json({ message: "Notification sent successfully", notification });
@@ -2978,19 +3084,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create audit log
-      await storage.createAuditLog({
-        userId: req.session.user!.id,
-        actionType: "notification_send",
-        targetEntity: "notification",
-        targetId: notifications[0]?.id || 'bulk',
-        details: { 
+      // Create audit event
+      await EventService.publishEvent("notification_sent", {
+        aggregateType: "notification",
+        aggregateId: notifications[0]?.id || 'team_bulk',
+        eventData: { 
           selectedCoaches, 
           includeTeamMembers, 
           notificationType, 
-          subject, 
-          recipientCount 
+          subject,
+          totalNotifications: notifications.length,
+          recipientCount,
+          processedBy: req.session.user!.name
         },
+        metadata: {
+          userId: req.session.user!.id,
+          correlationId: `team_notification_${Date.now()}`
+        }
       });
 
       res.json({
