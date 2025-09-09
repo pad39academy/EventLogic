@@ -46,11 +46,24 @@ export default function CheckinBoard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch checkin data
-  const { data: checkinData, isLoading } = useQuery({
-    queryKey: ["/api/admin/dashboard/checkin"],
+  // Fetch checkin data with optimized backend
+  const { data: checkinData, isLoading, refetch } = useQuery({
+    queryKey: ["/api/admin/dashboard/checkin", filterBy, searchTerm],
     queryFn: async () => {
-      const response = await fetch("/api/admin/dashboard/checkin", {
+      const params = new URLSearchParams({
+        limit: "50",
+        page: "1"
+      });
+      
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      
+      if (filterBy !== 'all') {
+        params.append('status', filterBy);
+      }
+
+      const response = await fetch(`/api/admin/dashboard/checkin?${params.toString()}`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -64,6 +77,7 @@ export default function CheckinBoard() {
   const stats: CheckinStats = checkinData?.stats || { 
     totalPending: 0, dueToday: 0, late: 0, completed: 0 
   };
+  const pagination = checkinData?.pagination;
 
   // Bulk checkin mutation
   const bulkCheckinMutation = useMutation({
@@ -132,33 +146,13 @@ export default function CheckinBoard() {
     },
   });
 
-  // Filter and search logic
-  const filteredParticipants = participants.filter((participant) => {
-    const matchesSearch = participant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         participant.participantId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         participant.hotelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         participant.discipline.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesFilter = (() => {
-      switch (filterBy) {
-        case "pending":
-          return participant.checkinStatus === "pending";
-        case "due_today":
-          return participant.daysUntilArrival === 0 && participant.checkinStatus === "pending";
-        case "late":
-          return participant.isLate;
-        case "checked_in":
-          return participant.checkinStatus === "checked_in";
-        default:
-          return true;
-      }
-    })();
-
-    return matchesSearch && matchesFilter;
-  });
+  // No more client-side filtering - server does it all now
+  const filteredParticipants = participants; // Data already filtered by server
 
   const handleSearch = () => {
-    setSearchTerm(searchInput);
+    const trimmedSearch = searchInput.trim();
+    setSearchTerm(trimmedSearch);
+    // React Query will automatically refetch with new search term
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -166,6 +160,11 @@ export default function CheckinBoard() {
       handleSearch();
     }
   };
+
+  // Auto-refetch when filters change
+  React.useEffect(() => {
+    refetch();
+  }, [filterBy, refetch]);
 
   const handleSelectParticipant = (participantId: string) => {
     setSelectedParticipants(prev => 
