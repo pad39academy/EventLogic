@@ -19,7 +19,10 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByMobile(mobileNumber: string): Promise<User | undefined>;
   getUserByCoachId(coachId: string): Promise<User | undefined>;
+  getUsersByCoachIds(coachIds: string[]): Promise<User[]>;
+  getUsersByMobiles(mobileNumbers: string[]): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  batchCreateUsers(users: InsertUser[]): Promise<User[]>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
 
   // Hotel management
@@ -158,6 +161,25 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
+  }
+
+  async getUsersByCoachIds(coachIds: string[]): Promise<User[]> {
+    if (coachIds.length === 0) return [];
+    return await db.select().from(users).where(
+      sql`${users.coachId} = ANY(${coachIds})`
+    );
+  }
+
+  async getUsersByMobiles(mobileNumbers: string[]): Promise<User[]> {
+    if (mobileNumbers.length === 0) return [];
+    return await db.select().from(users).where(
+      sql`${users.mobileNumber} = ANY(${mobileNumbers})`
+    );
+  }
+
+  async batchCreateUsers(insertUsers: InsertUser[]): Promise<User[]> {
+    if (insertUsers.length === 0) return [];
+    return await db.insert(users).values(insertUsers).returning();
   }
 
   async getHotels(filters?: HotelFilters): Promise<Hotel[]> {

@@ -477,28 +477,28 @@ export class UploadService {
   }
 
   // Helper method for batch coach user creation
-  static async batchCreateCoachUsers(uniqueCoaches: Map<string, any>, result: UploadResult): Promise<void> {
+  static async batchCreateCoachUsers(uniqueCoaches: Map<string, InsertUser>, result: UploadResult): Promise<void> {
     try {
       // Extract coach IDs and mobile numbers for batch checking
       const coachIds = Array.from(uniqueCoaches.keys());
-      const mobileNumbers = Array.from(uniqueCoaches.values()).map(coach => coach.mobileNumber);
+      const mobileNumbers = Array.from(uniqueCoaches.values()).map((coach: InsertUser) => coach.mobileNumber!);
       
       // Batch check existing users by coachId
       const existingUsersByCoachId = await storage.getUsersByCoachIds(coachIds);
       const existingUsersByMobile = await storage.getUsersByMobiles(mobileNumbers);
       
       // Create maps for quick lookup
-      const existingCoachIdMap = new Map(existingUsersByCoachId.map(user => [user.coachId, user]));
-      const existingMobileMap = new Map(existingUsersByMobile.map(user => [user.mobileNumber, user]));
+      const existingCoachIdMap = new Map(existingUsersByCoachId.map((user: User) => [user.coachId, user]));
+      const existingMobileMap = new Map(existingUsersByMobile.map((user: User) => [user.mobileNumber, user]));
       
       // Determine which users need to be created vs updated
-      const usersToCreate: any[] = [];
-      const usersToUpdate: Array<{id: string, updates: any}> = [];
+      const usersToCreate: InsertUser[] = [];
+      const usersToUpdate: Array<{id: string, updates: Partial<InsertUser>}> = [];
       
-      for (const [coachId, coachData] of uniqueCoaches) {
+      for (const [coachId, coachData] of uniqueCoaches.entries()) {
         let existingUser = existingCoachIdMap.get(coachId);
         if (!existingUser) {
-          existingUser = existingMobileMap.get(coachData.mobileNumber);
+          existingUser = existingMobileMap.get(coachData.mobileNumber!);
         }
         
         if (!existingUser) {
