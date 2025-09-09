@@ -674,7 +674,7 @@ export class UploadService {
             travelPocMobile: data.TRAVEL_POC_MOBILE,
             venuePocName: data.VENUE_POC_NAME,
             venuePocMobile: data.VENUE_POC_MOBILE,
-            checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
+            checkinStatus: data.ROLE.toUpperCase() === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
           const createdParticipant = await storage.createParticipant(insertParticipant);
@@ -871,7 +871,7 @@ export class UploadService {
             travelPocMobile: data.TRAVEL_POC_MOBILE,
             venuePocName: data.VENUE_POC_NAME,
             venuePocMobile: data.VENUE_POC_MOBILE,
-            checkinStatus: data.ROLE === 'OFFICIAL' ? 'checked_in' : 'pending',
+            checkinStatus: data.ROLE.toUpperCase() === 'OFFICIAL' ? 'checked_in' : 'pending',
           };
 
           // Determine if user creation is needed for coaches
