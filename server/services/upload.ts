@@ -878,7 +878,7 @@ export class UploadService {
           let needsUserCreation = false;
           let userData: InsertUser | undefined;
 
-          if (data.ROLE === 'COACH') {
+          if (data.ROLE.toUpperCase() === 'COACH') {
             console.log(`🔍 Checking coach ${data.COACH_ID} (${data.NAME}) with mobile ${normalizedMobile}`);
             
             const existingUserByCoach = usersByCoachId.get(data.COACH_ID);
