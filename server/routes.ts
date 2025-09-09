@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { AuthService } from "./services/auth";
 import { UploadService } from "./services/upload";
 import { NotificationService } from "./services/notification";
+import { EventService } from "./services/event";
 import { 
   loginSchema, uploadFileSchema, checkinSchema, checkoutSchema,
   otpRequestSchema, otpVerifySchema, hotelVerificationSchema, updateHotelSchema, calculateHotelStatus,
