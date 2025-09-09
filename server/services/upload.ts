@@ -799,6 +799,10 @@ export class UploadService {
       const validParticipants: ValidatedParticipant[] = [];
       const participantIdSet = new Set<string>();
       
+      // Track coaches being processed in THIS upload to prevent duplicates
+      const coachesInCurrentUpload = new Map<string, string>(); // coachId -> mobile
+      const mobilesInCurrentUpload = new Set<string>();
+      
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const data: any = {};
@@ -877,8 +881,10 @@ export class UploadService {
           if (data.ROLE === 'COACH') {
             const existingUserByCoach = usersByCoachId.get(data.COACH_ID);
             const existingUserByMobile = usersByMobile.get(normalizedMobile);
+            const alreadyProcessingCoach = coachesInCurrentUpload.has(data.COACH_ID);
+            const alreadyProcessingMobile = mobilesInCurrentUpload.has(normalizedMobile);
             
-            if (!existingUserByCoach && !existingUserByMobile) {
+            if (!existingUserByCoach && !existingUserByMobile && !alreadyProcessingCoach && !alreadyProcessingMobile) {
               needsUserCreation = true;
               userData = {
                 mobileNumber: normalizedMobile,
@@ -887,6 +893,10 @@ export class UploadService {
                 coachId: data.COACH_ID,
                 isActive: true,
               };
+              
+              // Track this coach to prevent duplicates in same upload
+              coachesInCurrentUpload.set(data.COACH_ID, normalizedMobile);
+              mobilesInCurrentUpload.add(normalizedMobile);
             }
           }
 
