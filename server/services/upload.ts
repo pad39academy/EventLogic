@@ -567,6 +567,10 @@ export class UploadService {
         return result;
       }
 
+      // PHASE 1: Extract and validate all coach data first
+      const validParticipants: any[] = [];
+      const uniqueCoaches = new Map<string, InsertUser>();
+      
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const data: any = {};
@@ -583,14 +587,12 @@ export class UploadService {
           }
 
           // MANDATORY: Enforce 3-day minimum stay for coach/official bookings
-          // This business rule applies to actual participant bookings, not hotel inventory
           const startDate = this.parseDDMMYYYY(data.BOOKING_START_DATE);
           const endDate = this.parseDDMMYYYY(data.BOOKING_END_DATE);
           const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
           
-          // Fixed: For 3 calendar days minimum (e.g., Oct 2,3,4), duration should be >= 2 days
           if (daysDiff < 2) {
-            const calendarDays = daysDiff + 1; // Convert duration to calendar days for user-friendly message
+            const calendarDays = daysDiff + 1;
             result.errors.push(`Row ${i + 1}: Coach/Official booking must span at least 3 calendar days. Current: ${calendarDays} calendar days`);
             continue;
           }
@@ -602,7 +604,7 @@ export class UploadService {
             continue;
           }
 
-          // Normalize mobile number format (ensure +91 prefix for Indian numbers)
+          // Normalize mobile number format
           let normalizedMobile = data.MOBILE_NUMBER;
           if (normalizedMobile && !normalizedMobile.startsWith('+')) {
             if (normalizedMobile.startsWith('91')) {
@@ -612,30 +614,47 @@ export class UploadService {
             }
           }
 
-          // Create coach user account if role is COACH
-          if (data.ROLE === 'COACH') {
-            // Check if user exists by coachId or mobile number
-            let existingUser = await storage.getUserByCoachId(data.COACH_ID);
-            if (!existingUser) {
-              existingUser = await storage.getUserByMobile(normalizedMobile);
-            }
-            
-            if (!existingUser) {
-              await storage.createUser({
-                mobileNumber: normalizedMobile,
-                name: data.NAME,
-                role: "coach",
-                coachId: data.COACH_ID,
-                isActive: true,
-              });
-            } else if (existingUser.coachId !== data.COACH_ID) {
-              // Update existing user with coachId if missing
-              await storage.updateUser(existingUser.id, {
-                coachId: data.COACH_ID,
-                name: data.NAME, // Update name to match PSV data
-              });
-            }
+          // Collect unique coaches for batch processing
+          if (data.ROLE === 'COACH' && !uniqueCoaches.has(data.COACH_ID)) {
+            uniqueCoaches.set(data.COACH_ID, {
+              coachId: data.COACH_ID,
+              name: data.NAME,
+              mobileNumber: normalizedMobile,
+              role: "coach" as const,
+              isActive: true,
+            });
           }
+
+          // Store valid participant data for later processing
+          validParticipants.push({
+            rowIndex: i + 1,
+            data,
+            normalizedMobile,
+            startDate,
+            endDate
+          });
+        } catch (error) {
+          result.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Stop if validation errors found
+      if (result.errors.length > 0) {
+        result.success = false;
+        return result;
+      }
+
+      // PHASE 2: Batch create coach users
+      if (uniqueCoaches.size > 0) {
+        console.log(`🔑 Creating users for ${uniqueCoaches.size} unique coaches...`);
+        await this.batchCreateCoachUsers(uniqueCoaches, result);
+      }
+
+      // PHASE 3: Process participants (users are guaranteed to exist)
+      for (const participantData of validParticipants) {
+        const { rowIndex, data, normalizedMobile, startDate, endDate } = participantData;
+        
+        try {
 
           const insertParticipant: InsertParticipant = {
             participantId: data.COACH_ID,
