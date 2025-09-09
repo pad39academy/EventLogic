@@ -246,12 +246,6 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Add availableRooms calculation to match return type
-    hotelResults = hotelResults.map(hotel => ({
-      ...hotel,
-      availableRooms: Math.max(0, hotel.totalRooms - (hotel.occupiedRooms || 0))
-    }));
-
     // Apply status filtering in JavaScript since it's computed
     if (filters?.status) {
       hotelResults = hotelResults.filter(hotel => {

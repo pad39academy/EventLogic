@@ -12,10 +12,6 @@ import {
   Building, UserCheck, Users as UsersIcon, LogOut, Clock, Shield, Zap
 } from "lucide-react";
 import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
-import governmentTNLogo from "@/assets/logos/government-tn.png";
-import sdatLogo from "@/assets/logos/sdat-logo.png";
-import cmTrophyLogo from "@/assets/logos/cm-trophy-2025.png";
-import ievolveFullLogo from "@/assets/logos/ievolve-full-logo.png";
 import StatsCards from "@/components/stats-cards";
 import UploadModal from "@/components/upload-modal";
 import ParticipantTable from "@/components/participant-table";
@@ -151,38 +147,20 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Official Logos Header */}
-      <div className="bg-white border-b border-gray-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-center space-x-8">
-            <div className="flex items-center space-x-6">
-              <img 
-                src={governmentTNLogo} 
-                alt="Government of Tamil Nadu" 
-                className="h-16 w-16 object-contain"
-              />
-              <img 
-                src={sdatLogo} 
-                alt="SDAT" 
-                className="h-16 w-auto object-contain"
-              />
-              <img 
-                src={cmTrophyLogo} 
-                alt="Chief Minister's Trophy 2025" 
-                className="h-20 w-auto object-contain"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation Header */}
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-xl font-semibold text-gray-900">Event Management System</span>
+                <div className="h-8 w-8 rounded-lg overflow-hidden">
+                  <img 
+                    src={ievolveSymbol} 
+                    alt="Ievolve" 
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <span className="ml-3 text-xl font-semibold text-gray-900">Ievolve Events</span>
               </div>
               <div className="hidden md:block">
                 <div className="ml-10 flex items-baseline space-x-4">
@@ -825,19 +803,6 @@ export default function AdminDashboard() {
         mode={hotelAddMode}
         onModeChange={setHotelAddMode}
       />
-
-      {/* Footer with Ievolve Logo */}
-      <footer className="bg-white border-t border-gray-200 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-center">
-            <img 
-              src={ievolveFullLogo} 
-              alt="Powered by Ievolve Events" 
-              className="h-8 w-auto object-contain opacity-70"
-            />
-          </div>
-        </div>
-      </footer>
 
     </div>
   );

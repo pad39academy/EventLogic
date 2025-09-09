@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { customErrorHandler, handle404 } from "./middleware/error-handler";
 import { BackgroundJobsService } from "./services/background-jobs";
-import { WebSocketService } from "./services/websocket-service";
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const app = express();
@@ -119,16 +118,12 @@ app.use((req, res, next) => {
       ? await import("../viteDev")
       : await import("../viteProd");
     
-    // Initialize WebSocket service
-    WebSocketService.initialize(server);
-    
     // Clear startup messages
     console.log('\n' + '='.repeat(50));
     console.log('🚀 IEVOLVE EVENT MANAGEMENT SYSTEM');
     console.log('='.repeat(50));
     console.log(`✅ Database connected`);
     console.log(`✅ Routes registered`); 
-    console.log(`✅ WebSocket server enabled on /ws`);
     console.log(`✅ Server listening on ${host}:${port}`);
     console.log(`📱 Admin Panel: http://localhost:${port}/admin`);
     console.log(`👨‍💼 Coach Portal: http://localhost:${port}/coach`);

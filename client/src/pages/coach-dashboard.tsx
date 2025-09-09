@@ -13,10 +13,6 @@ import {
   Calendar, LogOut, Phone, LogIn, Users as UsersIcon, Bell
 } from "lucide-react";
 import ievolveSymbol from "@/assets/logos/ievolve-symbol.jpg";
-import governmentTNLogo from "@/assets/logos/government-tn.png";
-import sdatLogo from "@/assets/logos/sdat-logo.png";
-import cmTrophyLogo from "@/assets/logos/cm-trophy-2025.png";
-import ievolveFullLogo from "@/assets/logos/ievolve-full-logo.png";
 import { NotificationsList } from "@/components/notifications-list";
 import HotelVerificationModal from "@/components/hotel-verification-modal";
 import type { Participant } from "@/lib/types";
@@ -318,39 +314,21 @@ export default function CoachDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Official Logos Header */}
-      <div className="bg-white border-b border-gray-300">
-        <div className="max-w-md mx-auto px-4 py-3">
-          <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <img 
-                src={governmentTNLogo} 
-                alt="Government of Tamil Nadu" 
-                className="h-12 w-12 object-contain"
-              />
-              <img 
-                src={sdatLogo} 
-                alt="SDAT" 
-                className="h-12 w-auto object-contain"
-              />
-              <img 
-                src={cmTrophyLogo} 
-                alt="Chief Minister's Trophy 2025" 
-                className="h-16 w-auto object-contain"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Mobile Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-md mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-lg overflow-hidden">
+                <img 
+                  src={ievolveSymbol} 
+                  alt="Ievolve" 
+                  className="h-full w-full object-cover"
+                />
+              </div>
               <div>
-                <h1 className="text-lg font-semibold text-gray-900" data-testid="header-title">Coach Portal</h1>
-                <p className="text-sm text-gray-500" data-testid="header-subtitle">Event Management System</p>
+                <h1 className="text-lg font-semibold text-gray-900" data-testid="header-title">Ievolve Events</h1>
+                <p className="text-sm text-gray-500" data-testid="header-subtitle">Coach Portal</p>
               </div>
             </div>
             <Button 
@@ -1002,20 +980,6 @@ export default function CoachDashboard() {
         onOpenChange={setShowHotelVerificationModal}
         onVerificationSuccess={onHotelVerificationSuccess}
       />
-
-      {/* Footer with Ievolve Logo */}
-      <footer className="bg-white border-t border-gray-200 mt-8">
-        <div className="max-w-md mx-auto px-4 py-6">
-          <div className="flex items-center justify-center">
-            <img 
-              src={ievolveFullLogo} 
-              alt="Powered by Ievolve Events" 
-              className="h-6 w-auto object-contain opacity-70"
-            />
-          </div>
-        </div>
-      </footer>
-
     </div>
   );
 }

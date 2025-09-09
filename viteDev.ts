@@ -21,24 +21,15 @@ export async function setupVite(app: Express, server: Server) {
     },
     server: {
       middlewareMode: true,
-      hmr: false, // Completely disable hot module replacement in cloud environment
+      hmr: { server },
       allowedHosts: true,
-      watch: null, // Disable file watching to prevent connection issues
     },
     appType: "custom",
     customLogger: {
       ...viteLogger,
-      // Don't exit on errors, just log them
       error: (msg, options) => {
-        if (!msg.includes('WebSocket server error') && !msg.includes('server connection')) {
-          viteLogger.error(msg, options);
-        }
-      },
-      warn: (msg, options) => {
-        // Suppress WebSocket connection warnings that spam the console
-        if (!msg.includes('WebSocket server error') && !msg.includes('server connection')) {
-          viteLogger.warn(msg, options);
-        }
+        viteLogger.error(msg, options);
+        process.exit(1);
       },
     },
   });
