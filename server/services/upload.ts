@@ -879,17 +879,10 @@ export class UploadService {
           let userData: InsertUser | undefined;
 
           if (data.ROLE.toUpperCase() === 'COACH') {
-            console.log(`🔍 Checking coach ${data.COACH_ID} (${data.NAME}) with mobile ${normalizedMobile}`);
-            
             const existingUserByCoach = usersByCoachId.get(data.COACH_ID);
             const existingUserByMobile = usersByMobile.get(normalizedMobile);
             const alreadyProcessingCoach = coachesInCurrentUpload.has(data.COACH_ID);
             const alreadyProcessingMobile = mobilesInCurrentUpload.has(normalizedMobile);
-            
-            console.log(`  - Existing by coach ID: ${!!existingUserByCoach}`);
-            console.log(`  - Existing by mobile: ${!!existingUserByMobile}`);
-            console.log(`  - Already processing coach: ${alreadyProcessingCoach}`);
-            console.log(`  - Already processing mobile: ${alreadyProcessingMobile}`);
             
             if (!existingUserByCoach && !existingUserByMobile && !alreadyProcessingCoach && !alreadyProcessingMobile) {
               needsUserCreation = true;
@@ -901,13 +894,9 @@ export class UploadService {
                 isActive: true,
               };
               
-              console.log(`  ✅ WILL CREATE USER for coach ${data.COACH_ID}`);
-              
               // Track this coach to prevent duplicates in same upload
               coachesInCurrentUpload.set(data.COACH_ID, normalizedMobile);
               mobilesInCurrentUpload.add(normalizedMobile);
-            } else {
-              console.log(`  ❌ SKIPPING USER creation for coach ${data.COACH_ID}`);
             }
           }
 
@@ -956,16 +945,9 @@ export class UploadService {
           const batchResults = await db.transaction(async (tx) => {
             // First, create any needed user accounts
             const usersToCreate = batch.filter(item => item.needsUserCreation && item.userData);
-            console.log(`  🔍 BATCH DEBUG: ${batch.length} total items, ${usersToCreate.length} need user creation`);
-            
             if (usersToCreate.length > 0) {
               console.log(`  👤 Creating ${usersToCreate.length} user accounts...`);
-              const userValues = usersToCreate.map(item => item.userData!);
-              console.log(`  📋 User data to create:`, userValues.map(u => `${u.coachId}:${u.name}`));
-              await tx.insert(users).values(userValues);
-              console.log(`  ✅ Successfully created ${usersToCreate.length} user accounts in database`);
-            } else {
-              console.log(`  ⚠️ No users to create in this batch`);
+              await tx.insert(users).values(usersToCreate.map(item => item.userData!));
             }
             
             // Then, create participants
