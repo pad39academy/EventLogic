@@ -49,6 +49,10 @@ export interface IStorage {
   updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined>;
   deleteParticipant(id: string): Promise<boolean>;
   bulkCreateParticipants(participants: InsertParticipant[]): Promise<Participant[]>;
+  
+  // Optimized check-in/check-out methods
+  getCheckinParticipants(filters?: { search?: string; status?: string; page?: number; limit?: number }): Promise<{ participants: any[]; stats: any; pagination?: any }>;
+  getCheckoutParticipants(filters?: { search?: string; status?: string; page?: number; limit?: number }): Promise<{ participants: any[]; stats: any; pagination?: any }>;
 
   // Reassignment management
   createReassignment(reassignment: InsertReassignment): Promise<Reassignment>;
@@ -1414,6 +1418,270 @@ export class DatabaseStorage implements IStorage {
         lte(hotelOccupancyBalance.date, endDate)
       ))
       .orderBy(desc(hotelOccupancyBalance.date));
+  }
+
+  // Optimized check-in participants with pre-calculated stats
+  async getCheckinParticipants(filters: { search?: string; status?: string; page?: number; limit?: number } = {}): Promise<{ participants: any[]; stats: any; pagination?: any }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Build conditions for participants relevant to check-in
+    const conditions = [
+      or(
+        eq(participants.checkinStatus, "pending"),
+        eq(participants.checkinStatus, "checked_in")
+      )
+    ];
+
+    // Apply search filter
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(participants.name, `%${filters.search}%`),
+          ilike(participants.participantId, `%${filters.search}%`),
+          ilike(hotels.hotelName, `%${filters.search}%`),
+          ilike(participants.discipline, `%${filters.search}%`)
+        )
+      );
+    }
+
+    // Apply status filter
+    if (filters.status && filters.status !== 'all') {
+      switch (filters.status) {
+        case 'pending':
+          conditions.push(eq(participants.checkinStatus, "pending"));
+          break;
+        case 'due_today':
+          conditions.push(
+            and(
+              eq(participants.checkinStatus, "pending"),
+              sql`DATE(${participants.bookingStartDate}) = DATE(${today})`
+            )
+          );
+          break;
+        case 'late':
+          conditions.push(
+            and(
+              eq(participants.checkinStatus, "pending"),
+              sql`DATE(${participants.bookingStartDate}) < DATE(${today})`
+            )
+          );
+          break;
+        case 'checked_in':
+          conditions.push(eq(participants.checkinStatus, "checked_in"));
+          break;
+      }
+    }
+
+    // Base query with calculated fields
+    const baseQuery = db.selectDistinct({
+      id: participants.id,
+      participantId: participants.participantId,
+      name: participants.name,
+      role: participants.role,
+      discipline: participants.discipline,
+      district: participants.district,
+      teamName: participants.teamName,
+      hotelId: participants.hotelId,
+      hotelName: hotels.hotelName,
+      bookingStartDate: participants.bookingStartDate,
+      bookingEndDate: participants.bookingEndDate,
+      checkinStatus: participants.checkinStatus,
+      checkinTime: participants.checkinTime,
+      // Pre-calculate fields that would be computed client-side
+      daysUntilArrival: sql<number>`CAST(DATE_PART('day', ${participants.bookingStartDate} - ${today}) AS INTEGER)`.as('daysUntilArrival'),
+      isLate: sql<boolean>`(DATE(${participants.bookingStartDate}) < DATE(${today}) AND ${participants.checkinStatus} = 'pending')`.as('isLate')
+    })
+    .from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+    .where(and(...conditions))
+    .orderBy(desc(participants.createdAt));
+
+    // Get total count for pagination
+    let totalQuery = db.select({ count: sql<number>`count(*)`.as('count') })
+      .from(participants)
+      .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+      .where(and(...conditions));
+    
+    const [{ count: totalCount }] = await totalQuery;
+
+    // Apply pagination
+    let query = baseQuery;
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+    
+    if (limit) {
+      query = query.limit(limit);
+      if (page > 1) {
+        query = query.offset((page - 1) * limit);
+      }
+    }
+
+    const participantData = await query;
+
+    // Calculate stats in a single query
+    const statsQuery = await db.select({
+      totalPending: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending')`.as('totalPending'),
+      dueToday: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending' AND DATE(${participants.bookingStartDate}) = DATE(${today}))`.as('dueToday'),
+      late: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'pending' AND DATE(${participants.bookingStartDate}) < DATE(${today}))`.as('late'),
+      completed: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_in' AND DATE(${participants.checkinTime}) = DATE(${today}))`.as('completed')
+    })
+    .from(participants)
+    .where(
+      or(
+        eq(participants.checkinStatus, "pending"),
+        eq(participants.checkinStatus, "checked_in")
+      )
+    );
+
+    const stats = statsQuery[0];
+    
+    const pagination = {
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+      total: totalCount,
+      hasNext: page * limit < totalCount,
+      hasPrev: page > 1
+    };
+
+    return {
+      participants: participantData,
+      stats,
+      pagination: filters.limit ? pagination : undefined
+    };
+  }
+
+  // Optimized check-out participants with pre-calculated stats
+  async getCheckoutParticipants(filters: { search?: string; status?: string; page?: number; limit?: number } = {}): Promise<{ participants: any[]; stats: any; pagination?: any }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Build conditions for participants relevant to check-out
+    const conditions = [
+      or(
+        eq(participants.checkinStatus, "checked_in"),
+        eq(participants.checkinStatus, "checked_out")
+      )
+    ];
+
+    // Apply search filter
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(participants.name, `%${filters.search}%`),
+          ilike(participants.participantId, `%${filters.search}%`),
+          ilike(hotels.hotelName, `%${filters.search}%`),
+          ilike(participants.discipline, `%${filters.search}%`)
+        )
+      );
+    }
+
+    // Apply status filter
+    if (filters.status && filters.status !== 'all') {
+      switch (filters.status) {
+        case 'checked_in':
+          conditions.push(eq(participants.checkinStatus, "checked_in"));
+          break;
+        case 'due_today':
+          conditions.push(
+            and(
+              eq(participants.checkinStatus, "checked_in"),
+              sql`DATE(${participants.bookingEndDate}) = DATE(${today})`
+            )
+          );
+          break;
+        case 'overdue':
+          conditions.push(
+            and(
+              eq(participants.checkinStatus, "checked_in"),
+              sql`DATE(${participants.bookingEndDate}) < DATE(${today})`
+            )
+          );
+          break;
+        case 'checked_out':
+          conditions.push(eq(participants.checkinStatus, "checked_out"));
+          break;
+      }
+    }
+
+    // Base query with calculated fields
+    const baseQuery = db.selectDistinct({
+      id: participants.id,
+      participantId: participants.participantId,
+      name: participants.name,
+      role: participants.role,
+      discipline: participants.discipline,
+      district: participants.district,
+      teamName: participants.teamName,
+      hotelId: participants.hotelId,
+      hotelName: hotels.hotelName,
+      bookingStartDate: participants.bookingStartDate,
+      bookingEndDate: participants.bookingEndDate,
+      checkinStatus: participants.checkinStatus,
+      checkinTime: participants.checkinTime,
+      checkoutTime: participants.checkoutTime,
+      actualCheckoutDate: participants.actualCheckoutDate,
+      // Pre-calculate fields that would be computed client-side
+      daysRemaining: sql<number>`CAST(DATE_PART('day', ${participants.bookingEndDate} - ${today}) AS INTEGER)`.as('daysRemaining'),
+      isOverdue: sql<boolean>`(DATE(${participants.bookingEndDate}) < DATE(${today}) AND ${participants.checkinStatus} != 'checked_out')`.as('isOverdue')
+    })
+    .from(participants)
+    .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+    .where(and(...conditions))
+    .orderBy(desc(participants.createdAt));
+
+    // Get total count for pagination
+    let totalQuery = db.select({ count: sql<number>`count(*)`.as('count') })
+      .from(participants)
+      .leftJoin(hotels, eq(participants.hotelId, hotels.hotelId))
+      .where(and(...conditions));
+    
+    const [{ count: totalCount }] = await totalQuery;
+
+    // Apply pagination
+    let query = baseQuery;
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+    
+    if (limit) {
+      query = query.limit(limit);
+      if (page > 1) {
+        query = query.offset((page - 1) * limit);
+      }
+    }
+
+    const participantData = await query;
+
+    // Calculate stats in a single query
+    const statsQuery = await db.select({
+      totalCheckedIn: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_in')`.as('totalCheckedIn'),
+      dueToday: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_in' AND DATE(${participants.bookingEndDate}) = DATE(${today}))`.as('dueToday'),
+      overdue: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_in' AND DATE(${participants.bookingEndDate}) < DATE(${today}))`.as('overdue'),
+      completed: sql<number>`COUNT(*) FILTER (WHERE ${participants.checkinStatus} = 'checked_out' AND DATE(${participants.checkoutTime}) = DATE(${today}))`.as('completed')
+    })
+    .from(participants)
+    .where(
+      or(
+        eq(participants.checkinStatus, "checked_in"),
+        eq(participants.checkinStatus, "checked_out")
+      )
+    );
+
+    const stats = statsQuery[0];
+    
+    const pagination = {
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+      total: totalCount,
+      hasNext: page * limit < totalCount,
+      hasPrev: page > 1
+    };
+
+    return {
+      participants: participantData,
+      stats,
+      pagination: filters.limit ? pagination : undefined
+    };
   }
 }
 
