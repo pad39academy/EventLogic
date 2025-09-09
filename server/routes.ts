@@ -15,8 +15,8 @@ import {
   type User, type Participant, type Hotel, type UpdateHotel 
 } from "@shared/schema";
 import { db } from "./db";
-import { users, participants, settings, hotelDailyBalance, hotels, eventStore } from "@shared/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { users, participants, settings, hotelDailyBalance, hotels, eventStore, eventHandlers } from "@shared/schema";
+import { eq, sql, desc, and } from "drizzle-orm";
 import multer from "multer";
 import { z } from "zod";
 
@@ -571,6 +571,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (fallbackError) {
         res.status(500).json({ message: error instanceof Error ? error.message : "Failed to get stats" });
       }
+    }
+  });
+
+  // Get calculation status with estimated completion time
+  app.get("/api/admin/dashboard/calculation-status", requireAdmin, async (req, res) => {
+    try {
+      // Count pending participant_registered events (these trigger occupancy calculations)
+      const pendingEvents = await db.select()
+        .from(eventStore)
+        .where(and(
+          eq(eventStore.eventType, 'participant_registered'),
+          eq(eventStore.status, 'pending')
+        ));
+
+      // Count currently processing events (handlers that are running)
+      const processingEvents = await db.select()
+        .from(eventHandlers)
+        .where(and(
+          eq(eventHandlers.handlerName, 'occupancy_calculator'),
+          eq(eventHandlers.status, 'pending')
+        ));
+
+      const totalPending = pendingEvents.length;
+      const totalProcessing = processingEvents.length;
+      const totalRemaining = totalPending + totalProcessing;
+
+      // Estimate completion time (2.5 seconds average per calculation)
+      const avgTimePerCalculation = 2.5; // seconds
+      const estimatedSeconds = totalRemaining * avgTimePerCalculation;
+      const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
+
+      // Determine status
+      let status = 'idle';
+      let message = 'All hotel occupancy calculations are up to date';
+      
+      if (totalRemaining > 0) {
+        status = 'calculating';
+        if (estimatedMinutes <= 1) {
+          message = `Hotel occupancy calculations in progress. Data will be updated in less than 1 minute.`;
+        } else {
+          message = `Hotel occupancy calculations in progress. Data will be updated in approximately ${estimatedMinutes} minutes.`;
+        }
+      }
+
+      res.json({
+        status,
+        message,
+        details: {
+          pendingCalculations: totalPending,
+          processingCalculations: totalProcessing,
+          totalRemaining,
+          estimatedCompletionSeconds: Math.round(estimatedSeconds),
+          estimatedCompletionMinutes: estimatedMinutes
+        }
+      });
+
+    } catch (error) {
+      console.error('Calculation status error:', error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to get calculation status",
+        status: 'error'
+      });
     }
   });
 
