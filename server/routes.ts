@@ -1841,20 +1841,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await EventService.publishEvent("participant_checked_out", {
-        aggregateType: "participant",
-        aggregateId: "admin_checkout",
-        eventData: { 
+      await EventService.publishEvent(
+        "participant_checked_out", 
+        "admin_checkout",
+        "participant",
+        { 
           participantIds, 
           checkedOutCount: checkedOutParticipants.length, 
           newCheckoutDate,
           processedBy: req.session.user!.name
         },
-        metadata: {
+        {
           userId: req.session.user!.id,
           correlationId: `admin_checkout_${Date.now()}`
         }
-      });
+      );
 
       res.json({ 
         message: "Check-out successful", 
