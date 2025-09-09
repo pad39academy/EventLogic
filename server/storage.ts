@@ -1488,6 +1488,7 @@ export class DatabaseStorage implements IStorage {
       bookingEndDate: participants.bookingEndDate,
       checkinStatus: participants.checkinStatus,
       checkinTime: participants.checkinTime,
+      createdAt: participants.createdAt, // Add createdAt to fix ORDER BY issue
       // Pre-calculate fields that would be computed client-side
       daysUntilArrival: sql<number>`CAST(DATE_PART('day', ${participants.bookingStartDate} - ${today}) AS INTEGER)`.as('daysUntilArrival'),
       isLate: sql<boolean>`(DATE(${participants.bookingStartDate}) < DATE(${today}) AND ${participants.checkinStatus} = 'pending')`.as('isLate')
@@ -1621,6 +1622,7 @@ export class DatabaseStorage implements IStorage {
       checkinTime: participants.checkinTime,
       checkoutTime: participants.checkoutTime,
       actualCheckoutDate: participants.actualCheckoutDate,
+      createdAt: participants.createdAt, // Add createdAt to fix ORDER BY issue
       // Pre-calculate fields that would be computed client-side
       daysRemaining: sql<number>`CAST(DATE_PART('day', ${participants.bookingEndDate} - ${today}) AS INTEGER)`.as('daysRemaining'),
       isOverdue: sql<boolean>`(DATE(${participants.bookingEndDate}) < DATE(${today}) AND ${participants.checkinStatus} != 'checked_out')`.as('isOverdue')
