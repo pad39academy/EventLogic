@@ -399,9 +399,9 @@ export default function UploadModal({
               className="flex-1"
               onClick={handleClose}
               disabled={uploadMutation.isPending}
-              data-testid="button-cancel-upload"
+              data-testid="button-exit-upload"
             >
-              Cancel
+              Exit
             </Button>
             <Button
               className="flex-1"
