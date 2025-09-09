@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Building2, MapPin, Users, Bed, Edit3, Calendar, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { formatToIndianDate, formatForDateInput, formatDateRange } from "@/../../shared/dateUtils";
+import { CalculationStatusBanner } from "./calculation-status-banner";
 
 interface Hotel {
   id: string;
@@ -283,6 +284,7 @@ export default function HotelTable() {
 
   return (
     <Card>
+      <CalculationStatusBanner />
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
