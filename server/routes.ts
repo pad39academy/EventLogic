@@ -1865,76 +1865,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Checkin dashboard endpoint
+  // Optimized checkin dashboard endpoint
   app.get("/api/admin/dashboard/checkin", requireAdmin, async (req, res) => {
     try {
-      const participants = await storage.getParticipants();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const { search, status, page, limit } = req.query;
       
-      const checkinData = participants.map((participant: any) => {
-        const bookingStartDate = new Date(participant.bookingStartDate);
-        const timeDiff = bookingStartDate.getTime() - today.getTime();
-        const daysUntilArrival = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        
-        return {
-          ...participant,
-          daysUntilArrival,
-          isLate: daysUntilArrival < 0 && participant.checkinStatus === "pending"
-        };
-      }).filter((p: any) => p.checkinStatus === "pending" || p.checkinStatus === "checked_in");
-
-      // Calculate stats
-      const stats = {
-        totalPending: checkinData.filter((p: any) => p.checkinStatus === "pending").length,
-        dueToday: checkinData.filter((p: any) => p.daysUntilArrival === 0 && p.checkinStatus === "pending").length,
-        late: checkinData.filter((p: any) => p.isLate).length,
-        completed: checkinData.filter((p: any) => {
-          const checkinDate = p.checkinTime ? new Date(p.checkinTime) : null;
-          return p.checkinStatus === "checked_in" && checkinDate && 
-                 checkinDate.toDateString() === today.toDateString();
-        }).length
+      const filters = {
+        search: search as string,
+        status: status as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 50 // Default page size
       };
 
-      res.json({ participants: checkinData, stats });
+      const result = await storage.getCheckinParticipants(filters);
+      res.json(result);
     } catch (error) {
+      console.error('Checkin data error:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch checkin data" });
     }
   });
 
-  // Checkout dashboard endpoint
+  // Optimized checkout dashboard endpoint
   app.get("/api/admin/dashboard/checkout", requireAdmin, async (req, res) => {
     try {
-      const participants = await storage.getParticipants();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const { search, status, page, limit } = req.query;
       
-      const checkoutData = participants.map((participant: any) => {
-        const bookingEndDate = new Date(participant.bookingEndDate);
-        const timeDiff = bookingEndDate.getTime() - today.getTime();
-        const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        
-        return {
-          ...participant,
-          daysRemaining,
-          isOverdue: daysRemaining < 0 && participant.checkinStatus !== "checked_out"
-        };
-      }).filter((p: any) => p.checkinStatus === "checked_in" || p.checkinStatus === "checked_out");
-
-      // Calculate stats
-      const stats = {
-        totalCheckedIn: checkoutData.filter((p: any) => p.checkinStatus === "checked_in").length,
-        dueToday: checkoutData.filter((p: any) => p.daysRemaining === 0 && p.checkinStatus === "checked_in").length,
-        overdue: checkoutData.filter((p: any) => p.isOverdue).length,
-        completed: checkoutData.filter((p: any) => {
-          const checkoutDate = p.checkoutTime ? new Date(p.checkoutTime) : null;
-          return p.checkinStatus === "checked_out" && checkoutDate && 
-                 checkoutDate.toDateString() === today.toDateString();
-        }).length
+      const filters = {
+        search: search as string,
+        status: status as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 50 // Default page size
       };
 
-      res.json({ participants: checkoutData, stats });
+      const result = await storage.getCheckoutParticipants(filters);
+      res.json(result);
     } catch (error) {
+      console.error('Checkout data error:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to fetch checkout data" });
     }
   });
