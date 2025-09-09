@@ -869,6 +869,15 @@ export class UploadService {
           result.created += batchResults.length;
           console.log(`✅ Batch ${batchNumber} completed successfully: ${batchResults.length} participants created`);
           
+          // 🔧 FIX: Update user cache after successful batch to prevent duplicate user creation
+          const createdUsers = batch.filter(item => item.needsUserCreation && item.userData);
+          createdUsers.forEach(item => {
+            const userData = item.userData!;
+            usersByCoachId.set(userData.coachId!, userData);
+            usersByMobile.set(userData.mobileNumber!, userData);
+          });
+          console.log(`  🔄 Updated user cache with ${createdUsers.length} new coach accounts`);
+          
         } catch (error) {
           result.errors.push(`Batch ${batchNumber} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
           console.log(`❌ Batch ${batchNumber} failed and was rolled back`);
