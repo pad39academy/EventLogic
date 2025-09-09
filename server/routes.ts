@@ -1784,19 +1784,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await EventService.publishEvent("participant_checked_in", {
-        aggregateType: "participant",
-        aggregateId: "admin_checkin",
-        eventData: { 
+      await EventService.publishEvent(
+        "participant_checked_in", 
+        "admin_checkin",
+        "participant",
+        { 
           participantIds, 
           checkedInCount: checkedInParticipants.length,
           processedBy: req.session.user!.name
         },
-        metadata: {
+        {
           userId: req.session.user!.id,
           correlationId: `admin_checkin_${Date.now()}`
         }
-      });
+      );
 
       res.json({ 
         message: "Check-in successful", 
