@@ -476,6 +476,70 @@ export class UploadService {
     return result;
   }
 
+  // Helper method for batch coach user creation
+  static async batchCreateCoachUsers(uniqueCoaches: Map<string, any>, result: UploadResult): Promise<void> {
+    try {
+      // Extract coach IDs and mobile numbers for batch checking
+      const coachIds = Array.from(uniqueCoaches.keys());
+      const mobileNumbers = Array.from(uniqueCoaches.values()).map(coach => coach.mobileNumber);
+      
+      // Batch check existing users by coachId
+      const existingUsersByCoachId = await storage.getUsersByCoachIds(coachIds);
+      const existingUsersByMobile = await storage.getUsersByMobiles(mobileNumbers);
+      
+      // Create maps for quick lookup
+      const existingCoachIdMap = new Map(existingUsersByCoachId.map(user => [user.coachId, user]));
+      const existingMobileMap = new Map(existingUsersByMobile.map(user => [user.mobileNumber, user]));
+      
+      // Determine which users need to be created vs updated
+      const usersToCreate: any[] = [];
+      const usersToUpdate: Array<{id: string, updates: any}> = [];
+      
+      for (const [coachId, coachData] of uniqueCoaches) {
+        let existingUser = existingCoachIdMap.get(coachId);
+        if (!existingUser) {
+          existingUser = existingMobileMap.get(coachData.mobileNumber);
+        }
+        
+        if (!existingUser) {
+          // User doesn't exist, create new one
+          usersToCreate.push(coachData);
+        } else if (existingUser.coachId !== coachId) {
+          // User exists but missing coachId, update it
+          usersToUpdate.push({
+            id: existingUser.id,
+            updates: {
+              coachId: coachId,
+              name: coachData.name,
+            }
+          });
+        }
+      }
+      
+      // Batch create new users
+      if (usersToCreate.length > 0) {
+        console.log(`🚀 Creating ${usersToCreate.length} new coach users...`);
+        await storage.batchCreateUsers(usersToCreate);
+        console.log(`✅ Successfully created ${usersToCreate.length} coach users`);
+      }
+      
+      // Batch update existing users
+      for (const userUpdate of usersToUpdate) {
+        await storage.updateUser(userUpdate.id, userUpdate.updates);
+      }
+      
+      if (usersToUpdate.length > 0) {
+        console.log(`🔄 Updated ${usersToUpdate.length} existing coach users`);
+      }
+      
+    } catch (error) {
+      const errorMessage = `Batch user creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      result.errors.push(errorMessage);
+      console.error('❌', errorMessage);
+      throw error;
+    }
+  }
+
   // Upload Coach and Official Data Sheet
   static async uploadCoachesOfficials(content: string): Promise<UploadResult> {
     const result: UploadResult = {
