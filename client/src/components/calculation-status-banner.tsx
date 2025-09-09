@@ -7,6 +7,7 @@ interface CalculationStatus {
   details: {
     pendingCalculations: number;
     processingCalculations: number;
+    recentActivity: number;
     totalRemaining: number;
     estimatedCompletionSeconds: number;
     estimatedCompletionMinutes: number;
@@ -16,8 +17,8 @@ interface CalculationStatus {
 export function CalculationStatusBanner() {
   const { data: status, isLoading } = useQuery<CalculationStatus>({
     queryKey: ["/api/admin/dashboard/calculation-status"],
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 25000, // Consider data stale after 25 seconds
+    refetchInterval: 10000, // Refresh every 10 seconds for better detection
+    staleTime: 8000, // Consider data stale after 8 seconds
   });
 
   // Don't show anything if loading or if calculations are idle
@@ -61,9 +62,12 @@ export function CalculationStatusBanner() {
           <p className="text-sm text-amber-700 dark:text-amber-300">
             {status.message}
           </p>
-          {status.details.totalRemaining > 0 && (
+          {(status.details.totalRemaining > 0 || status.details.recentActivity > 0) && (
             <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              Processing {status.details.totalRemaining} participant{status.details.totalRemaining !== 1 ? 's' : ''} 
+              {status.details.totalRemaining > 0 
+                ? `Processing ${status.details.totalRemaining} participant${status.details.totalRemaining !== 1 ? 's' : ''}`
+                : `Recent activity: ${status.details.recentActivity} calculations`
+              }
               {status.details.pendingCalculations > 0 && ` (${status.details.pendingCalculations} pending)`}
               {status.details.processingCalculations > 0 && ` (${status.details.processingCalculations} in progress)`}
             </div>
@@ -71,13 +75,15 @@ export function CalculationStatusBanner() {
         </div>
         <div className="flex-shrink-0 text-right">
           <div className="text-xs text-amber-600 dark:text-amber-400">
-            ETA: {status.details.estimatedCompletionMinutes > 1 
-              ? `~${status.details.estimatedCompletionMinutes} min` 
-              : '<1 min'
+            {status.details.totalRemaining > 0 
+              ? `ETA: ${status.details.estimatedCompletionMinutes > 1 
+                  ? `~${status.details.estimatedCompletionMinutes} min` 
+                  : '<1 min'}`
+              : 'Finishing soon'
             }
           </div>
           <div className="text-xs text-amber-500 dark:text-amber-500 mt-1">
-            Auto-refreshing...
+            Auto-refreshing (10s)
           </div>
         </div>
       </div>

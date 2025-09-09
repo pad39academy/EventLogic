@@ -593,8 +593,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(eventHandlers.status, 'pending')
         ));
 
+      // Also check for recent events (last 5 minutes) to detect ongoing activity
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recentEvents = await db.select()
+        .from(eventStore)
+        .where(and(
+          eq(eventStore.eventType, 'participant_registered'),
+          sql`${eventStore.createdAt} > ${fiveMinutesAgo.toISOString()}`
+        ));
+
       const totalPending = pendingEvents.length;
       const totalProcessing = processingEvents.length;
+      const recentActivity = recentEvents.length;
       const totalRemaining = totalPending + totalProcessing;
 
       // Estimate completion time (2.5 seconds average per calculation)
@@ -602,16 +612,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const estimatedSeconds = totalRemaining * avgTimePerCalculation;
       const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
 
-      // Determine status
+      // Determine status - include recent activity detection
       let status = 'idle';
       let message = 'All hotel occupancy calculations are up to date';
       
-      if (totalRemaining > 0) {
+      if (totalRemaining > 0 || recentActivity > 10) {
         status = 'calculating';
-        if (estimatedMinutes <= 1) {
-          message = `Hotel occupancy calculations in progress. Data will be updated in less than 1 minute.`;
-        } else {
-          message = `Hotel occupancy calculations in progress. Data will be updated in approximately ${estimatedMinutes} minutes.`;
+        
+        if (totalRemaining > 0) {
+          // Active pending/processing events
+          if (estimatedMinutes <= 1) {
+            message = `Hotel occupancy calculations in progress. Data will be updated in less than 1 minute.`;
+          } else {
+            message = `Hotel occupancy calculations in progress. Data will be updated in approximately ${estimatedMinutes} minutes.`;
+          }
+        } else if (recentActivity > 10) {
+          // Recent activity detected but no pending events - calculations likely finishing soon
+          message = `Hotel occupancy calculations finishing up. ${recentActivity} recent calculations detected.`;
         }
       }
 
@@ -621,6 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: {
           pendingCalculations: totalPending,
           processingCalculations: totalProcessing,
+          recentActivity,
           totalRemaining,
           estimatedCompletionSeconds: Math.round(estimatedSeconds),
           estimatedCompletionMinutes: estimatedMinutes
