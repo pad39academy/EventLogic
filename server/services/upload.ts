@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import { type InsertHotel, type InsertParticipant, type InsertUser } from "@shared/schema";
+import { type InsertHotel, type InsertParticipant, type InsertUser, type User } from "@shared/schema";
 import { AuthService } from "./auth";
 import { EventService } from "./event";
 import { BalanceWindowManager } from "./balance-window-manager";
@@ -495,7 +495,7 @@ export class UploadService {
       const usersToCreate: InsertUser[] = [];
       const usersToUpdate: Array<{id: string, updates: Partial<InsertUser>}> = [];
       
-      for (const [coachId, coachData] of uniqueCoaches.entries()) {
+      for (const [coachId, coachData] of Array.from(uniqueCoaches.entries())) {
         let existingUser = existingCoachIdMap.get(coachId);
         if (!existingUser) {
           existingUser = existingMobileMap.get(coachData.mobileNumber!);
